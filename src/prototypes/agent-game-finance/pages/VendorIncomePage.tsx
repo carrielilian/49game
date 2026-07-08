@@ -4,11 +4,13 @@ import { ReadonlyField } from '../components/FormFields';
 import { Drawer, Toast } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { useAppStore } from '../data/store';
+import { ListSearchFields } from '../components/ListSearchFields';
+import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { formatMoney } from '../utils/settlement';
 
 export function VendorIncomePage() {
   const { balances, vendors, applyPayment, getVendorName } = useAppStore();
-  const [keyword, setKeyword] = useState('');
+  const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState('');
   const [toast, setToast] = useState('');
@@ -16,7 +18,7 @@ export function VendorIncomePage() {
   const rows = balances.map((b) => {
     const v = vendors.find((x) => x.id === b.vendorId);
     return { ...b, vendorName: v?.name ?? b.vendorId };
-  }).filter((r) => !keyword || r.vendorName.includes(keyword) || r.vendorId.includes(keyword));
+  }).filter((r) => matchesListSearch(search, { vendorId: r.vendorId, vendorName: r.vendorName }));
 
   const handleApply = (vendorId: string) => {
     setSelectedVendor(vendorId);
@@ -34,7 +36,7 @@ export function VendorIncomePage() {
   return (
     <div className="agf-card">
       <FilterBar>
-        <input className="agf-input" placeholder="厂商ID / 厂商名称" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+        <ListSearchFields mode="vendor" value={search} onChange={setSearch} />
       </FilterBar>
       <DataTable
         rowKey={(r) => r.vendorId}
@@ -57,7 +59,9 @@ export function VendorIncomePage() {
         <ReadonlyField label="厂商ID" value={selectedVendor} />
         <ReadonlyField label="厂商名称" value={getVendorName(selectedVendor)} />
         <ReadonlyField label="账户余额（待付金额）" value={formatMoney(selectedBalance?.balance ?? 0)} />
-        <p style={{ marginTop: 12, color: '#666', fontSize: 13 }}>确认后将账户余额清零，并进入付款管理列表。</p>
+        <div className="agf-form-item agf-form-item--hint-only">
+          <p className="agf-form-hint">确认后将账户余额清零，并进入付款管理列表。</p>
+        </div>
       </Drawer>
       {toast && <Toast message={toast} onDone={() => setToast('')} />}
     </div>

@@ -2,9 +2,9 @@ import React from 'react';
 
 export function ReadonlyField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="agf-form-item">
-      <label className="agf-form-label">{label}</label>
-      <input className="agf-form-input" readOnly value={value} />
+    <div className="agf-form-item agf-form-item--readonly">
+      <label className="agf-form-label agf-form-label--readonly">{label}</label>
+      <div className="agf-form-readonly-value">{value}</div>
     </div>
   );
 }

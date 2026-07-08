@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../components/DataTable';
+import { FilterBar } from '../components/FilterBar';
 import { useAppStore } from '../data/store';
+import { ListSearchFields } from '../components/ListSearchFields';
+import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchMode, type ListSearchQuery } from '../utils/listKeyword';
 import { formatMoney } from '../utils/settlement';
 
 type StatTab = 'vendor' | 'channel' | 'game';
@@ -17,6 +20,11 @@ export function StatisticsPage({ defaultTab = 'vendor' }: Props) {
     setTab(defaultTab);
   }, [defaultTab]);
   const [yearMonth, setYearMonth] = useState('');
+  const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
+
+  useEffect(() => {
+    setSearch({});
+  }, [tab]);
 
   const internalSettled = useMemo(() =>
     settlements.filter((s) => {
@@ -48,7 +56,13 @@ export function StatisticsPage({ defaultTab = 'vendor' }: Props) {
     }));
   }, [internalSettled, getGame]);
 
-  const dataMap = { vendor: vendorStats, channel: channelStats, game: gameStats };
+  const filteredDataMap = useMemo(() => ({
+    vendor: vendorStats.filter((r) => matchesListSearch(search, { vendorId: r.id, vendorName: r.name })),
+    channel: channelStats,
+    game: gameStats.filter((r) => matchesListSearch(search, { gameId: r.id, gameName: r.name })),
+  }), [vendorStats, channelStats, gameStats, search]);
+
+  const searchMode: ListSearchMode | undefined = tab === 'vendor' ? 'vendor' : tab === 'game' ? 'game' : undefined;
 
   const timeFilter = {
     type: 'select' as const,
@@ -91,7 +105,12 @@ export function StatisticsPage({ defaultTab = 'vendor' }: Props) {
         <button type="button" className={`agf-tab${tab === 'channel' ? ' agf-tab--active' : ''}`} onClick={() => setTab('channel')}>渠道收入统计</button>
         <button type="button" className={`agf-tab${tab === 'game' ? ' agf-tab--active' : ''}`} onClick={() => setTab('game')}>游戏收入统计</button>
       </div>
-      <DataTable rowKey={(r) => r.id} data={dataMap[tab]} columns={columns} />
+      {searchMode && (
+        <FilterBar>
+          <ListSearchFields mode={searchMode} value={search} onChange={setSearch} />
+        </FilterBar>
+      )}
+      <DataTable rowKey={(r) => r.id} data={filteredDataMap[tab]} columns={columns} />
     </div>
   );
 }

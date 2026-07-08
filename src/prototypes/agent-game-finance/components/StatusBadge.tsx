@@ -14,8 +14,7 @@ const VARIANT_MAP: Record<string, BadgeVariant> = {
   '合作中': 'success',
   '待付款': 'warning',
   '未提交': 'warning',
-  '已终止': 'danger',
-  '停运': 'danger',
+  '合作终止': 'danger',
   '未上线': 'muted',
 };
 

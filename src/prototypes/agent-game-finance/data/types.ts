@@ -1,7 +1,7 @@
 export type PaymentApplyStatus = '未提交' | '已提交';
 export type PaymentStatus = '待付款' | '已付款';
-export type OperationStatus = '未上线' | '已上线' | '停运';
-export type CooperationStatus = '合作中' | '已终止';
+export type OperationStatus = '未上线' | '已上线';
+export type CooperationStatus = '合作中' | '合作终止';
 export type LicenseStatus = '有' | '无';
 export type SettlementType = 'external' | 'internal' | 'refund';
 export type ChannelType = 'internal' | 'external';

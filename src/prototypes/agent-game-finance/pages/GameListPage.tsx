@@ -6,6 +6,13 @@ import { FilterBar } from '../components/FilterBar';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
 import type { Contract, Game } from '../data/types';
+import {
+  COOPERATION_STATUS_FILTER_OPTIONS,
+  LICENSE_FILTER_OPTIONS,
+  OPERATION_STATUS_FILTER_OPTIONS,
+} from '../utils/columnFilters';
+import { ListSearchFields } from '../components/ListSearchFields';
+import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 
 const EMPTY_GAME: Omit<Game, 'id'> = {
   name: '', onlineName: '', vendorId: '', manager: '', license: '有', remark: '',
@@ -39,46 +46,46 @@ function AddGameForm({ form, setForm, vendors }: {
   );
 }
 
-function EditGameForm({ form, setForm, editing, getVendorName }: {
+function EditGameForm({ form, setForm, editing, vendors }: {
   form: Omit<Game, 'id'>;
   setForm: React.Dispatch<React.SetStateAction<Omit<Game, 'id'>>>;
   editing: Game;
-  getVendorName: (id: string) => string;
+  vendors: { id: string; name: string }[];
 }) {
   return (
     <>
       <ReadonlyField label="游戏ID" value={editing.id} />
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称（合同名称）</label><input className="agf-form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-      <ReadonlyField label="厂商ID" value={form.vendorId} />
-      <ReadonlyField label="厂商名称" value={getVendorName(form.vendorId)} />
-      <div className="agf-form-item"><label className="agf-form-label">上线时间</label><input type="date" className="agf-form-input" value={form.launchDate} onChange={(e) => setForm({ ...form, launchDate: e.target.value })} /></div>
-      <div className="agf-form-item"><label className="agf-form-label">游戏负责人</label><input className="agf-form-input" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} /></div>
-      <div className="agf-form-item"><label className="agf-form-label">版号（有/无）</label>
-        <select className="agf-form-input" value={form.license} onChange={(e) => setForm({ ...form, license: e.target.value as Game['license'] })}>
-          <option value="有">有</option><option value="无">无</option>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">上线游戏名称</label><input className="agf-form-input" value={form.onlineName} onChange={(e) => setForm({ ...form, onlineName: e.target.value })} /></div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label><input className="agf-form-input" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} /></div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">归属厂商</label>
+        <select className="agf-form-input" value={form.vendorId} onChange={(e) => setForm({ ...form, vendorId: e.target.value })}>
+          <option value="">请选择</option>
+          {vendors.map((v) => <option key={v.id} value={v.id}>{v.id} - {v.name}</option>)}
         </select>
       </div>
-      <div className="agf-form-row">
-        <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
-          <select className="agf-form-input" value={form.operationStatus} onChange={(e) => setForm({ ...form, operationStatus: e.target.value as Game['operationStatus'] })}>
-            <option value="未上线">未上线</option><option value="已上线">已上线</option><option value="停运">停运</option>
-          </select>
-        </div>
-        <div className="agf-form-item"><label className="agf-form-label">合作状态</label>
-          <select className="agf-form-input" value={form.cooperationStatus} onChange={(e) => setForm({ ...form, cooperationStatus: e.target.value as Game['cooperationStatus'] })}>
-            <option value="合作中">合作中</option><option value="已终止">已终止</option>
-          </select>
+      <div className="agf-form-item"><label className="agf-form-label">版号</label>
+        <div className="agf-radio-group">
+          <label className="agf-radio-item"><input type="radio" name="edit-license" checked={form.license === '有'} onChange={() => setForm({ ...form, license: '有' })} />有</label>
+          <label className="agf-radio-item"><input type="radio" name="edit-license" checked={form.license === '无'} onChange={() => setForm({ ...form, license: '无' })} />无</label>
         </div>
       </div>
       <div className="agf-form-item"><label className="agf-form-label">备注（版号费、版号支付方）</label><textarea className="agf-form-textarea" value={form.remark ?? ''} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></div>
+      <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
+        <select className="agf-form-input" value={form.operationStatus} onChange={(e) => setForm({ ...form, operationStatus: e.target.value as Game['operationStatus'] })}>
+          <option value="未上线">未上线</option><option value="已上线">已上线</option>
+        </select>
+      </div>
     </>
   );
 }
 
 export function GameListPage() {
   const { games, vendors, contracts, gameLogs, addGame, updateGame, updateContract, getVendorName, getGame } = useAppStore();
-  const [keyword, setKeyword] = useState('');
+  const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [opStatus, setOpStatus] = useState('');
+  const [licenseFilter, setLicenseFilter] = useState('');
+  const [coopFilter, setCoopFilter] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [contractDrawer, setContractDrawer] = useState(false);
@@ -89,8 +96,15 @@ export function GameListPage() {
   const [selectedGameId, setSelectedGameId] = useState('');
 
   const filtered = games.filter((g) => {
-    if (keyword && !g.name.includes(keyword) && !g.id.includes(keyword)) return false;
+    if (!matchesListSearch(search, {
+      gameId: g.id,
+      gameName: g.name,
+      vendorId: g.vendorId,
+      vendorName: getVendorName(g.vendorId),
+    })) return false;
+    if (licenseFilter && g.license !== licenseFilter) return false;
     if (opStatus && g.operationStatus !== opStatus) return false;
+    if (coopFilter && g.cooperationStatus !== coopFilter) return false;
     return true;
   });
 
@@ -115,16 +129,27 @@ export function GameListPage() {
       <FilterBar
         actions={<button type="button" className="agf-btn agf-btn--primary" onClick={openAdd}>添加游戏</button>}
       >
-        <input className="agf-input" placeholder="游戏ID / 游戏名称" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
         data={filtered}
         columns={[
           { key: 'game', title: '游戏ID/游戏名称', render: (r) => <DualCell main={r.name} sub={r.id} /> },
-          { key: 'vendor', title: '厂商ID/厂商名称', render: (r) => <DualCell main={getVendorName(r.vendorId)} sub={r.vendorId} /> },
+          { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
+          { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
           { key: 'manager', title: '游戏负责人', render: (r) => r.manager },
-          { key: 'license', title: '版号（有/无）', render: (r) => r.license },
+          {
+            key: 'license',
+            title: '版号',
+            filter: {
+              type: 'select',
+              value: licenseFilter,
+              onChange: setLicenseFilter,
+              options: LICENSE_FILTER_OPTIONS,
+            },
+            render: (r) => r.license,
+          },
           {
             key: 'op',
             title: '运营状态',
@@ -132,15 +157,21 @@ export function GameListPage() {
               type: 'select',
               value: opStatus,
               onChange: setOpStatus,
-              options: [
-                { label: '已上线', value: '已上线' },
-                { label: '未上线', value: '未上线' },
-                { label: '停运', value: '停运' },
-              ],
+              options: OPERATION_STATUS_FILTER_OPTIONS,
             },
             render: (r) => <StatusBadge text={r.operationStatus} />,
           },
-          { key: 'coop', title: '合作状态', render: (r) => <StatusBadge text={r.cooperationStatus} /> },
+          {
+            key: 'coop',
+            title: '合作状态',
+            filter: {
+              type: 'select',
+              value: coopFilter,
+              onChange: setCoopFilter,
+              options: COOPERATION_STATUS_FILTER_OPTIONS,
+            },
+            render: (r) => <StatusBadge text={r.cooperationStatus} />,
+          },
           { key: 'ops', title: '操作', render: (r) => (
             <div className="agf-actions">
               <button type="button" className="agf-btn agf-btn--link" onClick={() => openEdit(r)}>编辑</button>
@@ -156,7 +187,7 @@ export function GameListPage() {
       </Drawer>
       <Drawer title="编辑游戏" open={editOpen} onClose={() => setEditOpen(false)} large
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>保存</button></>}>
-        {editing && <EditGameForm form={form} setForm={setForm} editing={editing} getVendorName={getVendorName} />}
+        {editing && <EditGameForm form={form} setForm={setForm} editing={editing} vendors={vendors} />}
       </Drawer>
       <Drawer title="合同管理" open={contractDrawer} onClose={() => setContractDrawer(false)}
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setContractDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveContract}>保存</button></>}>

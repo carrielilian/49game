@@ -6,17 +6,24 @@ import { FilterBar } from '../components/FilterBar';
 import { useAppStore } from '../data/store';
 import type { FormulaConfig } from '../data/types';
 import { formatFormulaText } from '../utils/settlement';
+import { ListSearchFields } from '../components/ListSearchFields';
+import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 
 export function FormulaListPage() {
   const { games, formulas, formulaLogs, getVendorName, getGame, updateFormula } = useAppStore();
-  const [keyword, setKeyword] = useState('');
+  const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [formulaDrawer, setFormulaDrawer] = useState(false);
   const [channelDrawer, setChannelDrawer] = useState(false);
   const [logDrawer, setLogDrawer] = useState(false);
   const [editing, setEditing] = useState<FormulaConfig | null>(null);
   const [selectedGameId, setSelectedGameId] = useState('');
 
-  const rows = games.filter((g) => !keyword || g.name.includes(keyword) || g.id.includes(keyword));
+  const rows = games.filter((g) => matchesListSearch(search, {
+    gameId: g.id,
+    gameName: g.name,
+    vendorId: g.vendorId,
+    vendorName: getVendorName(g.vendorId),
+  }));
 
   const openFormula = (gameId: string) => {
     const f = formulas.find((x) => x.gameId === gameId);
@@ -41,7 +48,7 @@ export function FormulaListPage() {
   return (
     <div className="agf-card">
       <FilterBar>
-        <input className="agf-input" placeholder="游戏ID / 游戏名称" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
@@ -80,18 +87,14 @@ export function FormulaListPage() {
               <ReadonlyField label="厂商名称" value={getVendorName(editingGame.vendorId)} />
             </div>
             <FormSectionTitle>内部渠道结算公式设置</FormSectionTitle>
-            <div className="agf-form-row">
-              <div className="agf-form-item"><label className="agf-form-label">税点</label><input type="number" step="0.01" className="agf-form-input" value={editing.internalTax} onChange={(e) => setEditing({ ...editing, internalTax: Number(e.target.value) })} /></div>
-              <div className="agf-form-item"><label className="agf-form-label">渠道费</label><input type="number" step="0.01" className="agf-form-input" value={editing.internalChannelFee} onChange={(e) => setEditing({ ...editing, internalChannelFee: Number(e.target.value) })} /></div>
-              <div className="agf-form-item"><label className="agf-form-label">分成</label><input type="number" step="0.01" className="agf-form-input" value={editing.internalShare} onChange={(e) => setEditing({ ...editing, internalShare: Number(e.target.value) })} /></div>
-            </div>
+            <div className="agf-form-item"><label className="agf-form-label">税点</label><input type="number" step="0.01" className="agf-form-input" value={editing.internalTax} onChange={(e) => setEditing({ ...editing, internalTax: Number(e.target.value) })} /></div>
+            <div className="agf-form-item"><label className="agf-form-label">渠道费</label><input type="number" step="0.01" className="agf-form-input" value={editing.internalChannelFee} onChange={(e) => setEditing({ ...editing, internalChannelFee: Number(e.target.value) })} /></div>
+            <div className="agf-form-item"><label className="agf-form-label">分成</label><input type="number" step="0.01" className="agf-form-input" value={editing.internalShare} onChange={(e) => setEditing({ ...editing, internalShare: Number(e.target.value) })} /></div>
             <div className="agf-form-item"><label className="agf-form-label">其他自定义</label><input className="agf-form-input" placeholder="自定义内部渠道公式说明" value={editing.internalCustomFormula ?? ''} onChange={(e) => setEditing({ ...editing, internalCustomFormula: e.target.value })} /></div>
             <FormSectionTitle>外部渠道结算公式设置</FormSectionTitle>
-            <div className="agf-form-row">
-              <div className="agf-form-item"><label className="agf-form-label">税点</label><input type="number" step="0.01" className="agf-form-input" value={editing.externalTax} onChange={(e) => setEditing({ ...editing, externalTax: Number(e.target.value) })} /></div>
-              <div className="agf-form-item"><label className="agf-form-label">渠道费</label><input type="number" step="0.01" className="agf-form-input" value={editing.externalChannelFee} onChange={(e) => setEditing({ ...editing, externalChannelFee: Number(e.target.value) })} /></div>
-              <div className="agf-form-item"><label className="agf-form-label">分成</label><input type="number" step="0.01" className="agf-form-input" value={editing.externalShare} onChange={(e) => setEditing({ ...editing, externalShare: Number(e.target.value) })} /></div>
-            </div>
+            <div className="agf-form-item"><label className="agf-form-label">税点</label><input type="number" step="0.01" className="agf-form-input" value={editing.externalTax} onChange={(e) => setEditing({ ...editing, externalTax: Number(e.target.value) })} /></div>
+            <div className="agf-form-item"><label className="agf-form-label">渠道费</label><input type="number" step="0.01" className="agf-form-input" value={editing.externalChannelFee} onChange={(e) => setEditing({ ...editing, externalChannelFee: Number(e.target.value) })} /></div>
+            <div className="agf-form-item"><label className="agf-form-label">分成</label><input type="number" step="0.01" className="agf-form-input" value={editing.externalShare} onChange={(e) => setEditing({ ...editing, externalShare: Number(e.target.value) })} /></div>
             <div className="agf-form-item"><label className="agf-form-label">其他自定义</label><input className="agf-form-input" placeholder="自定义外部渠道公式说明" value={editing.externalCustomFormula ?? ''} onChange={(e) => setEditing({ ...editing, externalCustomFormula: e.target.value })} /></div>
             <FormSectionTitle>发票设置</FormSectionTitle>
             <div className="agf-form-item"><label className="agf-form-label">发票设置</label>
@@ -118,17 +121,20 @@ export function FormulaListPage() {
             {editing.channels.filter((c) => c.type === 'internal').map((ch) => {
               const i = editing.channels.findIndex((x) => x.id === ch.id);
               return (
-                <div key={ch.id} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-                  <label className="agf-check-item"><input type="checkbox" checked={ch.enabled} onChange={(e) => {
-                    const channels = [...editing.channels];
-                    channels[i] = { ...ch, enabled: e.target.checked };
-                    setEditing({ ...editing, channels });
-                  }} />{ch.name}</label>
-                  <input className="agf-form-input" style={{ flex: 1 }} placeholder="渠道游戏ID" value={ch.channelGameId ?? ''} onChange={(e) => {
-                    const channels = [...editing.channels];
-                    channels[i] = { ...ch, channelGameId: e.target.value };
-                    setEditing({ ...editing, channels });
-                  }} />
+                <div key={ch.id} className="agf-form-item">
+                  <label className="agf-form-label">{ch.name}</label>
+                  <div className="agf-form-field" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="agf-check-item"><input type="checkbox" checked={ch.enabled} onChange={(e) => {
+                      const channels = [...editing.channels];
+                      channels[i] = { ...ch, enabled: e.target.checked };
+                      setEditing({ ...editing, channels });
+                    }} />启用</label>
+                    <input className="agf-form-input" placeholder="渠道游戏ID" value={ch.channelGameId ?? ''} onChange={(e) => {
+                      const channels = [...editing.channels];
+                      channels[i] = { ...ch, channelGameId: e.target.value };
+                      setEditing({ ...editing, channels });
+                    }} />
+                  </div>
                 </div>
               );
             })}
@@ -136,17 +142,20 @@ export function FormulaListPage() {
             {editing.channels.filter((c) => c.type === 'external').map((ch) => {
               const i = editing.channels.findIndex((x) => x.id === ch.id);
               return (
-                <div key={ch.id} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-                  <label className="agf-check-item"><input type="checkbox" checked={ch.enabled} onChange={(e) => {
-                    const channels = [...editing.channels];
-                    channels[i] = { ...ch, enabled: e.target.checked };
-                    setEditing({ ...editing, channels });
-                  }} />{ch.name}</label>
-                  <input className="agf-form-input" style={{ flex: 1 }} placeholder="渠道游戏ID" value={ch.channelGameId ?? ''} onChange={(e) => {
-                    const channels = [...editing.channels];
-                    channels[i] = { ...ch, channelGameId: e.target.value };
-                    setEditing({ ...editing, channels });
-                  }} />
+                <div key={ch.id} className="agf-form-item">
+                  <label className="agf-form-label">{ch.name}</label>
+                  <div className="agf-form-field" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label className="agf-check-item"><input type="checkbox" checked={ch.enabled} onChange={(e) => {
+                      const channels = [...editing.channels];
+                      channels[i] = { ...ch, enabled: e.target.checked };
+                      setEditing({ ...editing, channels });
+                    }} />启用</label>
+                    <input className="agf-form-input" placeholder="渠道游戏ID" value={ch.channelGameId ?? ''} onChange={(e) => {
+                      const channels = [...editing.channels];
+                      channels[i] = { ...ch, channelGameId: e.target.value };
+                      setEditing({ ...editing, channels });
+                    }} />
+                  </div>
                 </div>
               );
             })}

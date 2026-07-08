@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 
 export interface ColumnFilterConfig {
   type: 'select' | 'text';
@@ -7,6 +6,14 @@ export interface ColumnFilterConfig {
   onChange: (value: string) => void;
   options?: { label: string; value: string }[];
   placeholder?: string;
+}
+
+function FilterIcon() {
+  return (
+    <svg className="agf-col-filter__funnel" viewBox="0 0 10 10" aria-hidden="true">
+      <path d="M0 0h10L6.2 5.8V9H3.8V5.8L0 0z" />
+    </svg>
+  );
 }
 
 export function ColumnFilter({ title, filter }: { title: string; filter: ColumnFilterConfig }) {
@@ -31,11 +38,11 @@ export function ColumnFilter({ title, filter }: { title: string; filter: ColumnF
     <div className="agf-col-filter" ref={ref}>
       <button
         type="button"
-        className={`agf-col-filter__trigger${active ? ' agf-col-filter__trigger--active' : ''}`}
+        className={`agf-col-filter__trigger${active ? ' agf-col-filter__trigger--active' : ''}${open ? ' agf-col-filter__trigger--open' : ''}`}
         onClick={() => setOpen(!open)}
       >
         <span>{title}</span>
-        <ChevronDown size={12} className={`agf-col-filter__icon${open ? ' agf-col-filter__icon--open' : ''}`} />
+        <FilterIcon />
       </button>
       {open && (
         <div className="agf-col-filter__menu">

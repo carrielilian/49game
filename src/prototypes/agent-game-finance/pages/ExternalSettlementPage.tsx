@@ -1,24 +1,41 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { Modal, Toast } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
 import { buildImportPreview, useAppStore } from '../data/store';
+import { EXTERNAL_CHANNELS } from '../data/mock-data';
+import {
+  PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
+  selectOptions,
+  uniqueOptions,
+} from '../utils/columnFilters';
+import { ListSearchFields } from '../components/ListSearchFields';
+import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { formatMoney } from '../utils/settlement';
 
 export function ExternalSettlementPage() {
   const { settlements, games, formulas, getGame, importExternal } = useAppStore();
-  const [keyword, setKeyword] = useState('');
-  const [incomeTime, setIncomeTime] = useState('');
+  const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
+  const [incomeTimeFilter, setIncomeTimeFilter] = useState('');
+  const [channelFilter, setChannelFilter] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [preview, setPreview] = useState<ReturnType<typeof buildImportPreview>>([]);
   const [toast, setToast] = useState('');
 
+  const incomeTimeOptions = useMemo(
+    () => uniqueOptions(settlements.filter((s) => s.type === 'external').map((s) => s.incomeTime)),
+    [settlements],
+  );
+
   const data = settlements.filter((s) => {
     if (s.type !== 'external') return false;
-    if (keyword && !s.gameId.includes(keyword) && !getGame(s.gameId)?.name.includes(keyword)) return false;
-    if (incomeTime && !s.incomeTime.includes(incomeTime)) return false;
+    if (!matchesListSearch(search, { gameId: s.gameId, gameName: getGame(s.gameId)?.name })) return false;
+    if (incomeTimeFilter && s.incomeTime !== incomeTimeFilter) return false;
+    if (channelFilter && s.channel !== channelFilter) return false;
+    if (paymentStatusFilter && s.paymentApplyStatus !== paymentStatusFilter) return false;
     return true;
   });
 
@@ -38,22 +55,51 @@ export function ExternalSettlementPage() {
       <FilterBar
         actions={<button type="button" className="agf-btn agf-btn--primary" onClick={handleUpload}><Upload size={16} />导入并结算</button>}
       >
-        <input className="agf-input" placeholder="游戏ID / 游戏名称" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
-        <input className="agf-input" placeholder="收入时间" value={incomeTime} onChange={(e) => setIncomeTime(e.target.value)} />
+        <ListSearchFields mode="game" value={search} onChange={setSearch} />
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
         data={data}
         columns={[
-          { key: 'time', title: '收入时间', render: (r) => r.incomeTime },
+          {
+            key: 'time',
+            title: '收入时间',
+            filter: {
+              type: 'select',
+              value: incomeTimeFilter,
+              onChange: setIncomeTimeFilter,
+              options: incomeTimeOptions,
+            },
+            render: (r) => r.incomeTime,
+          },
           { key: 'game', title: '游戏ID/游戏名称', render: (r) => <DualCell main={getGame(r.gameId)?.name ?? r.gameId} sub={r.gameId} /> },
-          { key: 'channel', title: '渠道', render: (r) => r.channel },
+          {
+            key: 'channel',
+            title: '渠道',
+            filter: {
+              type: 'select',
+              value: channelFilter,
+              onChange: setChannelFilter,
+              options: selectOptions(EXTERNAL_CHANNELS),
+            },
+            render: (r) => r.channel,
+          },
           { key: 'gross', title: '总收入', render: (r) => formatMoney(r.grossRevenue) },
           { key: 'settleAmt', title: '结算金额', render: (r) => formatMoney(r.settlementAmount) },
           { key: 'settleInc', title: '结算收入', render: (r) => formatMoney(r.settlementIncome) },
           { key: 'formula', title: '结算公式', render: (r) => r.formulaText },
           { key: 'settleTime', title: '结算时间', render: (r) => r.settlementTime ?? '-' },
-          { key: 'status', title: '申请付款状态', render: (r) => <StatusBadge text={r.paymentApplyStatus} /> },
+          {
+            key: 'status',
+            title: '申请付款状态',
+            filter: {
+              type: 'select',
+              value: paymentStatusFilter,
+              onChange: setPaymentStatusFilter,
+              options: PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
+            },
+            render: (r) => <StatusBadge text={r.paymentApplyStatus} />,
+          },
         ]}
       />
       <Modal title="导入并结算" open={importOpen} onClose={() => setImportOpen(false)} large

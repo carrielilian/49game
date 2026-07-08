@@ -7,11 +7,14 @@ import { SettlementLetterDrawer } from '../components/SettlementLetterDrawer';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
 import type { PaymentRequest } from '../data/types';
+import { PAYMENT_STATUS_FILTER_OPTIONS } from '../utils/columnFilters';
+import { ListSearchFields } from '../components/ListSearchFields';
+import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { formatMoney } from '../utils/settlement';
 
 export function PaymentListPage() {
   const { payments, getVendorName, getVendor, markPaid } = useAppStore();
-  const [keyword, setKeyword] = useState('');
+  const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [statusFilter, setStatusFilter] = useState('');
   const [markOpen, setMarkOpen] = useState(false);
   const [letterOpen, setLetterOpen] = useState(false);
@@ -21,7 +24,7 @@ export function PaymentListPage() {
   const [toast, setToast] = useState('');
 
   const data = payments.filter((p) => {
-    if (keyword && !p.vendorId.includes(keyword) && !getVendorName(p.vendorId).includes(keyword)) return false;
+    if (!matchesListSearch(search, { vendorId: p.vendorId, vendorName: getVendorName(p.vendorId) })) return false;
     if (statusFilter && p.status !== statusFilter) return false;
     return true;
   });
@@ -47,7 +50,7 @@ export function PaymentListPage() {
   return (
     <div className="agf-card">
       <FilterBar>
-        <input className="agf-input" placeholder="厂商ID / 厂商名称" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+        <ListSearchFields mode="vendor" value={search} onChange={setSearch} />
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
@@ -64,10 +67,7 @@ export function PaymentListPage() {
               type: 'select',
               value: statusFilter,
               onChange: setStatusFilter,
-              options: [
-                { label: '待付款', value: '待付款' },
-                { label: '已付款', value: '已付款' },
-              ],
+              options: PAYMENT_STATUS_FILTER_OPTIONS,
             },
             render: (r) => <StatusBadge text={r.status} />,
           },
