@@ -9,5 +9,10 @@
   },
   "projectInfo": {
     "description": null
+  },
+  "versionCollaboration": {
+    "remote": {
+      "url": "https://github.com/carrielilian/49game.git"
+    }
   }
 }

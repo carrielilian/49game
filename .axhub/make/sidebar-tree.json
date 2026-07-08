@@ -1,24 +1,12 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-08T07:22:32.513Z",
+  "updatedAt": "2026-07-08T16:08:56.120Z",
   "prototypes": [
     {
-      "id": "item-prototypes-agent-game-finance",
+      "id": "item:prototypes:agent-game-finance",
       "kind": "item",
-      "title": "agent game finance",
+      "title": "代理游戏财务平台",
       "itemKey": "prototypes/agent-game-finance"
-    },
-    {
-      "id": "folder-1783404460757-gsdr0t",
-      "kind": "folder",
-      "title": "代理游戏台账",
-      "children": []
-    },
-    {
-      "id": "item:prototypes:beginner-guide",
-      "kind": "item",
-      "title": "新手指导",
-      "itemKey": "prototypes/beginner-guide"
     },
     {
       "id": "item:prototypes:touch-and-talk-annotation-demo",
