@@ -1,0 +1,136 @@
+export type PaymentApplyStatus = '未提交' | '已提交';
+export type PaymentStatus = '待付款' | '已付款';
+export type OperationStatus = '未上线' | '已上线' | '停运';
+export type CooperationStatus = '合作中' | '已终止';
+export type LicenseStatus = '有' | '无';
+export type SettlementType = 'external' | 'internal' | 'refund';
+export type ChannelType = 'internal' | 'external';
+
+export interface Vendor {
+  id: string;
+  name: string;
+  contact: string;
+  phone: string;
+  email: string;
+  address: string;
+  invoiceInfo: string;
+  accountName: string;
+  bank: string;
+  bankLocation: string;
+  branch: string;
+  cardNumber: string;
+}
+
+export interface Game {
+  id: string;
+  name: string;
+  onlineName: string;
+  vendorId: string;
+  launchDate: string;
+  manager: string;
+  license: LicenseStatus;
+  operationStatus: OperationStatus;
+  cooperationStatus: CooperationStatus;
+  remark?: string;
+  licenseFee?: number;
+  licensePayer?: string;
+}
+
+export interface Contract {
+  gameId: string;
+  prepayment: number;
+  licenseFee: number;
+  licensePayer: string;
+  operationStatus: OperationStatus;
+}
+
+export interface FormulaChannel {
+  id: string;
+  name: string;
+  type: ChannelType;
+  enabled: boolean;
+  channelGameId?: string;
+}
+
+export interface FormulaConfig {
+  gameId: string;
+  internalTax: number;
+  internalChannelFee: number;
+  internalShare: number;
+  externalTax: number;
+  externalChannelFee: number;
+  externalShare: number;
+  invoiceMode: '跟随发票' | '其他自定义';
+  customInvoice?: string;
+  internalCustomFormula?: string;
+  externalCustomFormula?: string;
+  channels: FormulaChannel[];
+}
+
+export interface SettlementRecord {
+  id: string;
+  type: SettlementType;
+  incomeTime: string;
+  gameId: string;
+  channel: string;
+  grossRevenue: number;
+  settlementAmount: number;
+  settlementIncome: number;
+  formulaText: string;
+  settlementTime?: string;
+  paymentApplyStatus: PaymentApplyStatus;
+  settled: boolean;
+  vendorId: string;
+}
+
+export interface VendorBalance {
+  vendorId: string;
+  balance: number;
+  accountTotalIncome: number;
+  prepayment: number;
+  totalIncome: number;
+  totalRefund: number;
+}
+
+export interface PaymentRequest {
+  id: string;
+  vendorId: string;
+  pendingAmount: number;
+  actualAmount?: number;
+  status: PaymentStatus;
+  applyTime: string;
+  payTime?: string;
+  payBank?: string;
+  receiptInfo?: string;
+  settlementLetter?: string;
+  invoice?: string;
+  remark?: string;
+}
+
+export interface GameOperationLog {
+  id: string;
+  gameId: string;
+  operator: string;
+  time: string;
+  field: '运营状态' | '合作状态';
+  from: string;
+  to: string;
+}
+
+export interface FormulaOperationLog {
+  id: string;
+  gameId: string;
+  operator: string;
+  time: string;
+  formulaText: string;
+}
+
+export interface ImportPreviewRow {
+  incomeTime: string;
+  gameId: string;
+  gameName: string;
+  channel: string;
+  grossRevenue: number;
+  settlementIncome: number;
+  formulaText: string;
+}
