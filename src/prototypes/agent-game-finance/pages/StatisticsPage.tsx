@@ -1,116 +1,242 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { DataTable } from '../components/DataTable';
+import React, { useMemo, useState } from 'react';
+import { DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
-import { useAppStore } from '../data/store';
+import { MonthRangePicker } from '../components/MonthRangePicker';
 import { ListSearchFields } from '../components/ListSearchFields';
-import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchMode, type ListSearchQuery } from '../utils/listKeyword';
+import { useAppStore } from '../data/store';
+import type { SettlementRecord } from '../data/types';
+import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
+import { getSampleMonthRange, isMonthInRange, type MonthRange } from '../utils/monthRange';
 import { formatMoney } from '../utils/settlement';
 
-type StatTab = 'vendor' | 'channel' | 'game';
+export type StatMode = 'vendor' | 'channel' | 'game';
 
 interface Props {
-  defaultTab?: StatTab;
+  mode: StatMode;
 }
 
-export function StatisticsPage({ defaultTab = 'vendor' }: Props) {
-  const { settlements, getVendorName, getGame } = useAppStore();
-  const [tab, setTab] = useState<StatTab>(defaultTab);
+interface VendorStatRow {
+  id: string;
+  time: string;
+  vendorId: string;
+  vendorName: string;
+  totalRevenue: number;
+  settlementIncome: number;
+  settlementRefund: number;
+}
 
-  useEffect(() => {
-    setTab(defaultTab);
-  }, [defaultTab]);
-  const [yearMonth, setYearMonth] = useState('');
+interface ChannelStatRow {
+  id: string;
+  time: string;
+  channel: string;
+  totalRevenue: number;
+  settlementIncome: number;
+  settlementRefund: number;
+}
+
+interface GameStatRow {
+  id: string;
+  time: string;
+  gameId: string;
+  gameName: string;
+  totalRevenue: number;
+  settlementIncome: number;
+  settlementRefund: number;
+}
+
+function aggregateSettled(settlements: SettlementRecord[]) {
+  return settlements.filter((s) => s.settled);
+}
+
+function buildVendorStats(settlements: SettlementRecord[], getVendorName: (id: string) => string): VendorStatRow[] {
+  const map = new Map<string, VendorStatRow>();
+  for (const s of aggregateSettled(settlements)) {
+    const key = `${s.incomeTime}|${s.vendorId}`;
+    let row = map.get(key);
+    if (!row) {
+      row = {
+        id: key,
+        time: s.incomeTime,
+        vendorId: s.vendorId,
+        vendorName: getVendorName(s.vendorId),
+        totalRevenue: 0,
+        settlementIncome: 0,
+        settlementRefund: 0,
+      };
+      map.set(key, row);
+    }
+    if (s.type === 'refund') {
+      row.settlementRefund += s.settlementIncome;
+    } else {
+      row.totalRevenue += s.grossRevenue;
+      row.settlementIncome += s.settlementIncome;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.time.localeCompare(a.time) || a.vendorId.localeCompare(b.vendorId));
+}
+
+function buildChannelStats(settlements: SettlementRecord[]): ChannelStatRow[] {
+  const map = new Map<string, ChannelStatRow>();
+  for (const s of aggregateSettled(settlements)) {
+    const key = `${s.incomeTime}|${s.channel}`;
+    let row = map.get(key);
+    if (!row) {
+      row = {
+        id: key,
+        time: s.incomeTime,
+        channel: s.channel,
+        totalRevenue: 0,
+        settlementIncome: 0,
+        settlementRefund: 0,
+      };
+      map.set(key, row);
+    }
+    if (s.type === 'refund') {
+      row.settlementRefund += s.settlementIncome;
+    } else {
+      row.totalRevenue += s.grossRevenue;
+      row.settlementIncome += s.settlementIncome;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.time.localeCompare(a.time) || a.channel.localeCompare(b.channel));
+}
+
+function buildGameStats(settlements: SettlementRecord[], getGameName: (id: string) => string): GameStatRow[] {
+  const map = new Map<string, GameStatRow>();
+  for (const s of aggregateSettled(settlements)) {
+    const key = `${s.incomeTime}|${s.gameId}`;
+    let row = map.get(key);
+    if (!row) {
+      row = {
+        id: key,
+        time: s.incomeTime,
+        gameId: s.gameId,
+        gameName: getGameName(s.gameId),
+        totalRevenue: 0,
+        settlementIncome: 0,
+        settlementRefund: 0,
+      };
+      map.set(key, row);
+    }
+    if (s.type === 'refund') {
+      row.settlementRefund += s.settlementIncome;
+    } else {
+      row.totalRevenue += s.grossRevenue;
+      row.settlementIncome += s.settlementIncome;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.time.localeCompare(a.time) || a.gameId.localeCompare(b.gameId));
+}
+
+function StatFilterBar({
+  mode,
+  search,
+  onSearchChange,
+  monthRange,
+  onMonthRangeChange,
+}: {
+  mode: StatMode;
+  search: ListSearchQuery;
+  onSearchChange: (v: ListSearchQuery) => void;
+  monthRange: MonthRange;
+  onMonthRangeChange: (v: MonthRange) => void;
+}) {
+  return (
+    <FilterBar>
+      <MonthRangePicker value={monthRange} onChange={onMonthRangeChange} />
+      {mode === 'vendor' && <ListSearchFields mode="vendor" value={search} onChange={onSearchChange} />}
+      {mode === 'game' && <ListSearchFields mode="game" value={search} onChange={onSearchChange} />}
+    </FilterBar>
+  );
+}
+
+export function StatisticsPage({ mode }: Props) {
+  const { settlements, getVendorName, getGame } = useAppStore();
+  const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
 
-  useEffect(() => {
-    setSearch({});
-  }, [tab]);
+  const filterByTime = <T extends { time: string }>(rows: T[]) =>
+    rows.filter((r) => isMonthInRange(r.time, monthRange));
 
-  const internalSettled = useMemo(() =>
-    settlements.filter((s) => {
-      if (s.type !== 'internal' || !s.settled) return false;
-      if (yearMonth && s.incomeTime !== yearMonth) return false;
-      return true;
-    }),
-  [settlements, yearMonth]);
+  const vendorRows = useMemo(() => {
+    const rows = buildVendorStats(settlements, getVendorName);
+    return filterByTime(rows).filter((r) =>
+      matchesListSearch(search, { vendorId: r.vendorId, vendorName: r.vendorName }),
+    );
+  }, [settlements, getVendorName, monthRange, search]);
 
-  const vendorStats = useMemo(() => {
-    const map = new Map<string, number>();
-    internalSettled.forEach((s) => map.set(s.vendorId, (map.get(s.vendorId) ?? 0) + s.grossRevenue));
-    return Array.from(map.entries()).map(([vendorId, total]) => ({
-      id: vendorId, name: getVendorName(vendorId), total,
-    }));
-  }, [internalSettled, getVendorName]);
+  const channelRows = useMemo(() => filterByTime(buildChannelStats(settlements)), [settlements, monthRange]);
 
-  const channelStats = useMemo(() => {
-    const map = new Map<string, number>();
-    internalSettled.forEach((s) => map.set(s.channel, (map.get(s.channel) ?? 0) + s.grossRevenue));
-    return Array.from(map.entries()).map(([channel, total]) => ({ id: channel, name: channel, total }));
-  }, [internalSettled]);
+  const gameRows = useMemo(() => {
+    const rows = buildGameStats(settlements, (id) => getGame(id)?.name ?? id);
+    return filterByTime(rows).filter((r) =>
+      matchesListSearch(search, { gameId: r.gameId, gameName: r.gameName }),
+    );
+  }, [settlements, getGame, monthRange, search]);
 
-  const gameStats = useMemo(() => {
-    const map = new Map<string, number>();
-    internalSettled.forEach((s) => map.set(s.gameId, (map.get(s.gameId) ?? 0) + s.grossRevenue));
-    return Array.from(map.entries()).map(([gameId, total]) => ({
-      id: gameId, name: getGame(gameId)?.name ?? gameId, total,
-    }));
-  }, [internalSettled, getGame]);
+  const filterBar = (
+    <StatFilterBar
+      mode={mode}
+      search={search}
+      onSearchChange={setSearch}
+      monthRange={monthRange}
+      onMonthRangeChange={setMonthRange}
+    />
+  );
 
-  const filteredDataMap = useMemo(() => ({
-    vendor: vendorStats.filter((r) => matchesListSearch(search, { vendorId: r.id, vendorName: r.name })),
-    channel: channelStats,
-    game: gameStats.filter((r) => matchesListSearch(search, { gameId: r.id, gameName: r.name })),
-  }), [vendorStats, channelStats, gameStats, search]);
+  if (mode === 'vendor') {
+    return (
+      <div className="agf-card">
+        {filterBar}
+        <DataTable
+          rowKey={(r) => r.id}
+          data={vendorRows}
+          columns={[
+            { key: 'time', title: '时间', render: (r) => r.time },
+            { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
+            { key: 'vendorName', title: '厂商名称', render: (r) => r.vendorName },
+            { key: 'totalRevenue', title: '总收入', render: (r) => formatMoney(r.totalRevenue) },
+            { key: 'settlementIncome', title: '结算收入', render: (r) => formatMoney(r.settlementIncome) },
+            { key: 'settlementRefund', title: '结算退款', render: (r) => formatMoney(r.settlementRefund) },
+          ]}
+        />
+      </div>
+    );
+  }
 
-  const searchMode: ListSearchMode | undefined = tab === 'vendor' ? 'vendor' : tab === 'game' ? 'game' : undefined;
-
-  const timeFilter = {
-    type: 'select' as const,
-    value: yearMonth,
-    onChange: setYearMonth,
-    options: Array.from(new Set(settlements.filter((s) => s.type === 'internal' && s.settled).map((s) => s.incomeTime)))
-      .sort()
-      .reverse()
-      .map((t) => ({ label: t, value: t })),
-  };
-
-  const timeLabel = yearMonth || '全部';
-
-  const vendorColumns = [
-    { key: 'time', title: '时间（年/月）', filter: timeFilter, render: () => timeLabel },
-    { key: 'vendorId', title: '厂商ID', render: (r: { id: string }) => r.id },
-    { key: 'vendorName', title: '厂商名称', render: (r: { name: string }) => r.name },
-    { key: 'total', title: '总收入', render: (r: { total: number }) => formatMoney(r.total) },
-  ];
-
-  const channelColumns = [
-    { key: 'time', title: '时间（年/月）', filter: timeFilter, render: () => timeLabel },
-    { key: 'channel', title: '渠道', render: (r: { name: string }) => r.name },
-    { key: 'total', title: '总收入', render: (r: { total: number }) => formatMoney(r.total) },
-  ];
-
-  const gameColumns = [
-    { key: 'time', title: '时间（年/月）', filter: timeFilter, render: () => timeLabel },
-    { key: 'gameId', title: '游戏ID', render: (r: { id: string }) => r.id },
-    { key: 'gameName', title: '游戏名称', render: (r: { name: string }) => r.name },
-    { key: 'total', title: '总收入', render: (r: { total: number }) => formatMoney(r.total) },
-  ];
-
-  const columns = tab === 'vendor' ? vendorColumns : tab === 'channel' ? channelColumns : gameColumns;
+  if (mode === 'channel') {
+    return (
+      <div className="agf-card">
+        {filterBar}
+        <DataTable
+          rowKey={(r) => r.id}
+          data={channelRows}
+          columns={[
+            { key: 'time', title: '时间', render: (r) => r.time },
+            { key: 'channel', title: '渠道', render: (r) => r.channel },
+            { key: 'totalRevenue', title: '总收入', render: (r) => formatMoney(r.totalRevenue) },
+            { key: 'settlementIncome', title: '结算收入', render: (r) => formatMoney(r.settlementIncome) },
+            { key: 'settlementRefund', title: '结算退款', render: (r) => formatMoney(r.settlementRefund) },
+          ]}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="agf-card">
-      <div className="agf-tabs">
-        <button type="button" className={`agf-tab${tab === 'vendor' ? ' agf-tab--active' : ''}`} onClick={() => setTab('vendor')}>厂商收入统计</button>
-        <button type="button" className={`agf-tab${tab === 'channel' ? ' agf-tab--active' : ''}`} onClick={() => setTab('channel')}>渠道收入统计</button>
-        <button type="button" className={`agf-tab${tab === 'game' ? ' agf-tab--active' : ''}`} onClick={() => setTab('game')}>游戏收入统计</button>
-      </div>
-      {searchMode && (
-        <FilterBar>
-          <ListSearchFields mode={searchMode} value={search} onChange={setSearch} />
-        </FilterBar>
-      )}
-      <DataTable key={tab} rowKey={(r) => r.id} data={filteredDataMap[tab]} columns={columns} />
+      {filterBar}
+      <DataTable
+        rowKey={(r) => r.id}
+        data={gameRows}
+        columns={[
+          { key: 'time', title: '时间', render: (r) => r.time },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.gameName} sub={r.gameId} /> },
+          { key: 'totalRevenue', title: '总收入', render: (r) => formatMoney(r.totalRevenue) },
+          { key: 'settlementIncome', title: '结算收入', render: (r) => formatMoney(r.settlementIncome) },
+          { key: 'settlementRefund', title: '结算退款', render: (r) => formatMoney(r.settlementRefund) },
+        ]}
+      />
     </div>
   );
 }

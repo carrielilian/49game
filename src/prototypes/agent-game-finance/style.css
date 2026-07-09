@@ -74,6 +74,117 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "P
   border-radius: 4px;
 }
 
+/* Month range picker */
+.agf-month-range { position: relative; }
+.agf-month-range__input {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 228px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: #fff;
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  box-sizing: border-box;
+  outline: none;
+  appearance: none;
+}
+.agf-month-range__input:hover:not(.agf-month-range__input--open) { border-color: #c0c4cc; }
+button.agf-month-range__input--open,
+button.agf-month-range__input--open:hover,
+button.agf-month-range__input--open:focus {
+  border: 1px solid var(--color-primary);
+}
+.agf-month-range__icon { color: var(--color-text-muted); flex-shrink: 0; }
+.agf-month-range__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 200;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 12px 0;
+}
+.agf-month-range__panels { display: flex; }
+.agf-month-panel { width: 252px; padding: 0 12px; }
+.agf-month-panel + .agf-month-panel { border-left: 1px solid #e4e7ed; }
+.agf-month-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 8px;
+}
+.agf-month-panel__year { font-size: 16px; color: var(--color-text); font-weight: 400; }
+.agf-month-panel__nav {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+.agf-month-panel__nav:hover { color: var(--color-primary); }
+.agf-month-panel__nav--placeholder { visibility: hidden; }
+.agf-month-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 0;
+}
+.agf-month-panel__cell {
+  position: relative;
+  border: none;
+  background: none;
+  padding: 6px 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-text);
+}
+.agf-month-panel__cell-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 32px;
+  border-radius: 16px;
+}
+.agf-month-panel__cell:hover:not(:disabled) .agf-month-panel__cell-label { color: var(--color-primary); }
+.agf-month-panel__cell--disabled { cursor: not-allowed; }
+.agf-month-panel__cell--disabled .agf-month-panel__cell-label { color: #c0c4cc; }
+.agf-month-panel__cell--in-range::before,
+.agf-month-panel__cell--start::before,
+.agf-month-panel__cell--end::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 32px;
+  background: #eef2fc;
+  z-index: 0;
+}
+.agf-month-panel__cell--in-range::before { left: 0; right: 0; }
+.agf-month-panel__cell--start::before { left: 50%; right: 0; }
+.agf-month-panel__cell--end::before { left: 0; right: 50%; }
+.agf-month-panel__cell--start.agf-month-panel__cell--end::before { display: none; }
+.agf-month-panel__cell--start .agf-month-panel__cell-label,
+.agf-month-panel__cell--end .agf-month-panel__cell-label {
+  background: var(--color-primary);
+  color: #fff;
+}
+
 /* Column header filter */
 .agf-col-filter { position: relative; display: inline-flex; vertical-align: middle; }
 .agf-col-filter__trigger { display: inline-flex; align-items: center; gap: 3px; padding: 0; border: none; background: none; font: inherit; font-weight: inherit; color: var(--color-text); cursor: pointer; white-space: nowrap; line-height: 1; }
@@ -84,13 +195,13 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "P
 .agf-col-filter__trigger:hover .agf-col-filter__funnel,
 .agf-col-filter__trigger--open .agf-col-filter__funnel { fill: #333; }
 .agf-col-filter__trigger--active .agf-col-filter__funnel { fill: var(--color-primary); }
-.agf-col-filter__menu { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); min-width: 108px; background: #fff; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 8px 0; z-index: 100; }
+.agf-col-filter__menu { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); min-width: 108px; background: #fff; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 8px 0; z-index: 100; font-weight: 400; }
 .agf-col-filter__menu::before { content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 7px solid #fff; filter: drop-shadow(0 -1px 1px rgba(0,0,0,0.08)); }
-.agf-col-filter__item { display: block; width: 100%; padding: 10px 20px; border: none; background: none; font: inherit; font-size: 14px; color: var(--color-text); text-align: center; cursor: pointer; white-space: nowrap; line-height: 1.4; }
+.agf-col-filter__item { display: block; width: 100%; padding: 10px 20px; border: none; background: none; font-size: 14px; font-weight: 400; color: var(--color-text); text-align: center; cursor: pointer; white-space: nowrap; line-height: 1.4; }
 .agf-col-filter__item:hover { color: var(--color-primary); background: none; }
 .agf-col-filter__item--active { color: var(--color-primary); font-weight: 400; background: none; }
 .agf-col-filter__search { padding: 10px 12px; }
-.agf-col-filter__input { width: 180px; height: 32px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 4px; font: inherit; font-size: 13px; }
+.agf-col-filter__input { width: 180px; height: 32px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 13px; font-weight: 400; }
 .agf-col-filter__input:focus { outline: none; border-color: var(--color-primary); }
 
 .agf-input, .agf-select { height: 32px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 4px; font: inherit; font-size: 13px; color: var(--color-text); background: #fff; width: 200px; max-width: 100%; }

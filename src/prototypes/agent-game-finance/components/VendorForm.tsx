@@ -26,6 +26,7 @@ export const VENDOR_REQUIRED: { key: keyof VendorFormData; label: string }[] = [
   { key: 'invoiceInfo', label: '发票信息' },
   { key: 'accountName', label: '开户名称' },
   { key: 'bank', label: '开户银行' },
+  { key: 'bankLocation', label: '开户银行所在地' },
   { key: 'branch', label: '支行名称' },
   { key: 'cardNumber', label: '银行卡号' },
 ];
@@ -143,7 +144,7 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
             <tr>
               <th><GridLabel required>开户名称</GridLabel></th>
               <th><GridLabel required>开户银行</GridLabel></th>
-              <th><GridLabel>开户银行所在地</GridLabel></th>
+              <th><GridLabel required>开户银行所在地</GridLabel></th>
               <th><GridLabel required>支行名称</GridLabel></th>
               <th><GridLabel required>银行卡号</GridLabel></th>
             </tr>
@@ -152,7 +153,7 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
             <tr>
               <td><GridInput value={form.accountName} onChange={set('accountName')} error={errors.accountName} /></td>
               <td><GridSelect value={form.bank} onChange={set('bank')} options={BANK_OPTIONS} error={errors.bank} /></td>
-              <td><GridSelect value={form.bankLocation} onChange={set('bankLocation')} options={LOCATION_OPTIONS} /></td>
+              <td><GridSelect value={form.bankLocation} onChange={set('bankLocation')} options={LOCATION_OPTIONS} error={errors.bankLocation} /></td>
               <td><GridInput value={form.branch} onChange={set('branch')} error={errors.branch} /></td>
               <td><GridInput value={form.cardNumber} onChange={set('cardNumber')} error={errors.cardNumber} /></td>
             </tr>

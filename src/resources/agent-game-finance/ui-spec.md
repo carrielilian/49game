@@ -69,13 +69,31 @@
 
 | 模式 | 页面 |
 |------|------|
-| `gameAndVendor` | 游戏管理、结算公式 |
-| `vendor` | 厂商管理、付款管理、厂商收入 |
-| `game` | 外部/内部/退款结算 |
-| 按 Tab | 数据统计：厂商 Tab→vendor，游戏 Tab→game，渠道 Tab→无 |
+| `gameAndVendor` | 游戏管理、结算公式、**收入汇总统计** |
+| `vendor` | 厂商管理、付款管理、厂商收入、**厂商收入统计** |
+| `game` | 外部/内部/退款结算、**游戏收入统计** |
+| — | **渠道收入统计**：仅时间范围，无文字查询 |
 
 组件：`components/ListSearchFields.tsx`  
 逻辑：`utils/listKeyword.ts` → `matchesListSearch`
+
+### 月份范围查询（MonthRangePicker）
+
+用于**数据统计**各页顶部时间筛选；最小维度为**月**。
+
+| 项 | 规范 |
+|----|------|
+| 组件 | `components/MonthRangePicker.tsx` |
+| 工具 | `utils/monthRange.ts`（`getSampleMonthRange`、`getDefaultMonthRange`、`isMonthInRange`） |
+| 展示格式 | `YYYY-MM - YYYY-MM`（如 `2025-05 - 2025-06`） |
+| 输入框 | 左侧日历图标；`min-width: 228px`；高度 32px；padding `0 12px` |
+| 展开态边框 | `border: 1px solid #4165d7`（class `agf-month-range__input--open`） |
+| 下拉面板 | 双年并排；年间 `1px #e4e7ed` 竖线；选中月份蓝底圆点 + 区间浅蓝 `#eef2fc` |
+| 未来月份 | 置灰不可选 |
+| 默认范围（数据统计） | `getSampleMonthRange()` → `2025-05 - 2025-06`（对齐 mock） |
+| 表头「时间」列 | **仅展示**，不用 `ColumnFilter` 筛选 |
+
+交互：第一次点选起始月，第二次点选结束月后关闭并生效；同月则起止相同。
 
 ---
 
@@ -87,6 +105,7 @@
 - 游戏 ID + 名称：可用 `DualCell`，单行展示为 `ID / 名称`（如 `4001 / 星际探险`）；表头文案斜杠前后加空格（如 `游戏ID / 游戏名称`）
 - 厂商 ID、厂商名称：**分两列**，不合并
 - 枚举列：表头带漏斗筛选（`ColumnFilter` + `utils/columnFilters.ts`）
+- **列头筛选下拉**：选项文字 `font-weight: 400`，不继承表头 `700` 加粗（`.agf-col-filter__menu` / `__item`）
 
 ### 分页（Pagination + DataTable）
 
@@ -143,6 +162,13 @@
 - 参考：编辑广告位抽屉中的不可编辑行
 - 组件：`components/FormFields.tsx` → `ReadonlyField`
 
+### 抽屉内信息行（非表单布局）
+
+- 用于操作记录等「表格上方说明当前对象」的场景
+- class：`agf-drawer-meta`
+- 左对齐与下方表格首列文字齐平（`padding-left: 16px`，匹配 `th/td` 水平 padding）
+- **不要**使用 168px 右对齐 `ReadonlyField` 表单布局
+
 ### 单选字段（Radio）
 
 - 16px 圆形，选中：蓝色描边 + 蓝色实心圆点
@@ -155,14 +181,28 @@
 - 聚焦边框：主题蓝 `#4165d7`，无浏览器默认 outline
 - class：`agf-form-textarea`
 
-### 必填
+### 必填与提交校验
 
 - 标签前红色 `*`
 - class：`agf-form-label--required`（宽表格用 `agf-form-grid__label--required`）
 - **提交校验**：任一必填未填时
-  1. 字段下方小号红字：`{字段名}不能为空`（`agf-form-error` / `agf-form-grid__error`）
-  2. 顶部红色 Toast：`请完善所有信息`，显示 3 秒后隐藏（`Toast type="error"`）
+  1. 字段下方小号红字：`{字段名}不能为空`（`agf-form-error` / `agf-form-grid__error`，12px，`#F56C6C`）
+  2. 顶部红色 Toast：`请完善所有信息`，显示 **3 秒**后隐藏（`Toast type="error"`）
   3. 不关闭抽屉、不提交
+  4. 用户修改该字段时清除对应错误（`clearError`）
+
+### 错误 Toast（`Toast type="error"`）
+
+| 项 | 值 |
+|----|-----|
+| 背景 | `#FEF0F0` |
+| 文字/图标色 | `#F56C6C` |
+| 边框 | `#FDE2E2` |
+| 图标 | 左侧红底白叉圆形 |
+| 时长 | 3000ms |
+| class | `agf-toast agf-toast--error` |
+
+默认 Toast（成功/普通提示）仍为深色半透明底白字。
 
 ---
 
@@ -210,7 +250,7 @@
 
 ### 游戏管理 — 操作记录
 
-1. 游戏ID / 游戏名称（只读，`4001 / 星际探险`，表格上方；左对齐与表头「操作人」齐平，不用 168px 表单布局）
+1. 游戏ID / 游戏名称（只读，`4001 / 星际探险`，表格上方；`agf-drawer-meta`，左对齐与表头「操作人」齐平，不用 168px 表单布局）
 
 | 记录类型 | 「操作」列展示 |
 |----------|---------------|
@@ -219,6 +259,79 @@
 | 合作状态变更 | StatusBadge（最新状态） |
 
 - 排序：操作时间 **新 → 旧**
+
+### 厂商管理 — 添加 / 编辑厂商（1175px，`agf-form-grid`）
+
+**厂商信息**
+
+1. 厂商ID（只读，添加时显示 `-`）  
+2. 厂商名称（公司名称）*  
+3. 联系人 *  
+4. 手机 *  
+5. 邮箱 *  
+6. 单位地址 *  
+7. 发票信息 *  
+
+**银行信息**
+
+1. 开户名称 *  
+2. 开户银行 *  
+3. 开户银行所在地 *  
+4. 支行名称 *  
+5. 银行卡号 *  
+
+校验：`VendorForm` → `validateVendorForm` / `VENDOR_REQUIRED`（共 11 项必填）。
+
+### 数据统计 — 厂商收入统计（`stats-vendor`）
+
+**查询栏**：`MonthRangePicker` + `ListSearchFields`（`vendor`）
+
+| 列 | 说明 |
+|----|------|
+| 时间 | 月，如 `2025-05` |
+| 厂商ID / 厂商名称 | 分两列 |
+| 总收入 | 已结算内部/外部 `grossRevenue` 合计 |
+| 结算收入 / 结算退款 | `settlementIncome` 分项汇总 |
+
+### 数据统计 — 渠道收入统计（`stats-channel`）
+
+**查询栏**：仅 `MonthRangePicker`
+
+| 列 | 说明 |
+|----|------|
+| 时间 | 月 |
+| 渠道 | |
+| 总收入 | 已结算内部/外部 `grossRevenue` 合计 |
+| 结算收入 / 结算退款 | |
+
+### 数据统计 — 游戏收入统计（`stats-game`）
+
+**查询栏**：`MonthRangePicker` + `ListSearchFields`（`game`）
+
+| 列 | 说明 |
+|----|------|
+| 时间 | 月 |
+| 游戏ID / 游戏名称 | `DualCell` |
+| 总收入 | 已结算内部/外部 `grossRevenue` 合计 |
+| 结算收入 / 结算退款 | |
+
+**注意**：三页均已移除「累计流水」列；导航为侧栏独立菜单，**无页内 Tab**。
+
+### 数据统计 — 收入汇总统计（`stats-summary`）
+
+**查询栏**：查询维度下拉（游戏/渠道/厂商）+ `MonthRangePicker` + `ListSearchFields`（`gameAndVendor`）
+
+列表列随查询维度切换：
+
+| 维度 | 列 |
+|------|-----|
+| 游戏 | 时间、游戏ID / 游戏名称、总收入、结算收入、结算退款 |
+| 渠道 | 时间、渠道、总收入、结算收入、结算退款 |
+| 厂商 | 时间、厂商ID、厂商名称、总收入、结算收入、结算退款 |
+
+**总收入** = 结算收入 − 结算退款（与本节前三页口径不同）。
+
+实现：`pages/RevenueSummaryPage.tsx`；切换维度时 `DataTable` 设 `key={dimension}` 重置分页。
 
 ---
 
@@ -238,14 +351,18 @@ src/prototypes/agent-game-finance/
 │   ├── DataTable.tsx            # 表格 + 分页
 │   ├── Pagination.tsx
 │   ├── ListSearchFields.tsx
-│   ├── FormFields.tsx           # ReadonlyField
+│   ├── FormFields.tsx           # ReadonlyField、FieldError
 │   ├── FilterBar.tsx
 │   ├── ColumnFilter.tsx
-│   └── StatusBadge.tsx
+│   ├── StatusBadge.tsx
+│   ├── MonthRangePicker.tsx     # 月份范围选择器
+│   ├── VendorForm.tsx           # 厂商 1175 宽表 + 必填校验
+│   └── Modal.tsx                # Drawer、Toast（含 error）
 ├── utils/
 │   ├── listKeyword.ts
-│   └── columnFilters.ts
-└── pages/                       # 各业务列表页
+│   ├── columnFilters.ts
+│   └── monthRange.ts
+└── pages/                       # 各业务列表页（含 StatisticsPage、RevenueSummaryPage）
 ```
 
 ---
@@ -253,10 +370,11 @@ src/prototypes/agent-game-finance/
 ## 10. 后续扩展原则
 
 1. **新列表页**：复用 `DataTable`（自带分页）、`FilterBar`、`ListSearchFields`  
-2. **新抽屉表单**：730px 默认，标签 168px + 冒号，只读用 `ReadonlyField`，单选用 `agf-radio-group`  
-3. **新枚举列**：在 `columnFilters.ts` 增加选项，列配置加 `filter`  
-4. **色彩/间距**：优先扩展 CSS 变量，不散落硬编码  
-5. **与厂商 1175px 抽屉区分**：宽表格用 `agf-form-grid`，不走 730px 横向表单规则  
+2. **数据统计时间筛选**：复用 `MonthRangePicker` + `getSampleMonthRange`；勿在表头「时间」列加 `ColumnFilter`  
+3. **新抽屉表单**：730px 默认，标签 168px + 冒号，只读用 `ReadonlyField`，单选用 `agf-radio-group`  
+4. **新枚举列**：在 `columnFilters.ts` 增加选项，列配置加 `filter`；下拉项保持常规字重  
+5. **色彩/间距**：优先扩展 CSS 变量，不散落硬编码  
+6. **与厂商 1175px 抽屉区分**：宽表格用 `agf-form-grid`，不走 730px 横向表单规则  
 
 ---
 
@@ -310,4 +428,10 @@ src/resources/agent-game-finance/ui-spec.md 为准。
 | 日期 | 摘要 |
 |------|------|
 | 2026-07-09 | 初版：色彩、按钮、查询栏、分页、730/1175 抽屉、表单、枚举、操作记录 |
-| 2026-07-09 | 必填校验：字段下红字 + 红色 Toast「请完善所有信息」3 秒 |
+| 2026-07-09 | DualCell 单行 `ID / 名称`；表头 `游戏ID / 游戏名称`（斜杠前后空格）；表头加粗 700 |
+| 2026-07-09 | 操作记录增加 `agf-drawer-meta` 游戏信息行 |
+| 2026-07-09 | 必填校验：字段下红字 + 红色 Toast「请完善所有信息」3 秒；合同预付分成款必填 |
+| 2026-07-09 | 厂商「开户银行所在地」改为必填；补全厂商字段清单 |
+| 2026-07-09 | 列头筛选下拉不加粗；`MonthRangePicker` 月份范围查询规范 |
+| 2026-07-09 | 数据统计 4 页：无 Tab、顶部时间查询、字段清单；移除「累计流水」；渠道加「总收入」 |
+| 2026-07-09 | 新增「收入汇总统计」页；mock 结算 S001–S021；默认 `getSampleMonthRange` |
