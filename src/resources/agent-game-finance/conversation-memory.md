@@ -207,7 +207,7 @@ src/resources/agent-game-finance/
 | 远程 | https://github.com/carrielilian/49game.git |
 | 分支 | `main` |
 | 上一版已推 | `3cc8c59` — 合同管理、操作记录、分页、ui-spec |
-| 本次待推 | 表单校验、DualCell/表头统一、操作记录 meta、conversation-memory + 模板 |
+| **当前最新** | `61b6e6e` — 表单校验、DualCell/表头统一、操作记录 meta、conversation-memory + 模板 |
 
 ---
 
