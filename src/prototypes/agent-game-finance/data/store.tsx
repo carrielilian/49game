@@ -105,11 +105,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addGame = useCallback((g: Omit<Game, 'id'>) => {
     setGames((prev) => {
       const id = nextNumericId(prev, GAME_ID_BASE);
-      setContracts((cPrev) => [...cPrev, { gameId: id, prepayment: 0, licenseFee: 0, licensePayer: '-', operationStatus: g.operationStatus }]);
+      setContracts((cPrev) => [...cPrev, {
+        gameId: id, prepayment: 0, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: g.cooperationStatus,
+      }]);
       setFormulas((fPrev) => [...fPrev, {
         gameId: id, internalTax: 0.06, internalChannelFee: 0.3, internalShare: 0.5,
         externalTax: 0.06, externalChannelFee: 0.25, externalShare: 0.45, invoiceMode: '跟随发票',
         channels: [],
+      }]);
+      setGameLogs((logs) => [...logs, {
+        id: genId('GL'), gameId: id, operator: '当前用户', time: new Date().toLocaleString('zh-CN'), action: '添加游戏',
       }]);
       return [...prev, { ...g, id }];
     });
@@ -120,10 +125,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const old = prev.find((x) => x.id === g.id);
       if (old) {
         if (old.operationStatus !== g.operationStatus) {
-          setGameLogs((logs) => [...logs, { id: genId('GL'), gameId: g.id, operator: '当前用户', time: new Date().toLocaleString('zh-CN'), field: '运营状态', from: old.operationStatus, to: g.operationStatus }]);
+          setGameLogs((logs) => [...logs, {
+            id: genId('GL'), gameId: g.id, operator: '当前用户', time: new Date().toLocaleString('zh-CN'),
+            action: '运营状态', status: g.operationStatus,
+          }]);
         }
         if (old.cooperationStatus !== g.cooperationStatus) {
-          setGameLogs((logs) => [...logs, { id: genId('GL'), gameId: g.id, operator: '当前用户', time: new Date().toLocaleString('zh-CN'), field: '合作状态', from: old.cooperationStatus, to: g.cooperationStatus }]);
+          setGameLogs((logs) => [...logs, {
+            id: genId('GL'), gameId: g.id, operator: '当前用户', time: new Date().toLocaleString('zh-CN'),
+            action: '合作状态', status: g.cooperationStatus,
+          }]);
         }
       }
       return prev.map((x) => (x.id === g.id ? g : x));
@@ -132,6 +143,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateContract = useCallback((c: Contract) => {
     setContracts((prev) => prev.map((x) => (x.gameId === c.gameId ? c : x)));
+    setGames((prev) => {
+      const old = prev.find((x) => x.id === c.gameId);
+      if (old && old.cooperationStatus !== c.cooperationStatus) {
+        setGameLogs((logs) => [...logs, {
+          id: genId('GL'), gameId: c.gameId, operator: '当前用户', time: new Date().toLocaleString('zh-CN'),
+          action: '合作状态', status: c.cooperationStatus,
+        }]);
+      }
+      return prev.map((x) => (x.id === c.gameId ? { ...x, cooperationStatus: c.cooperationStatus } : x));
+    });
   }, []);
 
   const updateFormula = useCallback((f: FormulaConfig, operator = '当前用户') => {

@@ -110,7 +110,7 @@ export function StatisticsPage({ defaultTab = 'vendor' }: Props) {
           <ListSearchFields mode={searchMode} value={search} onChange={setSearch} />
         </FilterBar>
       )}
-      <DataTable rowKey={(r) => r.id} data={filteredDataMap[tab]} columns={columns} />
+      <DataTable key={tab} rowKey={(r) => r.id} data={filteredDataMap[tab]} columns={columns} />
     </div>
   );
 }

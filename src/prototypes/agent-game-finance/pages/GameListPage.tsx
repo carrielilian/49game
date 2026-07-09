@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { DataTable, DualCell } from '../components/DataTable';
 import { ReadonlyField } from '../components/FormFields';
 import { Drawer } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
-import type { Contract, Game } from '../data/types';
+import type { Contract, Game, GameOperationLog } from '../data/types';
 import {
   COOPERATION_STATUS_FILTER_OPTIONS,
   LICENSE_FILTER_OPTIONS,
@@ -18,6 +18,12 @@ const EMPTY_GAME: Omit<Game, 'id'> = {
   name: '', onlineName: '', vendorId: '', manager: '', license: '有', remark: '',
   launchDate: '', operationStatus: '未上线', cooperationStatus: '合作中',
 };
+
+function renderGameLogAction(log: GameOperationLog) {
+  if (log.action === '添加游戏') return '添加游戏';
+  if (log.status) return <StatusBadge text={log.status} />;
+  return log.action;
+}
 
 function AddGameForm({ form, setForm, vendors }: {
   form: Omit<Game, 'id'>;
@@ -41,7 +47,13 @@ function AddGameForm({ form, setForm, vendors }: {
           <label className="agf-radio-item"><input type="radio" name="license" checked={form.license === '无'} onChange={() => setForm({ ...form, license: '无' })} />无</label>
         </div>
       </div>
-      <div className="agf-form-item"><label className="agf-form-label">备注（版号费、版号支付方）</label><textarea className="agf-form-textarea" value={form.remark ?? ''} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></div>
+      <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
+        <div className="agf-radio-group">
+          <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => setForm({ ...form, operationStatus: '未上线' })} />未上线</label>
+          <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '已上线'} onChange={() => setForm({ ...form, operationStatus: '已上线' })} />已上线</label>
+        </div>
+      </div>
+      <div className="agf-form-item"><label className="agf-form-label">备注</label><textarea className="agf-form-textarea" value={form.remark ?? ''} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></div>
     </>
   );
 }
@@ -70,12 +82,13 @@ function EditGameForm({ form, setForm, editing, vendors }: {
           <label className="agf-radio-item"><input type="radio" name="edit-license" checked={form.license === '无'} onChange={() => setForm({ ...form, license: '无' })} />无</label>
         </div>
       </div>
-      <div className="agf-form-item"><label className="agf-form-label">备注（版号费、版号支付方）</label><textarea className="agf-form-textarea" value={form.remark ?? ''} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></div>
       <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
-        <select className="agf-form-input" value={form.operationStatus} onChange={(e) => setForm({ ...form, operationStatus: e.target.value as Game['operationStatus'] })}>
-          <option value="未上线">未上线</option><option value="已上线">已上线</option>
-        </select>
+        <div className="agf-radio-group">
+          <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => setForm({ ...form, operationStatus: '未上线' })} />未上线</label>
+          <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '已上线'} onChange={() => setForm({ ...form, operationStatus: '已上线' })} />已上线</label>
+        </div>
       </div>
+      <div className="agf-form-item"><label className="agf-form-label">备注</label><textarea className="agf-form-textarea" value={form.remark ?? ''} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></div>
     </>
   );
 }
@@ -111,8 +124,11 @@ export function GameListPage() {
   const openAdd = () => { setForm(EMPTY_GAME); setAddOpen(true); };
   const openEdit = (g: Game) => { setEditing(g); setForm({ ...g }); setEditOpen(true); };
   const openContract = (gameId: string) => {
-    const c = contracts.find((x) => x.gameId === gameId) ?? { gameId, prepayment: 0, licenseFee: 0, licensePayer: '-', operationStatus: '未上线' as const };
-    setContractForm(c);
+    const game = getGame(gameId);
+    const c = contracts.find((x) => x.gameId === gameId) ?? {
+      gameId, prepayment: 0, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: '合作中' as const,
+    };
+    setContractForm({ ...c, cooperationStatus: c.cooperationStatus ?? game?.cooperationStatus ?? '合作中' });
     setContractDrawer(true);
   };
   const openLogs = (gameId: string) => { setSelectedGameId(gameId); setLogDrawer(true); };
@@ -121,7 +137,10 @@ export function GameListPage() {
   const handleEdit = () => { if (editing) updateGame({ ...editing, ...form }); setEditOpen(false); };
   const saveContract = () => { if (contractForm) updateContract(contractForm); setContractDrawer(false); };
 
-  const logs = gameLogs.filter((l) => l.gameId === selectedGameId);
+  const logs = useMemo(() => gameLogs
+    .filter((l) => l.gameId === selectedGameId)
+    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()),
+  [gameLogs, selectedGameId]);
   const contractGame = contractForm ? getGame(contractForm.gameId) : null;
 
   return (
@@ -193,17 +212,16 @@ export function GameListPage() {
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setContractDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveContract}>保存</button></>}>
         {contractForm && contractGame && (
           <>
-            <div className="agf-form-readonly-grid">
-              <ReadonlyField label="游戏ID" value={contractGame.id} />
-              <ReadonlyField label="游戏名称" value={contractGame.name} />
-            </div>
+            <ReadonlyField label="游戏ID/游戏名称" value={`${contractGame.id} / ${contractGame.name}`} />
             <div className="agf-form-item"><label className="agf-form-label">预付分成款</label><input type="number" className="agf-form-input" value={contractForm.prepayment} onChange={(e) => setContractForm({ ...contractForm, prepayment: Number(e.target.value) })} /></div>
-            <div className="agf-form-item"><label className="agf-form-label">版号费</label><input type="number" className="agf-form-input" value={contractForm.licenseFee} onChange={(e) => setContractForm({ ...contractForm, licenseFee: Number(e.target.value) })} /></div>
-            <div className="agf-form-item"><label className="agf-form-label">版号支付方</label><input className="agf-form-input" value={contractForm.licensePayer} onChange={(e) => setContractForm({ ...contractForm, licensePayer: e.target.value })} /></div>
-            <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
-              <select className="agf-form-input" value={contractForm.operationStatus} onChange={(e) => setContractForm({ ...contractForm, operationStatus: e.target.value as Contract['operationStatus'] })}>
-                <option value="未上线">未上线</option><option value="已上线">已上线</option>
-              </select>
+            <div className="agf-form-item"><label className="agf-form-label">付款代理金</label><input type="number" className="agf-form-input" value={contractForm.agencyPayment} onChange={(e) => setContractForm({ ...contractForm, agencyPayment: Number(e.target.value) })} /></div>
+            <div className="agf-form-item"><label className="agf-form-label">委托开发费用</label><input type="number" className="agf-form-input" value={contractForm.developmentFee} onChange={(e) => setContractForm({ ...contractForm, developmentFee: Number(e.target.value) })} /></div>
+            <div className="agf-form-item"><label className="agf-form-label">合同信息说明</label><textarea className="agf-form-textarea" value={contractForm.contractDescription} onChange={(e) => setContractForm({ ...contractForm, contractDescription: e.target.value })} /></div>
+            <div className="agf-form-item"><label className="agf-form-label">合作状态</label>
+              <div className="agf-radio-group">
+                <label className="agf-radio-item"><input type="radio" name="contract-cooperationStatus" checked={contractForm.cooperationStatus === '合作中'} onChange={() => setContractForm({ ...contractForm, cooperationStatus: '合作中' })} />合作中</label>
+                <label className="agf-radio-item"><input type="radio" name="contract-cooperationStatus" checked={contractForm.cooperationStatus === '合作终止'} onChange={() => setContractForm({ ...contractForm, cooperationStatus: '合作终止' })} />合作终止</label>
+              </div>
             </div>
           </>
         )}
@@ -211,9 +229,9 @@ export function GameListPage() {
       <Drawer title="操作记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
         {logs.length === 0 ? <div className="agf-empty">暂无操作记录</div> : (
           <table className="agf-table">
-            <thead><tr><th>操作人</th><th>操作时间</th><th>状态</th></tr></thead>
+            <thead><tr><th>操作人</th><th>操作时间</th><th>操作</th></tr></thead>
             <tbody>{logs.map((l) => (
-              <tr key={l.id}><td>{l.operator}</td><td>{l.time}</td><td>{l.field}：{l.from} → {l.to}</td></tr>
+              <tr key={l.id}><td>{l.operator}</td><td>{l.time}</td><td>{renderGameLogAction(l)}</td></tr>
             ))}</tbody>
           </table>
         )}

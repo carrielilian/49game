@@ -40,9 +40,10 @@ export const INITIAL_GAMES: Game[] = [
 export const INITIAL_CONTRACTS: Contract[] = INITIAL_GAMES.map((g, i) => ({
   gameId: g.id,
   prepayment: [500000, 300000, 200000, 400000, 600000, 350000, 150000, 450000, 250000, 380000, 100000, 280000][i],
-  licenseFee: g.license === '有' ? [30000, 25000, 0, 35000, 40000, 32000, 0, 28000, 22000, 38000, 0, 26000][i] : 0,
-  licensePayer: g.license === '有' ? (i % 2 === 0 ? '我方' : '厂商') : '-',
-  operationStatus: g.operationStatus,
+  agencyPayment: [80000, 50000, 30000, 60000, 90000, 45000, 20000, 70000, 35000, 55000, 15000, 40000][i],
+  developmentFee: [120000, 80000, 0, 100000, 150000, 90000, 60000, 110000, 70000, 95000, 0, 85000][i],
+  contractDescription: ['标准代理合同，按月结算', '含独家代理条款', '', '委托开发+联运', ''][i % 5] ?? '',
+  cooperationStatus: g.cooperationStatus,
 }));
 
 const INTERNAL_CHANNELS = ['TapTap', '好游快爆', '4399', '小米游戏'];
@@ -89,8 +90,10 @@ export const INITIAL_BALANCES: VendorBalance[] = deriveBalances(
 );
 
 export const INITIAL_GAME_LOGS: GameOperationLog[] = [
-  { id: 'GL001', gameId: '4001', operator: '张明', time: '2024-03-15 10:30', field: '运营状态', from: '未上线', to: '已上线' },
-  { id: 'GL002', gameId: '4006', operator: '刘洋', time: '2024-08-20 14:00', field: '运营状态', from: '未上线', to: '未上线' },
+  { id: 'GL000', gameId: '4001', operator: '张明', time: '2024-03-01 09:00', action: '添加游戏' },
+  { id: 'GL001', gameId: '4001', operator: '张明', time: '2024-03-15 10:30', action: '运营状态', status: '已上线' },
+  { id: 'GL004', gameId: '4001', operator: '张明', time: '2024-06-01 14:20', action: '合作状态', status: '合作中' },
+  { id: 'GL003', gameId: '4006', operator: '刘洋', time: '2024-09-01 11:00', action: '合作状态', status: '合作中' },
 ];
 
 export const INITIAL_FORMULA_LOGS: FormulaOperationLog[] = [

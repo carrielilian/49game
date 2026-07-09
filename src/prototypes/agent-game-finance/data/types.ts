@@ -39,9 +39,10 @@ export interface Game {
 export interface Contract {
   gameId: string;
   prepayment: number;
-  licenseFee: number;
-  licensePayer: string;
-  operationStatus: OperationStatus;
+  agencyPayment: number;
+  developmentFee: number;
+  contractDescription: string;
+  cooperationStatus: CooperationStatus;
 }
 
 export interface FormulaChannel {
@@ -107,14 +108,15 @@ export interface PaymentRequest {
   remark?: string;
 }
 
+export type GameOperationLogAction = '添加游戏' | '运营状态' | '合作状态';
+
 export interface GameOperationLog {
   id: string;
   gameId: string;
   operator: string;
   time: string;
-  field: '运营状态' | '合作状态';
-  from: string;
-  to: string;
+  action: GameOperationLogAction;
+  status?: string;
 }
 
 export interface FormulaOperationLog {

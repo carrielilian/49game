@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ColumnFilter, type ColumnFilterConfig } from './ColumnFilter';
+import { DEFAULT_PAGE_SIZE, Pagination } from './Pagination';
 
 export interface Column<T> {
   key: string;
@@ -17,6 +18,25 @@ interface DataTableProps<T> {
 }
 
 export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据' }: DataTableProps<T>) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const prevLengthRef = useRef(data.length);
+
+  useEffect(() => {
+    if (data.length !== prevLengthRef.current) {
+      setPage(1);
+      prevLengthRef.current = data.length;
+    }
+  }, [data.length]);
+
+  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedData = data.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   return (
     <div className="agf-table-wrap">
       <table className="agf-table">
@@ -35,11 +55,11 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
               <td colSpan={columns.length} className="agf-table__empty">{emptyText}</td>
             </tr>
           ) : (
-            data.map((row, i) => (
+            pagedData.map((row, i) => (
               <tr key={rowKey(row)}>
                 {columns.map((col) => (
                   <td key={col.key}>
-                    {col.render ? col.render(row, i) : String((row as Record<string, unknown>)[col.key] ?? '')}
+                    {col.render ? col.render(row, (safePage - 1) * pageSize + i) : String((row as Record<string, unknown>)[col.key] ?? '')}
                   </td>
                 ))}
               </tr>
@@ -47,7 +67,18 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
           )}
         </tbody>
       </table>
-      <div className="agf-pagination">共 {data.length} 条</div>
+      {data.length > 0 && (
+        <Pagination
+          total={data.length}
+          page={safePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
     </div>
   );
 }
