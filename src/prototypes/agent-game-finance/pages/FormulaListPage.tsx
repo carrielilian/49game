@@ -54,7 +54,7 @@ export function FormulaListPage() {
         rowKey={(r) => r.id}
         data={rows}
         columns={[
-          { key: 'game', title: '游戏ID/游戏名称', render: (r) => <DualCell main={r.name} sub={r.id} /> },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.name} sub={r.id} /> },
           { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
           { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
           { key: 'formula', title: '结算公式（内部渠道/外部渠道）', render: (r) => {

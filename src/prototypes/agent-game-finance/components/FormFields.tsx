@@ -9,6 +9,11 @@ export function ReadonlyField({ label, value }: { label: string; value: string }
   );
 }
 
+export function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <div className="agf-form-error">{message}</div>;
+}
+
 export function FormSectionTitle({ children }: { children: React.ReactNode }) {
   return <h4 className="agf-form-section-title">{children}</h4>;
 }

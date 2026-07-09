@@ -70,10 +70,30 @@ export function Drawer({ title, open, onClose, children, footer, large, width }:
   );
 }
 
-export function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+export function Toast({
+  message,
+  onDone,
+  type = 'default',
+}: {
+  message: string;
+  onDone: () => void;
+  type?: 'default' | 'error';
+}) {
   useEffect(() => {
-    const t = setTimeout(onDone, 2500);
+    const t = setTimeout(onDone, 3000);
     return () => clearTimeout(t);
   }, [onDone]);
-  return <div className="agf-toast">{message}</div>;
+  return (
+    <div className={`agf-toast${type === 'error' ? ' agf-toast--error' : ''}`}>
+      {type === 'error' && (
+        <span className="agf-toast__icon" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="8" fill="#F56C6C" />
+            <path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </span>
+      )}
+      <span>{message}</span>
+    </div>
+  );
 }

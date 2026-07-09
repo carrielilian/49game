@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { DataTable, DualCell } from '../components/DataTable';
-import { ReadonlyField } from '../components/FormFields';
-import { Drawer } from '../components/Modal';
+import { FieldError, ReadonlyField } from '../components/FormFields';
+import { Drawer, Toast } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
@@ -19,27 +19,69 @@ const EMPTY_GAME: Omit<Game, 'id'> = {
   launchDate: '', operationStatus: '未上线', cooperationStatus: '合作中',
 };
 
+const GAME_REQUIRED: { key: keyof Omit<Game, 'id'>; label: string }[] = [
+  { key: 'name', label: '游戏名称（合同名称）' },
+  { key: 'onlineName', label: '上线游戏名称' },
+  { key: 'manager', label: '游戏负责人' },
+  { key: 'vendorId', label: '归属厂商' },
+];
+
+type FieldErrors = Record<string, string>;
+
+function validateGameForm(form: Omit<Game, 'id'>): FieldErrors {
+  const errors: FieldErrors = {};
+  for (const { key, label } of GAME_REQUIRED) {
+    const v = form[key];
+    if (typeof v === 'string' && !v.trim()) errors[key] = `${label}不能为空`;
+  }
+  return errors;
+}
+
 function renderGameLogAction(log: GameOperationLog) {
   if (log.action === '添加游戏') return '添加游戏';
   if (log.status) return <StatusBadge text={log.status} />;
   return log.action;
 }
 
-function AddGameForm({ form, setForm, vendors }: {
+function AddGameForm({ form, setForm, vendors, errors, clearError }: {
   form: Omit<Game, 'id'>;
   setForm: React.Dispatch<React.SetStateAction<Omit<Game, 'id'>>>;
   vendors: { id: string; name: string }[];
+  errors: FieldErrors;
+  clearError: (key: string) => void;
 }) {
+  const set = (key: keyof Omit<Game, 'id'>, value: string) => {
+    clearError(key);
+    setForm({ ...form, [key]: value });
+  };
   return (
     <>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称（合同名称）</label><input className="agf-form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">上线游戏名称</label><input className="agf-form-input" value={form.onlineName} onChange={(e) => setForm({ ...form, onlineName: e.target.value })} /></div>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label><input className="agf-form-input" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} /></div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称（合同名称）</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.name} onChange={(e) => set('name', e.target.value)} />
+          <FieldError message={errors.name} />
+        </div>
+      </div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">上线游戏名称</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.onlineName} onChange={(e) => set('onlineName', e.target.value)} />
+          <FieldError message={errors.onlineName} />
+        </div>
+      </div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.manager} onChange={(e) => set('manager', e.target.value)} />
+          <FieldError message={errors.manager} />
+        </div>
+      </div>
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">归属厂商</label>
-        <select className="agf-form-input" value={form.vendorId} onChange={(e) => setForm({ ...form, vendorId: e.target.value })}>
-          <option value="">请选择</option>
-          {vendors.map((v) => <option key={v.id} value={v.id}>{v.id} - {v.name}</option>)}
-        </select>
+        <div className="agf-form-field">
+          <select className="agf-form-input" value={form.vendorId} onChange={(e) => set('vendorId', e.target.value)}>
+            <option value="">请选择</option>
+            {vendors.map((v) => <option key={v.id} value={v.id}>{v.id} - {v.name}</option>)}
+          </select>
+          <FieldError message={errors.vendorId} />
+        </div>
       </div>
       <div className="agf-form-item"><label className="agf-form-label">版号</label>
         <div className="agf-radio-group">
@@ -58,23 +100,47 @@ function AddGameForm({ form, setForm, vendors }: {
   );
 }
 
-function EditGameForm({ form, setForm, editing, vendors }: {
+function EditGameForm({ form, setForm, editing, vendors, errors, clearError }: {
   form: Omit<Game, 'id'>;
   setForm: React.Dispatch<React.SetStateAction<Omit<Game, 'id'>>>;
   editing: Game;
   vendors: { id: string; name: string }[];
+  errors: FieldErrors;
+  clearError: (key: string) => void;
 }) {
+  const set = (key: keyof Omit<Game, 'id'>, value: string) => {
+    clearError(key);
+    setForm({ ...form, [key]: value });
+  };
   return (
     <>
       <ReadonlyField label="游戏ID" value={editing.id} />
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称（合同名称）</label><input className="agf-form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">上线游戏名称</label><input className="agf-form-input" value={form.onlineName} onChange={(e) => setForm({ ...form, onlineName: e.target.value })} /></div>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label><input className="agf-form-input" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} /></div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称（合同名称）</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.name} onChange={(e) => set('name', e.target.value)} />
+          <FieldError message={errors.name} />
+        </div>
+      </div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">上线游戏名称</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.onlineName} onChange={(e) => set('onlineName', e.target.value)} />
+          <FieldError message={errors.onlineName} />
+        </div>
+      </div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.manager} onChange={(e) => set('manager', e.target.value)} />
+          <FieldError message={errors.manager} />
+        </div>
+      </div>
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">归属厂商</label>
-        <select className="agf-form-input" value={form.vendorId} onChange={(e) => setForm({ ...form, vendorId: e.target.value })}>
-          <option value="">请选择</option>
-          {vendors.map((v) => <option key={v.id} value={v.id}>{v.id} - {v.name}</option>)}
-        </select>
+        <div className="agf-form-field">
+          <select className="agf-form-input" value={form.vendorId} onChange={(e) => set('vendorId', e.target.value)}>
+            <option value="">请选择</option>
+            {vendors.map((v) => <option key={v.id} value={v.id}>{v.id} - {v.name}</option>)}
+          </select>
+          <FieldError message={errors.vendorId} />
+        </div>
       </div>
       <div className="agf-form-item"><label className="agf-form-label">版号</label>
         <div className="agf-radio-group">
@@ -107,6 +173,8 @@ export function GameListPage() {
   const [form, setForm] = useState(EMPTY_GAME);
   const [contractForm, setContractForm] = useState<Contract | null>(null);
   const [selectedGameId, setSelectedGameId] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [toast, setToast] = useState<{ message: string; type?: 'default' | 'error' } | null>(null);
 
   const filtered = games.filter((g) => {
     if (!matchesListSearch(search, {
@@ -121,27 +189,58 @@ export function GameListPage() {
     return true;
   });
 
-  const openAdd = () => { setForm(EMPTY_GAME); setAddOpen(true); };
-  const openEdit = (g: Game) => { setEditing(g); setForm({ ...g }); setEditOpen(true); };
+  const clearError = (key: string) => setErrors((prev) => {
+    if (!prev[key]) return prev;
+    const next = { ...prev };
+    delete next[key];
+    return next;
+  });
+
+  const openAdd = () => { setForm(EMPTY_GAME); setErrors({}); setAddOpen(true); };
+  const openEdit = (g: Game) => { setEditing(g); setForm({ ...g }); setErrors({}); setEditOpen(true); };
   const openContract = (gameId: string) => {
     const game = getGame(gameId);
     const c = contracts.find((x) => x.gameId === gameId) ?? {
       gameId, prepayment: 0, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: '合作中' as const,
     };
     setContractForm({ ...c, cooperationStatus: c.cooperationStatus ?? game?.cooperationStatus ?? '合作中' });
+    setErrors({});
     setContractDrawer(true);
   };
   const openLogs = (gameId: string) => { setSelectedGameId(gameId); setLogDrawer(true); };
 
-  const handleAdd = () => { addGame(form); setAddOpen(false); };
-  const handleEdit = () => { if (editing) updateGame({ ...editing, ...form }); setEditOpen(false); };
-  const saveContract = () => { if (contractForm) updateContract(contractForm); setContractDrawer(false); };
+  const showIncompleteToast = () => setToast({ message: '请完善所有信息', type: 'error' });
+
+  const handleAdd = () => {
+    const next = validateGameForm(form);
+    if (Object.keys(next).length) { setErrors(next); showIncompleteToast(); return; }
+    addGame(form);
+    setAddOpen(false);
+  };
+  const handleEdit = () => {
+    if (!editing) return;
+    const next = validateGameForm(form);
+    if (Object.keys(next).length) { setErrors(next); showIncompleteToast(); return; }
+    updateGame({ ...editing, ...form });
+    setEditOpen(false);
+  };
+  const saveContract = () => {
+    if (!contractForm) return;
+    if (Number.isNaN(contractForm.prepayment)) {
+      setErrors({ prepayment: '预付分成款不能为空' });
+      showIncompleteToast();
+      return;
+    }
+    updateContract(contractForm);
+    setContractDrawer(false);
+  };
 
   const logs = useMemo(() => gameLogs
     .filter((l) => l.gameId === selectedGameId)
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()),
   [gameLogs, selectedGameId]);
   const contractGame = contractForm ? getGame(contractForm.gameId) : null;
+  const logGame = selectedGameId ? getGame(selectedGameId) : null;
 
   return (
     <div className="agf-card">
@@ -154,7 +253,7 @@ export function GameListPage() {
         rowKey={(r) => r.id}
         data={filtered}
         columns={[
-          { key: 'game', title: '游戏ID/游戏名称', render: (r) => <DualCell main={r.name} sub={r.id} /> },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.name} sub={r.id} /> },
           { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
           { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
           { key: 'manager', title: '游戏负责人', render: (r) => r.manager },
@@ -202,18 +301,31 @@ export function GameListPage() {
       />
       <Drawer title="添加游戏" open={addOpen} onClose={() => setAddOpen(false)} large
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setAddOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleAdd}>确定</button></>}>
-        <AddGameForm form={form} setForm={setForm} vendors={vendors} />
+        <AddGameForm form={form} setForm={setForm} vendors={vendors} errors={errors} clearError={clearError} />
       </Drawer>
       <Drawer title="编辑游戏" open={editOpen} onClose={() => setEditOpen(false)} large
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>保存</button></>}>
-        {editing && <EditGameForm form={form} setForm={setForm} editing={editing} vendors={vendors} />}
+        {editing && <EditGameForm form={form} setForm={setForm} editing={editing} vendors={vendors} errors={errors} clearError={clearError} />}
       </Drawer>
       <Drawer title="合同管理" open={contractDrawer} onClose={() => setContractDrawer(false)}
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setContractDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveContract}>保存</button></>}>
         {contractForm && contractGame && (
           <>
-            <ReadonlyField label="游戏ID/游戏名称" value={`${contractGame.id} / ${contractGame.name}`} />
-            <div className="agf-form-item"><label className="agf-form-label">预付分成款</label><input type="number" className="agf-form-input" value={contractForm.prepayment} onChange={(e) => setContractForm({ ...contractForm, prepayment: Number(e.target.value) })} /></div>
+            <ReadonlyField label="游戏ID / 游戏名称" value={`${contractGame.id} / ${contractGame.name}`} />
+            <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">预付分成款</label>
+              <div className="agf-form-field">
+                <input
+                  type="number"
+                  className="agf-form-input"
+                  value={Number.isNaN(contractForm.prepayment) ? '' : contractForm.prepayment}
+                  onChange={(e) => {
+                    clearError('prepayment');
+                    setContractForm({ ...contractForm, prepayment: e.target.value === '' ? NaN : Number(e.target.value) });
+                  }}
+                />
+                <FieldError message={errors.prepayment} />
+              </div>
+            </div>
             <div className="agf-form-item"><label className="agf-form-label">付款代理金</label><input type="number" className="agf-form-input" value={contractForm.agencyPayment} onChange={(e) => setContractForm({ ...contractForm, agencyPayment: Number(e.target.value) })} /></div>
             <div className="agf-form-item"><label className="agf-form-label">委托开发费用</label><input type="number" className="agf-form-input" value={contractForm.developmentFee} onChange={(e) => setContractForm({ ...contractForm, developmentFee: Number(e.target.value) })} /></div>
             <div className="agf-form-item"><label className="agf-form-label">合同信息说明</label><textarea className="agf-form-textarea" value={contractForm.contractDescription} onChange={(e) => setContractForm({ ...contractForm, contractDescription: e.target.value })} /></div>
@@ -227,6 +339,9 @@ export function GameListPage() {
         )}
       </Drawer>
       <Drawer title="操作记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
+        {logGame && (
+          <div className="agf-drawer-meta">游戏ID / 游戏名称：{logGame.id} / {logGame.name}</div>
+        )}
         {logs.length === 0 ? <div className="agf-empty">暂无操作记录</div> : (
           <table className="agf-table">
             <thead><tr><th>操作人</th><th>操作时间</th><th>操作</th></tr></thead>
@@ -236,6 +351,7 @@ export function GameListPage() {
           </table>
         )}
       </Drawer>
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }

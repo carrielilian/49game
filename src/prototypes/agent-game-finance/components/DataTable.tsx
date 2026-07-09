@@ -83,11 +83,7 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
   );
 }
 
+/** 列表「游戏ID / 游戏名称」：单行 `ID / 名称` */
 export function DualCell({ main, sub }: { main: string; sub: string }) {
-  return (
-    <span>
-      <span className="agf-cell-main">{main}</span>
-      <span className="agf-cell-sub">{sub}</span>
-    </span>
-  );
+  return <span>{sub} / {main}</span>;
 }

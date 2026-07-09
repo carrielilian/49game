@@ -72,7 +72,7 @@ export function ExternalSettlementPage() {
             },
             render: (r) => r.incomeTime,
           },
-          { key: 'game', title: '游戏ID/游戏名称', render: (r) => <DualCell main={getGame(r.gameId)?.name ?? r.gameId} sub={r.gameId} /> },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={getGame(r.gameId)?.name ?? r.gameId} sub={r.gameId} /> },
           {
             key: 'channel',
             title: '渠道',
@@ -107,7 +107,7 @@ export function ExternalSettlementPage() {
         <div className="agf-upload" onClick={handleUpload}>点击上传外部渠道报表（模拟已解析 {preview.length || 3} 条）</div>
         {preview.length > 0 && (
           <table className="agf-table" style={{ marginTop: 16 }}>
-            <thead><tr><th>收入时间</th><th>游戏ID/游戏名称</th><th>渠道</th><th>总收入</th></tr></thead>
+            <thead><tr><th>收入时间</th><th>游戏ID / 游戏名称</th><th>渠道</th><th>总收入</th></tr></thead>
             <tbody>{preview.map((r, i) => (
               <tr key={i}>
                 <td>{r.incomeTime}</td>

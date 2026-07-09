@@ -97,7 +97,7 @@ export function InternalSettlementPage({ type }: Props) {
             },
             render: (r) => r.incomeTime,
           },
-          { key: 'game', title: '游戏ID/游戏名称', render: (r) => <DualCell main={getGame(r.gameId)?.name ?? r.gameId} sub={r.gameId} /> },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={getGame(r.gameId)?.name ?? r.gameId} sub={r.gameId} /> },
           {
             key: 'channel',
             title: '渠道',
