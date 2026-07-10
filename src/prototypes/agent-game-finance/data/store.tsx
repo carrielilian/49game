@@ -9,6 +9,7 @@ import {
   INITIAL_PAYMENTS,
   INITIAL_SETTLEMENTS,
   INITIAL_VENDORS,
+  createEmptyFormula,
 } from './mock-data';
 import type {
   Contract,
@@ -24,7 +25,7 @@ import type {
   VendorBalance,
 } from './types';
 import { deriveBalances } from '../utils/balance';
-import { calcSettlement, formatFormulaText, genId } from '../utils/settlement';
+import { calcRecordSettlementIncome, formatDateTime, formatFormulaText, genId } from '../utils/settlement';
 
 const VENDOR_ID_BASE = 1001;
 const GAME_ID_BASE = 4001;
@@ -50,6 +51,7 @@ interface AppContextValue extends AppState {
   getVendor: (id: string) => Vendor | undefined;
   getGame: (id: string) => Game | undefined;
   getVendorName: (id: string) => string;
+  getGameName: (id: string) => string;
   addVendor: (v: Omit<Vendor, 'id'>) => void;
   updateVendor: (v: Vendor) => void;
   addGame: (g: Omit<Game, 'id'>) => void;
@@ -81,6 +83,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const getVendor = useCallback((id: string) => vendors.find((v) => v.id === id), [vendors]);
   const getGame = useCallback((id: string) => games.find((g) => g.id === id), [games]);
   const getVendorName = useCallback((id: string) => vendors.find((v) => v.id === id)?.name ?? id, [vendors]);
+  const getGameName = useCallback((id: string) => games.find((g) => g.id === id)?.onlineName ?? id, [games]);
 
   const recalcBalances = useCallback(() => {
     setBalances(deriveBalances(settlements, vendors, contracts, games, payments));
@@ -105,18 +108,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addGame = useCallback((g: Omit<Game, 'id'>) => {
     setGames((prev) => {
       const id = nextNumericId(prev, GAME_ID_BASE);
-      setContracts((cPrev) => [...cPrev, {
+      setContracts((cPrev) => [{
         gameId: id, prepayment: 0, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: g.cooperationStatus,
-      }]);
-      setFormulas((fPrev) => [...fPrev, {
-        gameId: id, internalTax: 0.06, internalChannelFee: 0.3, internalShare: 0.5,
-        externalTax: 0.06, externalChannelFee: 0.25, externalShare: 0.45, invoiceMode: '跟随发票',
-        channels: [],
-      }]);
-      setGameLogs((logs) => [...logs, {
+      }, ...cPrev]);
+      setFormulas((fPrev) => [createEmptyFormula(id), ...fPrev]);
+      setGameLogs((logs) => [{
         id: genId('GL'), gameId: id, operator: '当前用户', time: new Date().toLocaleString('zh-CN'), action: '添加游戏',
-      }]);
-      return [...prev, { ...g, id }];
+      }, ...logs]);
+      return [{ ...g, id }, ...prev];
     });
   }, []);
 
@@ -157,7 +156,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateFormula = useCallback((f: FormulaConfig, operator = '当前用户') => {
     setFormulas((prev) => prev.map((x) => (x.gameId === f.gameId ? f : x)));
-    const text = `内部：${formatFormulaText(f.internalTax, f.internalChannelFee, f.internalShare, '内部')}；外部：${formatFormulaText(f.externalTax, f.externalChannelFee, f.externalShare, '外部')}`;
+    const text = [
+      formatFormulaText(f.internalTax, f.internalChannelFee, f.internalShare, '内部渠道'),
+      formatFormulaText(f.externalTax, f.externalChannelFee, f.externalShare, '外部渠道'),
+    ].join('\n');
     setFormulaLogs((prev) => [...prev, { id: genId('FL'), gameId: f.gameId, operator, time: new Date().toLocaleString('zh-CN'), formulaText: text }]);
   }, []);
 
@@ -169,14 +171,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newRecords: SettlementRecord[] = rows.map((r) => {
       const game = games.find((g) => g.id === r.gameId);
       return {
-        id: genId('S'), type: 'external' as SettlementType, incomeTime: r.incomeTime, gameId: r.gameId,
-        channel: r.channel, grossRevenue: r.grossRevenue, settlementAmount: r.grossRevenue * 0.7,
-        settlementIncome: r.settlementIncome, formulaText: r.formulaText,
-        settlementTime: new Date().toISOString().slice(0, 10), paymentApplyStatus: '未提交' as const,
-        settled: true, vendorId: game?.vendorId ?? '',
+        id: genId('S'), type: 'external' as SettlementType, incomeTime: r.incomeTime, gameId: r.gameId!,
+        channel: r.channel, grossRevenue: r.pendingAmount, settlementAmount: r.pendingAmount,
+        settlementIncome: 0, formulaText: r.formulaText!,
+        paymentApplyStatus: '未申请' as const,
+        settled: false, vendorId: game?.vendorId ?? '',
       };
     });
-    setSettlements((prev) => [...prev, ...newRecords]);
+    setSettlements((prev) => [...newRecords, ...prev]);
   }, [games]);
 
   const pullInternal = useCallback((type: 'internal' | 'refund') => {
@@ -186,27 +188,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }).slice(0, 3);
     const newRecords: SettlementRecord[] = unsettled.map((g) => {
       const f = formulas.find((x) => x.gameId === g.id);
-      const gross = Math.round(Math.random() * 100000 + 20000);
       const tax = f?.internalTax ?? 0.06;
-      const fee = f?.internalChannelFee ?? 0.3;
+      const fee = f?.internalChannelFee ?? 0.05;
       const share = f?.internalShare ?? 0.5;
-      const income = calcSettlement(gross, tax, fee, share);
+      const gross = Math.round(Math.random() * 100000 + 20000);
       return {
         id: genId('S'), type, incomeTime: '2025-07', gameId: g.id,
-        channel: type === 'refund' ? '好游快爆' : 'TapTap',
-        grossRevenue: gross, settlementAmount: gross * (1 - tax - fee), settlementIncome: income,
+        channel: type === 'refund' ? '快爆内购' : '快爆付费',
+        grossRevenue: gross, settlementAmount: gross, settlementIncome: 0,
         formulaText: formatFormulaText(tax, fee, share, type === 'refund' ? '退款' : '内部'),
-        paymentApplyStatus: '未提交', settled: false, vendorId: g.vendorId,
+        paymentApplyStatus: '未申请', settled: false, vendorId: g.vendorId,
       };
     });
     setSettlements((prev) => [...prev, ...newRecords]);
   }, [games, settlements, formulas]);
 
   const settleRecords = useCallback((ids: string[]) => {
-    setSettlements((prev) => prev.map((s) => ids.includes(s.id)
-      ? { ...s, settled: true, settlementTime: new Date().toISOString().slice(0, 10) }
-      : s));
-  }, []);
+    setSettlements((prev) => prev.map((s) => {
+      if (!ids.includes(s.id)) return s;
+      const f = formulas.find((x) => x.gameId === s.gameId);
+      const vendor = vendors.find((v) => v.id === s.vendorId);
+      return {
+        ...s,
+        settled: true,
+        settlementTime: formatDateTime(),
+        settlementIncome: calcRecordSettlementIncome(s, f, vendor),
+      };
+    }));
+  }, [formulas, vendors]);
 
   const applyPayment = useCallback((vendorId: string) => {
     const bal = deriveBalances(settlements, vendors, contracts, games, payments).find((b) => b.vendorId === vendorId);
@@ -216,8 +225,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       applyTime: new Date().toLocaleString('zh-CN'),
     }]);
     setSettlements((prev) => prev.map((s) =>
-      s.vendorId === vendorId && s.settled && s.paymentApplyStatus === '未提交'
-        ? { ...s, paymentApplyStatus: '已提交' as const }
+      s.vendorId === vendorId && s.settled && s.paymentApplyStatus === '未申请'
+        ? { ...s, paymentApplyStatus: '已申请' as const }
         : s,
     ));
     return true;
@@ -231,11 +240,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AppContextValue>(() => ({
     vendors, games, contracts, formulas, settlements, balances, payments, gameLogs, formulaLogs,
-    getVendor, getGame, getVendorName, addVendor, updateVendor, addGame, updateGame,
+    getVendor, getGame, getVendorName, getGameName, addVendor, updateVendor, addGame, updateGame,
     updateContract, updateFormula, addGameLog, importExternal, pullInternal, settleRecords,
     applyPayment, markPaid, recalcBalances,
   }), [vendors, games, contracts, formulas, settlements, balances, payments, gameLogs, formulaLogs,
-    getVendor, getGame, getVendorName, addVendor, updateVendor, addGame, updateGame,
+    getVendor, getGame, getVendorName, getGameName, addVendor, updateVendor, addGame, updateGame,
     updateContract, updateFormula, addGameLog, importExternal, pullInternal, settleRecords,
     applyPayment, markPaid, recalcBalances]);
 
@@ -248,15 +257,3 @@ export function useAppStore() {
   return ctx;
 }
 
-export function buildImportPreview(games: Game[], formulas: FormulaConfig[]): ImportPreviewRow[] {
-  return games.slice(0, 3).map((g) => {
-    const f = formulas.find((x) => x.gameId === g.id);
-    const gross = Math.round(Math.random() * 80000 + 10000);
-    const income = calcSettlement(gross, f?.externalTax ?? 0.06, f?.externalChannelFee ?? 0.25, f?.externalShare ?? 0.45);
-    return {
-      incomeTime: '2025-07', gameId: g.id, gameName: g.name, channel: 'Steam',
-      grossRevenue: gross, settlementIncome: income,
-      formulaText: formatFormulaText(f?.externalTax ?? 0.06, f?.externalChannelFee ?? 0.25, f?.externalShare ?? 0.45, '外部'),
-    };
-  });
-}

@@ -8,12 +8,12 @@ interface StatusBadgeProps {
 }
 
 const VARIANT_MAP: Record<string, BadgeVariant> = {
-  '已提交': 'success',
+  '已申请': 'success',
   '已付款': 'success',
   '已上线': 'success',
   '合作中': 'success',
   '待付款': 'warning',
-  '未提交': 'warning',
+  '未申请': 'warning',
   '合作终止': 'danger',
   '未上线': 'muted',
 };

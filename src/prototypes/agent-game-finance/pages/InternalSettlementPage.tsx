@@ -1,50 +1,49 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
+import { MonthRangePicker } from '../components/MonthRangePicker';
 import { StatusBadge } from '../components/StatusBadge';
-import { Toast } from '../components/Modal';
+import { Toast, type ToastType } from '../components/Modal';
 import { INTERNAL_CHANNELS } from '../data/mock-data';
 import { useAppStore } from '../data/store';
-import {
-  PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
-  selectOptions,
-  SETTLED_STATUS_FILTER_OPTIONS,
-  uniqueOptions,
-} from '../utils/columnFilters';
+import { PAYMENT_APPLY_STATUS_FILTER_OPTIONS, selectOptions } from '../utils/columnFilters';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
-import { formatMoney } from '../utils/settlement';
+import { getSampleMonthRange, isMonthInRange } from '../utils/monthRange';
+import {
+  displaySettlementFormula,
+  formatMoney,
+  formatSettlementIncome,
+  formatSettlementTime,
+  isUnsettledSettlement,
+} from '../utils/settlement';
 
 interface Props {
   type: 'internal' | 'refund';
 }
 
 export function InternalSettlementPage({ type }: Props) {
-  const { settlements, getGame, pullInternal, settleRecords } = useAppStore();
+  const { settlements, getGameName, getVendorName, pullInternal, settleRecords } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
-  const [incomeTimeFilter, setIncomeTimeFilter] = useState('');
+  const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [channelFilter, setChannelFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
-  const [settledFilter, setSettledFilter] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const incomeLabel = type === 'internal' ? '结算收入' : '结算退款';
 
-  const incomeTimeOptions = useMemo(
-    () => uniqueOptions(settlements.filter((s) => s.type === type).map((s) => s.incomeTime)),
-    [settlements, type],
-  );
-
   const data = settlements.filter((s) => {
     if (s.type !== type) return false;
-    if (!matchesListSearch(search, { gameId: s.gameId, gameName: getGame(s.gameId)?.name })) return false;
-    if (incomeTimeFilter && s.incomeTime !== incomeTimeFilter) return false;
+    if (!isMonthInRange(s.incomeTime, monthRange)) return false;
+    if (!matchesListSearch(search, {
+      gameId: s.gameId,
+      gameName: getGameName(s.gameId),
+      vendorId: s.vendorId,
+      vendorName: getVendorName(s.vendorId),
+    })) return false;
     if (channelFilter && s.channel !== channelFilter) return false;
     if (paymentStatusFilter && s.paymentApplyStatus !== paymentStatusFilter) return false;
-    if (settledFilter === '已结算' && !s.settled) return false;
-    if (settledFilter === '待结算' && s.settled) return false;
     return true;
   });
 
@@ -53,20 +52,24 @@ export function InternalSettlementPage({ type }: Props) {
     setTimeout(() => {
       pullInternal(type);
       setLoading(false);
-      setToast(type === 'internal' ? '已从财务中心拉取待结算数据' : '已从财务中心拉取待退款数据');
+      setToast({
+        message: type === 'internal' ? '已从财务中心拉取待结算数据' : '已从财务中心拉取待退款数据',
+        type: 'success',
+      });
     }, 800);
   };
 
   const handleSettle = () => {
-    const ids = selected.length > 0 ? selected : data.filter((s) => !s.settled).map((s) => s.id);
-    if (ids.length === 0) { setToast('没有待结算数据'); return; }
+    const ids = data.filter((s) => isUnsettledSettlement(s)).map((s) => s.id);
+    if (ids.length === 0) {
+      setToast({ message: '没有待结算数据', type: 'error' });
+      return;
+    }
     settleRecords(ids);
-    setSelected([]);
-    setToast(`已完成 ${ids.length} 条${type === 'internal' ? '结算' : '退款结算'}`);
-  };
-
-  const toggle = (id: string) => {
-    setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    setToast({
+      message: `已完成 ${ids.length} 条${type === 'internal' ? '结算' : '退款结算'}`,
+      type: 'success',
+    });
   };
 
   return (
@@ -79,25 +82,21 @@ export function InternalSettlementPage({ type }: Props) {
           </>
         }
       >
-        <ListSearchFields mode="game" value={search} onChange={setSearch} />
+        <MonthRangePicker value={monthRange} onChange={setMonthRange} />
+        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
         data={data}
         columns={[
-          { key: 'sel', title: '', render: (r) => !r.settled ? <input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} /> : null, width: '40px' },
           {
             key: 'time',
             title: type === 'internal' ? '收入时间' : '退款时间',
-            filter: {
-              type: 'select',
-              value: incomeTimeFilter,
-              onChange: setIncomeTimeFilter,
-              options: incomeTimeOptions,
-            },
             render: (r) => r.incomeTime,
           },
-          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={getGame(r.gameId)?.name ?? r.gameId} sub={r.gameId} /> },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={getGameName(r.gameId)} sub={r.gameId} /> },
+          { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
+          { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
           {
             key: 'channel',
             title: '渠道',
@@ -109,21 +108,10 @@ export function InternalSettlementPage({ type }: Props) {
             },
             render: (r) => r.channel,
           },
-          { key: 'gross', title: '总收入', render: (r) => formatMoney(r.grossRevenue) },
-          { key: 'settleAmt', title: '结算金额', render: (r) => formatMoney(r.settlementAmount) },
-          { key: 'settleInc', title: incomeLabel, render: (r) => formatMoney(r.settlementIncome) },
-          { key: 'formula', title: '结算公式', render: (r) => r.formulaText },
-          {
-            key: 'settleTime',
-            title: '结算时间',
-            filter: {
-              type: 'select',
-              value: settledFilter,
-              onChange: setSettledFilter,
-              options: SETTLED_STATUS_FILTER_OPTIONS,
-            },
-            render: (r) => r.settlementTime ?? (r.settled ? '-' : '待结算'),
-          },
+          { key: 'settleAmt', title: '待结算金额', render: (r) => formatMoney(r.settlementAmount) },
+          { key: 'settleInc', title: incomeLabel, render: (r) => formatSettlementIncome(r) },
+          { key: 'formula', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
+          { key: 'settleTime', title: '结算时间', render: (r) => formatSettlementTime(r) },
           {
             key: 'status',
             title: '申请付款状态',
@@ -137,7 +125,7 @@ export function InternalSettlementPage({ type }: Props) {
           },
         ]}
       />
-      {toast && <Toast message={toast} onDone={() => setToast('')} />}
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }

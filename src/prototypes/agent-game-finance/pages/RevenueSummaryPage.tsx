@@ -94,7 +94,7 @@ const DIMENSION_OPTIONS: { value: QueryDimension; label: string }[] = [
 ];
 
 export function RevenueSummaryPage() {
-  const { settlements, getVendorName, getGame } = useAppStore();
+  const { settlements, getVendorName, getGameName } = useAppStore();
   const [dimension, setDimension] = useState<QueryDimension>('game');
   const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
@@ -106,9 +106,9 @@ export function RevenueSummaryPage() {
       monthRange,
       search,
       getVendorName,
-      (id) => getGame(id)?.name ?? id,
+      getGameName,
     ),
-    [settlements, dimension, monthRange, search, getVendorName, getGame],
+    [settlements, dimension, monthRange, search, getVendorName, getGameName],
   );
 
   const columns = dimension === 'game'

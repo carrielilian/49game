@@ -1,8 +1,8 @@
 import type { Contract, Game, PaymentRequest, SettlementRecord, Vendor, VendorBalance } from '../data/types';
 
-/** 申请付款状态为「未提交」（未纳入付款申请）的已结算记录 */
+/** 申请付款状态为「未申请」（未纳入付款申请）的已结算记录 */
 function isUnappliedSettlement(s: SettlementRecord): boolean {
-  return s.settled && s.paymentApplyStatus === '未提交';
+  return s.settled && s.paymentApplyStatus === '未申请';
 }
 
 export function deriveBalances(

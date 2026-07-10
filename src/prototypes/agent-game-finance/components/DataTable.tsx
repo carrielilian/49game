@@ -38,35 +38,37 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
   }, [page, totalPages]);
 
   return (
-    <div className="agf-table-wrap">
-      <table className="agf-table">
-        <thead>
-          <tr>
-            {columns.map((col) => (
-              <th key={col.key} style={col.width ? { width: col.width } : undefined}>
-                {col.filter ? <ColumnFilter title={col.title} filter={col.filter} /> : col.title}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.length === 0 ? (
+    <div className="agf-table-panel">
+      <div className="agf-table-wrap">
+        <table className="agf-table">
+          <thead>
             <tr>
-              <td colSpan={columns.length} className="agf-table__empty">{emptyText}</td>
+              {columns.map((col) => (
+                <th key={col.key} style={col.width ? { width: col.width } : undefined}>
+                  {col.filter ? <ColumnFilter title={col.title} filter={col.filter} /> : col.title}
+                </th>
+              ))}
             </tr>
-          ) : (
-            pagedData.map((row, i) => (
-              <tr key={rowKey(row)}>
-                {columns.map((col) => (
-                  <td key={col.key}>
-                    {col.render ? col.render(row, (safePage - 1) * pageSize + i) : String((row as Record<string, unknown>)[col.key] ?? '')}
-                  </td>
-                ))}
+          </thead>
+          <tbody>
+            {data.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="agf-table__empty">{emptyText}</td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              pagedData.map((row, i) => (
+                <tr key={rowKey(row)}>
+                  {columns.map((col) => (
+                    <td key={col.key}>
+                      {col.render ? col.render(row, (safePage - 1) * pageSize + i) : String((row as Record<string, unknown>)[col.key] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
       {data.length > 0 && (
         <Pagination
           total={data.length}

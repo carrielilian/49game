@@ -7,9 +7,11 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   large?: boolean;
+  xl?: boolean;
+  plain?: boolean;
 }
 
-export function Modal({ title, open, onClose, children, footer, large }: ModalProps) {
+export function Modal({ title, open, onClose, children, footer, large, xl, plain }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -20,7 +22,7 @@ export function Modal({ title, open, onClose, children, footer, large }: ModalPr
   if (!open) return null;
   return (
     <div className="agf-overlay" onClick={onClose} role="presentation">
-      <div className={`agf-modal${large ? ' agf-modal--lg' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className={`agf-modal${xl ? ' agf-modal--xl' : large ? ' agf-modal--lg' : ''}${plain ? ' agf-modal--plain' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog">
         <div className="agf-modal__header">
           <span>{title}</span>
           <button type="button" className="agf-modal__close" onClick={onClose} aria-label="关闭">×</button>
@@ -70,26 +72,36 @@ export function Drawer({ title, open, onClose, children, footer, large, width }:
   );
 }
 
+export type ToastType = 'error' | 'success';
+
 export function Toast({
   message,
   onDone,
-  type = 'default',
+  type,
 }: {
   message: string;
   onDone: () => void;
-  type?: 'default' | 'error';
+  type: ToastType;
 }) {
   useEffect(() => {
     const t = setTimeout(onDone, 3000);
     return () => clearTimeout(t);
   }, [onDone]);
   return (
-    <div className={`agf-toast${type === 'error' ? ' agf-toast--error' : ''}`}>
+    <div className={`agf-toast${type === 'error' ? ' agf-toast--error' : ''}${type === 'success' ? ' agf-toast--success' : ''}`}>
       {type === 'error' && (
         <span className="agf-toast__icon" aria-hidden>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <circle cx="8" cy="8" r="8" fill="#F56C6C" />
             <path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </span>
+      )}
+      {type === 'success' && (
+        <span className="agf-toast__icon" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="8" fill="#67C23A" />
+            <path d="M4.8 8.2l2.2 2.2 4.2-4.4" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
       )}

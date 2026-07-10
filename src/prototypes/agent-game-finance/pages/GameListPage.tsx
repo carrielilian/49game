@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { DataTable, DualCell } from '../components/DataTable';
-import { FieldError, ReadonlyField } from '../components/FormFields';
-import { Drawer, Toast } from '../components/Modal';
+import { FieldError, FieldHint, ReadonlyField } from '../components/FormFields';
+import { Drawer, Toast, type ToastType } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
@@ -19,18 +19,27 @@ const EMPTY_GAME: Omit<Game, 'id'> = {
   launchDate: '', operationStatus: '未上线', cooperationStatus: '合作中',
 };
 
-const GAME_REQUIRED: { key: keyof Omit<Game, 'id'>; label: string }[] = [
-  { key: 'name', label: '游戏名称（合同名称）' },
-  { key: 'onlineName', label: '上线游戏名称' },
+const ADD_GAME_REQUIRED: { key: keyof Omit<Game, 'id'>; label: string }[] = [
+  { key: 'onlineName', label: '游戏名称' },
+  { key: 'name', label: '合同游戏名称' },
   { key: 'manager', label: '游戏负责人' },
   { key: 'vendorId', label: '归属厂商' },
 ];
 
+const EDIT_GAME_REQUIRED: { key: keyof Omit<Game, 'id'>; label: string }[] = [
+  { key: 'onlineName', label: '游戏名称' },
+  { key: 'name', label: '合同游戏名称' },
+  { key: 'manager', label: '游戏负责人' },
+];
+
 type FieldErrors = Record<string, string>;
 
-function validateGameForm(form: Omit<Game, 'id'>): FieldErrors {
+function validateGameForm(
+  form: Omit<Game, 'id'>,
+  required: { key: keyof Omit<Game, 'id'>; label: string }[],
+): FieldErrors {
   const errors: FieldErrors = {};
-  for (const { key, label } of GAME_REQUIRED) {
+  for (const { key, label } of required) {
     const v = form[key];
     if (typeof v === 'string' && !v.trim()) errors[key] = `${label}不能为空`;
   }
@@ -41,6 +50,31 @@ function renderGameLogAction(log: GameOperationLog) {
   if (log.action === '添加游戏') return '添加游戏';
   if (log.status) return <StatusBadge text={log.status} />;
   return log.action;
+}
+
+function GameNameFields({ form, set, errors }: {
+  form: Omit<Game, 'id'>;
+  set: (key: keyof Omit<Game, 'id'>, value: string) => void;
+  errors: FieldErrors;
+}) {
+  return (
+    <>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.onlineName} onChange={(e) => set('onlineName', e.target.value)} />
+          <FieldError message={errors.onlineName} />
+          <FieldHint>游戏上线后所使用的正式名称</FieldHint>
+        </div>
+      </div>
+      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">合同游戏名称</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.name} onChange={(e) => set('name', e.target.value)} />
+          <FieldError message={errors.name} />
+          <FieldHint>签约合同所使用的游戏名称</FieldHint>
+        </div>
+      </div>
+    </>
+  );
 }
 
 function AddGameForm({ form, setForm, vendors, errors, clearError }: {
@@ -56,18 +90,7 @@ function AddGameForm({ form, setForm, vendors, errors, clearError }: {
   };
   return (
     <>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称（合同名称）</label>
-        <div className="agf-form-field">
-          <input className="agf-form-input" value={form.name} onChange={(e) => set('name', e.target.value)} />
-          <FieldError message={errors.name} />
-        </div>
-      </div>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">上线游戏名称</label>
-        <div className="agf-form-field">
-          <input className="agf-form-input" value={form.onlineName} onChange={(e) => set('onlineName', e.target.value)} />
-          <FieldError message={errors.onlineName} />
-        </div>
-      </div>
+      <GameNameFields form={form} set={set} errors={errors} />
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label>
         <div className="agf-form-field">
           <input className="agf-form-input" value={form.manager} onChange={(e) => set('manager', e.target.value)} />
@@ -100,11 +123,11 @@ function AddGameForm({ form, setForm, vendors, errors, clearError }: {
   );
 }
 
-function EditGameForm({ form, setForm, editing, vendors, errors, clearError }: {
+function EditGameForm({ form, setForm, editing, getVendorName, errors, clearError }: {
   form: Omit<Game, 'id'>;
   setForm: React.Dispatch<React.SetStateAction<Omit<Game, 'id'>>>;
   editing: Game;
-  vendors: { id: string; name: string }[];
+  getVendorName: (id: string) => string;
   errors: FieldErrors;
   clearError: (key: string) => void;
 }) {
@@ -115,33 +138,14 @@ function EditGameForm({ form, setForm, editing, vendors, errors, clearError }: {
   return (
     <>
       <ReadonlyField label="游戏ID" value={editing.id} />
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称（合同名称）</label>
-        <div className="agf-form-field">
-          <input className="agf-form-input" value={form.name} onChange={(e) => set('name', e.target.value)} />
-          <FieldError message={errors.name} />
-        </div>
-      </div>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">上线游戏名称</label>
-        <div className="agf-form-field">
-          <input className="agf-form-input" value={form.onlineName} onChange={(e) => set('onlineName', e.target.value)} />
-          <FieldError message={errors.onlineName} />
-        </div>
-      </div>
+      <GameNameFields form={form} set={set} errors={errors} />
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label>
         <div className="agf-form-field">
           <input className="agf-form-input" value={form.manager} onChange={(e) => set('manager', e.target.value)} />
           <FieldError message={errors.manager} />
         </div>
       </div>
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">归属厂商</label>
-        <div className="agf-form-field">
-          <select className="agf-form-input" value={form.vendorId} onChange={(e) => set('vendorId', e.target.value)}>
-            <option value="">请选择</option>
-            {vendors.map((v) => <option key={v.id} value={v.id}>{v.id} - {v.name}</option>)}
-          </select>
-          <FieldError message={errors.vendorId} />
-        </div>
-      </div>
+      <ReadonlyField label="归属厂商" value={`${editing.vendorId} / ${getVendorName(editing.vendorId)}`} />
       <div className="agf-form-item"><label className="agf-form-label">版号</label>
         <div className="agf-radio-group">
           <label className="agf-radio-item"><input type="radio" name="edit-license" checked={form.license === '有'} onChange={() => setForm({ ...form, license: '有' })} />有</label>
@@ -174,12 +178,13 @@ export function GameListPage() {
   const [contractForm, setContractForm] = useState<Contract | null>(null);
   const [selectedGameId, setSelectedGameId] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [toast, setToast] = useState<{ message: string; type?: 'default' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const filtered = games.filter((g) => {
     if (!matchesListSearch(search, {
       gameId: g.id,
-      gameName: g.name,
+      gameName: g.onlineName,
+      contractName: g.name,
       vendorId: g.vendorId,
       vendorName: getVendorName(g.vendorId),
     })) return false;
@@ -212,16 +217,16 @@ export function GameListPage() {
   const showIncompleteToast = () => setToast({ message: '请完善所有信息', type: 'error' });
 
   const handleAdd = () => {
-    const next = validateGameForm(form);
+    const next = validateGameForm(form, ADD_GAME_REQUIRED);
     if (Object.keys(next).length) { setErrors(next); showIncompleteToast(); return; }
     addGame(form);
     setAddOpen(false);
   };
   const handleEdit = () => {
     if (!editing) return;
-    const next = validateGameForm(form);
+    const next = validateGameForm(form, EDIT_GAME_REQUIRED);
     if (Object.keys(next).length) { setErrors(next); showIncompleteToast(); return; }
-    updateGame({ ...editing, ...form });
+    updateGame({ ...editing, ...form, vendorId: editing.vendorId });
     setEditOpen(false);
   };
   const saveContract = () => {
@@ -247,13 +252,14 @@ export function GameListPage() {
       <FilterBar
         actions={<button type="button" className="agf-btn agf-btn--primary" onClick={openAdd}>添加游戏</button>}
       >
-        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
+        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} showContractName />
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
         data={filtered}
         columns={[
-          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.name} sub={r.id} /> },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.onlineName} sub={r.id} /> },
+          { key: 'contractName', title: '合同游戏名称', render: (r) => r.name },
           { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
           { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
           { key: 'manager', title: '游戏负责人', render: (r) => r.manager },
@@ -305,13 +311,13 @@ export function GameListPage() {
       </Drawer>
       <Drawer title="编辑游戏" open={editOpen} onClose={() => setEditOpen(false)} large
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>保存</button></>}>
-        {editing && <EditGameForm form={form} setForm={setForm} editing={editing} vendors={vendors} errors={errors} clearError={clearError} />}
+        {editing && <EditGameForm form={form} setForm={setForm} editing={editing} getVendorName={getVendorName} errors={errors} clearError={clearError} />}
       </Drawer>
       <Drawer title="合同管理" open={contractDrawer} onClose={() => setContractDrawer(false)}
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setContractDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveContract}>保存</button></>}>
         {contractForm && contractGame && (
           <>
-            <ReadonlyField label="游戏ID / 游戏名称" value={`${contractGame.id} / ${contractGame.name}`} />
+            <ReadonlyField label="游戏ID / 游戏名称" value={`${contractGame.id} / ${contractGame.onlineName}`} />
             <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">预付分成款</label>
               <div className="agf-form-field">
                 <input
@@ -340,15 +346,17 @@ export function GameListPage() {
       </Drawer>
       <Drawer title="操作记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
         {logGame && (
-          <div className="agf-drawer-meta">游戏ID / 游戏名称：{logGame.id} / {logGame.name}</div>
+          <div className="agf-drawer-meta">游戏ID / 游戏名称：{logGame.id} / {logGame.onlineName}</div>
         )}
         {logs.length === 0 ? <div className="agf-empty">暂无操作记录</div> : (
-          <table className="agf-table">
-            <thead><tr><th>操作人</th><th>操作时间</th><th>操作</th></tr></thead>
-            <tbody>{logs.map((l) => (
-              <tr key={l.id}><td>{l.operator}</td><td>{l.time}</td><td>{renderGameLogAction(l)}</td></tr>
-            ))}</tbody>
-          </table>
+          <div className="agf-table-wrap">
+            <table className="agf-table">
+              <thead><tr><th>操作人</th><th>操作时间</th><th>操作</th></tr></thead>
+              <tbody>{logs.map((l) => (
+                <tr key={l.id}><td>{l.operator}</td><td>{l.time}</td><td>{renderGameLogAction(l)}</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
         )}
       </Drawer>
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

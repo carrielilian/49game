@@ -15,7 +15,7 @@ interface VendorFormProps {
 
 const BANK_OPTIONS = ['中国工商银行', '招商银行', '建设银行', '农业银行', '中国银行', '交通银行', '浦发银行', '民生银行'];
 const LOCATION_OPTIONS = ['北京市', '上海市', '广东省', '浙江省', '四川省', '湖北省', '江苏省'];
-const INVOICE_OPTIONS = ['增值税专用发票（6%）', '增值税专用发票（3%）', '增值税专用发票（1%）', '其他'];
+const INVOICE_OPTIONS = ['增值税专用发票（6%）', '增值税专用发票（3%）', '增值税专用发票（1%）', '普通发票', '其他'];
 
 export const VENDOR_REQUIRED: { key: keyof VendorFormData; label: string }[] = [
   { key: 'name', label: '厂商名称（公司名称）' },

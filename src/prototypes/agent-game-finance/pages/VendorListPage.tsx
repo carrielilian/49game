@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { DataTable } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
-import { Drawer, Toast } from '../components/Modal';
+import { Drawer, Toast, type ToastType } from '../components/Modal';
 import {
   EMPTY_VENDOR_FORM,
   VendorForm,
@@ -24,7 +24,7 @@ export function VendorListPage() {
   const [editing, setEditing] = useState<Vendor | null>(null);
   const [form, setForm] = useState(EMPTY_VENDOR_FORM);
   const [errors, setErrors] = useState<VendorFieldErrors>({});
-  const [toast, setToast] = useState<{ message: string; type?: 'default' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const filtered = vendors.filter((v) => {
     if (!matchesListSearch(search, { vendorId: v.id, vendorName: v.name })) return false;

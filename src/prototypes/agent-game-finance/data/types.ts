@@ -1,4 +1,4 @@
-export type PaymentApplyStatus = '未提交' | '已提交';
+export type PaymentApplyStatus = '未申请' | '已申请';
 export type PaymentStatus = '待付款' | '已付款';
 export type OperationStatus = '未上线' | '已上线';
 export type CooperationStatus = '合作中' | '合作终止';
@@ -53,18 +53,18 @@ export interface FormulaChannel {
   channelGameId?: string;
 }
 
+export type TaxMode = '跟随发票' | '自定义';
+
 export interface FormulaConfig {
   gameId: string;
+  internalTaxMode: TaxMode;
   internalTax: number;
   internalChannelFee: number;
   internalShare: number;
+  externalTaxMode: TaxMode;
   externalTax: number;
   externalChannelFee: number;
   externalShare: number;
-  invoiceMode: '跟随发票' | '其他自定义';
-  customInvoice?: string;
-  internalCustomFormula?: string;
-  externalCustomFormula?: string;
   channels: FormulaChannel[];
 }
 
@@ -128,11 +128,15 @@ export interface FormulaOperationLog {
 }
 
 export interface ImportPreviewRow {
+  id: string;
+  channelGameId: string;
   incomeTime: string;
-  gameId: string;
-  gameName: string;
+  pendingAmount: number;
   channel: string;
-  grossRevenue: number;
-  settlementIncome: number;
-  formulaText: string;
+  gameId?: string;
+  gameName?: string;
+  formulaText?: string;
+  settlementIncome?: number;
+  calculated: boolean;
+  error?: string;
 }

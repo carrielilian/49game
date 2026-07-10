@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DataTable } from '../components/DataTable';
 import { ReadonlyField } from '../components/FormFields';
 import { FilterBar } from '../components/FilterBar';
-import { Drawer, Toast } from '../components/Modal';
+import { Drawer, Toast, type ToastType } from '../components/Modal';
 import { SettlementLetterDrawer } from '../components/SettlementLetterDrawer';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
@@ -21,7 +21,7 @@ export function PaymentListPage() {
   const [voucherOpen, setVoucherOpen] = useState(false);
   const [current, setCurrent] = useState<PaymentRequest | null>(null);
   const [form, setForm] = useState({ payBank: '', receiptInfo: '', remark: '' });
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const data = payments.filter((p) => {
     if (!matchesListSearch(search, { vendorId: p.vendorId, vendorName: getVendorName(p.vendorId) })) return false;
@@ -43,7 +43,7 @@ export function PaymentListPage() {
     if (current) {
       markPaid(current.id, { ...form, actualAmount: current.pendingAmount });
       setMarkOpen(false);
-      setToast('已标记付款');
+      setToast({ message: '已标记付款', type: 'success' });
     }
   };
 
@@ -101,7 +101,7 @@ export function PaymentListPage() {
         <div className="agf-form-item"><label className="agf-form-label">电子发票</label><div className="agf-upload">点击上传电子发票（模拟）</div></div>
       </Drawer>
       {current && <SettlementLetterDrawer open={letterOpen} onClose={() => setLetterOpen(false)} vendorId={current.vendorId} amount={current.pendingAmount} />}
-      {toast && <Toast message={toast} onDone={() => setToast('')} />}
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }

@@ -6,9 +6,11 @@ interface ListSearchFieldsProps {
   mode: ListSearchMode;
   value: ListSearchQuery;
   onChange: (value: ListSearchQuery) => void;
+  /** 游戏管理：额外展示「合同游戏名称」搜索 */
+  showContractName?: boolean;
 }
 
-export function ListSearchFields({ mode, value, onChange }: ListSearchFieldsProps) {
+export function ListSearchFields({ mode, value, onChange, showContractName }: ListSearchFieldsProps) {
   const patch = (key: keyof ListSearchQuery, next: string) => onChange({ ...value, [key]: next });
 
   return (
@@ -19,6 +21,14 @@ export function ListSearchFields({ mode, value, onChange }: ListSearchFieldsProp
           placeholder={SEARCH_FIELD_PLACEHOLDER.game}
           value={value.game ?? ''}
           onChange={(e) => patch('game', e.target.value)}
+        />
+      )}
+      {showContractName && (
+        <input
+          className="agf-input"
+          placeholder={SEARCH_FIELD_PLACEHOLDER.contractName}
+          value={value.contractName ?? ''}
+          onChange={(e) => patch('contractName', e.target.value)}
         />
       )}
       {(mode === 'vendor' || mode === 'gameAndVendor') && (

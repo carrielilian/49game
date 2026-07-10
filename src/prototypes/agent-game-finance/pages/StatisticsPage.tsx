@@ -151,7 +151,7 @@ function StatFilterBar({
 }
 
 export function StatisticsPage({ mode }: Props) {
-  const { settlements, getVendorName, getGame } = useAppStore();
+  const { settlements, getVendorName, getGameName } = useAppStore();
   const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
 
@@ -168,11 +168,11 @@ export function StatisticsPage({ mode }: Props) {
   const channelRows = useMemo(() => filterByTime(buildChannelStats(settlements)), [settlements, monthRange]);
 
   const gameRows = useMemo(() => {
-    const rows = buildGameStats(settlements, (id) => getGame(id)?.name ?? id);
+    const rows = buildGameStats(settlements, getGameName);
     return filterByTime(rows).filter((r) =>
       matchesListSearch(search, { gameId: r.gameId, gameName: r.gameName }),
     );
-  }, [settlements, getGame, monthRange, search]);
+  }, [settlements, getGameName, monthRange, search]);
 
   const filterBar = (
     <StatFilterBar

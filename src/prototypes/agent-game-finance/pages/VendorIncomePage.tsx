@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { DataTable } from '../components/DataTable';
 import { ReadonlyField } from '../components/FormFields';
-import { Drawer, Toast } from '../components/Modal';
+import { Drawer, Toast, type ToastType } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { useAppStore } from '../data/store';
 import { ListSearchFields } from '../components/ListSearchFields';
@@ -13,7 +13,7 @@ export function VendorIncomePage() {
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState('');
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const rows = balances.map((b) => {
     const v = vendors.find((x) => x.id === b.vendorId);
@@ -28,7 +28,10 @@ export function VendorIncomePage() {
   const confirmApply = () => {
     const ok = applyPayment(selectedVendor);
     setConfirmOpen(false);
-    setToast(ok ? '申请付款成功，账户余额已清零' : '账户余额不足，无法申请');
+    setToast({
+      message: ok ? '申请付款成功，账户余额已清零' : '账户余额不足，无法申请',
+      type: ok ? 'success' : 'error',
+    });
   };
 
   const selectedBalance = balances.find((b) => b.vendorId === selectedVendor);
@@ -63,7 +66,7 @@ export function VendorIncomePage() {
           <p className="agf-form-hint">确认后将账户余额清零，并进入付款管理列表。</p>
         </div>
       </Drawer>
-      {toast && <Toast message={toast} onDone={() => setToast('')} />}
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }
