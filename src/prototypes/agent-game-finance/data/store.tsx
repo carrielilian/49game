@@ -168,18 +168,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const importExternal = useCallback((rows: ImportPreviewRow[]) => {
+    const now = formatDateTime();
     const newRecords: SettlementRecord[] = rows.map((r) => {
       const game = games.find((g) => g.id === r.gameId);
+      const formula = formulas.find((f) => f.gameId === r.gameId);
+      const vendor = vendors.find((v) => v.id === game?.vendorId);
+      const settlementIncome = r.settlementIncome != null
+        ? r.settlementIncome
+        : calcRecordSettlementIncome(
+            { type: 'external', gameId: r.gameId!, channel: r.channel, settlementAmount: r.pendingAmount, formulaText: r.formulaText! } as SettlementRecord,
+            formula,
+            vendor,
+          );
       return {
         id: genId('S'), type: 'external' as SettlementType, incomeTime: r.incomeTime, gameId: r.gameId!,
         channel: r.channel, grossRevenue: r.pendingAmount, settlementAmount: r.pendingAmount,
-        settlementIncome: 0, formulaText: r.formulaText!,
+        settlementIncome, formulaText: r.formulaText!,
         paymentApplyStatus: '未申请' as const,
-        settled: false, vendorId: game?.vendorId ?? '',
+        settled: true, vendorId: game?.vendorId ?? '', settlementTime: now,
       };
     });
     setSettlements((prev) => [...newRecords, ...prev]);
-  }, [games]);
+  }, [games, formulas, vendors]);
 
   const pullInternal = useCallback((type: 'internal' | 'refund') => {
     const unsettled = games.filter((g) => {

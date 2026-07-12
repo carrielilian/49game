@@ -21,7 +21,7 @@ import {
   enrichImportRowsOnParse,
   hasChannelEnabledGames,
 } from '../utils/externalImport';
-import { displaySettlementFormula, formatMoney, formatSettlementIncome, formatSettlementTime, isUnsettledSettlement } from '../utils/settlement';
+import { displaySettlementFormula, formatMoney, formatSettlementIncome, formatSettlementTime } from '../utils/settlement';
 
 const EMPTY_IMPORT: ImportPreviewRow[] = [];
 
@@ -48,7 +48,7 @@ const IMPORT_PREVIEW_COLUMNS: Column<ImportPreviewRow>[] = [
 ];
 
 export function ExternalSettlementPage() {
-  const { settlements, formulas, games, vendors, getGameName, getVendorName, importExternal, settleRecords } = useAppStore();
+  const { settlements, formulas, games, vendors, getGameName, getVendorName, importExternal } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [channelFilter, setChannelFilter] = useState('');
@@ -62,7 +62,7 @@ export function ExternalSettlementPage() {
   const importSettlementReady =
     importUploaded && preview.every((r) => r.settlementIncome != null && !r.error);
   const canConfirmImport =
-    importUploaded && preview.every((r) => r.gameId && r.formulaText && r.formulaText !== '-' && !r.error);
+    importUploaded && preview.every((r) => r.gameId && r.formulaText && r.formulaText !== '-' && r.settlementIncome != null && !r.error);
 
   const data = settlements.filter((s) => {
     if (s.type !== 'external') return false;
@@ -142,7 +142,8 @@ export function ExternalSettlementPage() {
       return;
     }
     if (!canConfirmImport) {
-      showErrorToast('存在无法导入的数据，请修正后重试');
+      const hasUnsettled = preview.some((r) => r.settlementIncome == null && !r.error);
+      showErrorToast(hasUnsettled ? '请先完成弹窗内结算，再确认导入' : '存在无法导入的数据，请修正后重试');
       return;
     }
     importExternal(preview);
@@ -150,27 +151,14 @@ export function ExternalSettlementPage() {
     showToast('导入成功，已加入外部收入结算列表', 'success');
   };
 
-  const handleSettle = () => {
-    const ids = data.filter((s) => isUnsettledSettlement(s)).map((s) => s.id);
-    if (ids.length === 0) {
-      showErrorToast('没有待结算数据');
-      return;
-    }
-    settleRecords(ids);
-    showToast(`已完成 ${ids.length} 条结算`, 'success');
-  };
-
   return (
     <div className="agf-card">
       <FilterBar
         actions={
-          <>
-            <button type="button" className="agf-btn agf-btn--primary" onClick={handleSettle}>结算</button>
-            <button type="button" className="agf-btn agf-btn--primary" onClick={openImport}>
-              <Upload size={16} />
-              导入并结算
-            </button>
-          </>
+          <button type="button" className="agf-btn agf-btn--primary" onClick={openImport}>
+            <Upload size={16} />
+            导入并结算
+          </button>
         }
       >
         <MonthRangePicker value={monthRange} onChange={setMonthRange} />
