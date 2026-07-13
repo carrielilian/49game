@@ -9,9 +9,10 @@ interface ModalProps {
   large?: boolean;
   xl?: boolean;
   plain?: boolean;
+  compact?: boolean;
 }
 
-export function Modal({ title, open, onClose, children, footer, large, xl, plain }: ModalProps) {
+export function Modal({ title, open, onClose, children, footer, large, xl, plain, compact }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -22,7 +23,7 @@ export function Modal({ title, open, onClose, children, footer, large, xl, plain
   if (!open) return null;
   return (
     <div className="agf-overlay" onClick={onClose} role="presentation">
-      <div className={`agf-modal${xl ? ' agf-modal--xl' : large ? ' agf-modal--lg' : ''}${plain ? ' agf-modal--plain' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className={`agf-modal${xl ? ' agf-modal--xl' : large ? ' agf-modal--lg' : compact ? ' agf-modal--compact' : ''}${plain ? ' agf-modal--plain' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog">
         <div className="agf-modal__header">
           <span>{title}</span>
           <button type="button" className="agf-modal__close" onClick={onClose} aria-label="关闭">×</button>

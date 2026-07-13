@@ -62,15 +62,15 @@ function GameNameFields({ form, set, errors }: {
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏名称</label>
         <div className="agf-form-field">
           <input className="agf-form-input" value={form.onlineName} onChange={(e) => set('onlineName', e.target.value)} />
-          <FieldError message={errors.onlineName} />
           <FieldHint>游戏上线后所使用的正式名称</FieldHint>
+          <FieldError message={errors.onlineName} />
         </div>
       </div>
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">合同游戏名称</label>
         <div className="agf-form-field">
           <input className="agf-form-input" value={form.name} onChange={(e) => set('name', e.target.value)} />
-          <FieldError message={errors.name} />
           <FieldHint>签约合同所使用的游戏名称</FieldHint>
+          <FieldError message={errors.name} />
         </div>
       </div>
     </>

@@ -69,18 +69,16 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
           </tbody>
         </table>
       </div>
-      {data.length > 0 && (
-        <Pagination
-          total={data.length}
-          page={safePage}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
-      )}
+      <Pagination
+        total={data.length}
+        page={safePage}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }

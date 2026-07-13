@@ -34,7 +34,7 @@ function needsTaxInput(mode: TaxMode, invoiceInfo: string): boolean {
 function validateChannelsForm(channels: FormulaChannel[]): FieldErrors {
   const errors: FieldErrors = {};
   for (const ch of channels) {
-    if (ch.type === 'internal' && ch.enabled && !ch.channelGameId?.trim()) {
+    if (ch.enabled && !ch.channelGameId?.trim()) {
       errors[`channel-${ch.id}`] = '渠道游戏ID不能为空';
     }
   }
@@ -352,7 +352,7 @@ export function FormulaListPage() {
               </div>
             ))}
             <FormSectionTitle>外部渠道</FormSectionTitle>
-            <FieldHint>请勾选支持的外部渠道</FieldHint>
+            <FieldHint>请勾选支持的外部渠道，并填写该渠道下对应的游戏ID</FieldHint>
             {editing.channels.map((ch, i) => ch.type !== 'external' ? null : (
               <div key={ch.id} className="agf-channel-row">
                 <label className="agf-channel-row__check">
@@ -363,6 +363,18 @@ export function FormulaListPage() {
                   />
                 </label>
                 <span className="agf-channel-row__name">{ch.name}</span>
+                <div className="agf-channel-row__field">
+                  <input
+                    className="agf-form-input"
+                    placeholder="渠道游戏ID"
+                    value={ch.channelGameId ?? ''}
+                    onChange={(e) => {
+                      clearError(`channel-${ch.id}`);
+                      updateChannel(i, { channelGameId: e.target.value });
+                    }}
+                  />
+                  <FieldError message={errors[`channel-${ch.id}`]} />
+                </div>
               </div>
             ))}
           </>

@@ -52,6 +52,27 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "P
 .agf-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); }
 .agf-breadcrumb__sep { color: var(--color-text-muted); }
 .agf-breadcrumb__current { color: var(--color-text); }
+.agf-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  line-height: 0;
+}
+.agf-help-btn:hover { color: var(--color-primary); }
+.agf-field-help-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.agf-field-help-list li + li { margin-top: 12px; }
 .agf-header__actions { display: flex; align-items: center; gap: 16px; color: var(--color-text-secondary); }
 .agf-content { flex: 1; padding: 16px 24px 24px; overflow: auto; }
 
@@ -372,10 +393,23 @@ button.agf-month-range__input--open:focus {
 .agf-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 24px; }
 .agf-modal { background: #fff; border-radius: 8px; width: 100%; max-width: 560px; max-height: 90vh; overflow: auto; box-shadow: 0 4px 24px rgba(0,0,0,0.15); }
 .agf-modal--lg { max-width: 720px; }
+.agf-modal--compact { width: auto; max-width: 480px; }
 .agf-modal--xl { max-width: 960px; }
 .agf-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--color-border); font-size: 16px; font-weight: 500; }
 .agf-modal__close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--color-text-muted); line-height: 1; }
 .agf-modal__body { padding: 24px; }
+.agf-confirm-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.agf-confirm-text p {
+  margin: 0;
+}
+.agf-confirm-text p + p {
+  margin-top: 12px;
+}
 .agf-modal__footer { display: flex; justify-content: flex-end; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--color-border); }
 .agf-modal--plain .agf-modal__header { border-bottom: none; }
 .agf-modal--plain .agf-modal__footer { border-top: none; }

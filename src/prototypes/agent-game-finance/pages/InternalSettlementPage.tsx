@@ -4,12 +4,13 @@ import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
 import { StatusBadge } from '../components/StatusBadge';
 import { Toast, type ToastType } from '../components/Modal';
-import { INTERNAL_CHANNELS } from '../data/mock-data';
+import { isFormulaConfigured, INTERNAL_CHANNELS } from '../data/mock-data';
 import { useAppStore } from '../data/store';
 import { PAYMENT_APPLY_STATUS_FILTER_OPTIONS, selectOptions } from '../utils/columnFilters';
+import { checkFinanceCenterReady, fetchFinanceCenterRows } from '../utils/financeCenter';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
-import { getSampleMonthRange, isMonthInRange } from '../utils/monthRange';
+import { getPreviousMonthKey, getRecentTwoMonthsRange, isMonthInRange } from '../utils/monthRange';
 import {
   displaySettlementFormula,
   formatMoney,
@@ -23,13 +24,24 @@ interface Props {
 }
 
 export function InternalSettlementPage({ type }: Props) {
-  const { settlements, getGameName, getVendorName, pullInternal, settleRecords } = useAppStore();
+  const {
+    settlements,
+    formulas,
+    games,
+    getGameName,
+    getVendorName,
+    pullInternal,
+    settleRecords,
+    internalSettlementButtons,
+    setInternalSettlementButtons,
+  } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
-  const [monthRange, setMonthRange] = useState(getSampleMonthRange);
+  const [monthRange, setMonthRange] = useState(getRecentTwoMonthsRange);
   const [channelFilter, setChannelFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [loading, setLoading] = useState(false);
+  const { pullCompleted, settleCompleted } = internalSettlementButtons[type];
 
   const incomeLabel = type === 'internal' ? '结算收入' : '结算退款';
 
@@ -47,29 +59,48 @@ export function InternalSettlementPage({ type }: Props) {
     return true;
   });
 
-  const handlePull = () => {
+  const pullDisabled = loading || pullCompleted;
+  const settleDisabled = loading || !pullCompleted || settleCompleted;
+
+  const handlePull = async () => {
+    if (pullDisabled) return;
     setLoading(true);
-    setTimeout(() => {
-      pullInternal(type);
+    try {
+      const ready = await checkFinanceCenterReady();
+      if (!ready) {
+        setToast({ message: '财务中心还未结算完成', type: 'error' });
+        return;
+      }
+      const incomeMonthKey = getPreviousMonthKey();
+      const rows = fetchFinanceCenterRows(type, formulas, games, incomeMonthKey);
+      pullInternal(type, rows, incomeMonthKey);
+      setMonthRange({ start: incomeMonthKey, end: incomeMonthKey });
+      setInternalSettlementButtons(type, { pullCompleted: true, settleCompleted: false });
+      setToast({ message: '已从财务中心拉取待结算数据', type: 'success' });
+    } finally {
       setLoading(false);
-      setToast({
-        message: type === 'internal' ? '已从财务中心拉取待结算数据' : '已从财务中心拉取待退款数据',
-        type: 'success',
-      });
-    }, 800);
+    }
   };
 
   const handleSettle = () => {
-    const ids = data.filter((s) => isUnsettledSettlement(s)).map((s) => s.id);
-    if (ids.length === 0) {
+    if (settleDisabled) return;
+    const unsettled = data.filter((s) => isUnsettledSettlement(s));
+    if (unsettled.length === 0) {
       setToast({ message: '没有待结算数据', type: 'error' });
       return;
     }
-    settleRecords(ids);
-    setToast({
-      message: `已完成 ${ids.length} 条${type === 'internal' ? '结算' : '退款结算'}`,
-      type: 'success',
+    const missingGameIds = [...new Set(unsettled.map((s) => s.gameId))].filter((gameId) => {
+      const formula = formulas.find((f) => f.gameId === gameId);
+      return !isFormulaConfigured(formula);
     });
+    if (missingGameIds.length > 0) {
+      const names = missingGameIds.map((id) => getGameName(id)).join('、');
+      setToast({ message: `${names}未设置结算公式`, type: 'error' });
+      return;
+    }
+    settleRecords(unsettled.map((s) => s.id));
+    setInternalSettlementButtons(type, { pullCompleted, settleCompleted: true });
+    setToast({ message: '结算成功', type: 'success' });
   };
 
   return (
@@ -77,8 +108,22 @@ export function InternalSettlementPage({ type }: Props) {
       <FilterBar
         actions={
           <>
-            <button type="button" className="agf-btn agf-btn--default" onClick={handlePull} disabled={loading}>{loading ? '拉取中...' : '数据拉取'}</button>
-            <button type="button" className="agf-btn agf-btn--primary" onClick={handleSettle}>结算</button>
+            <button
+              type="button"
+              className="agf-btn agf-btn--primary"
+              onClick={handlePull}
+              disabled={pullDisabled}
+            >
+              {loading ? '拉取中...' : '数据拉取'}
+            </button>
+            <button
+              type="button"
+              className="agf-btn agf-btn--primary"
+              onClick={handleSettle}
+              disabled={settleDisabled}
+            >
+              结算
+            </button>
           </>
         }
       >

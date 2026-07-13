@@ -2,8 +2,8 @@
 
 > **用途**：在新 Cursor 对话中快速恢复本项目背景、已做决策和待办，避免重复对齐。  
 > **UI 细节**：改样式、表单、抽屉、分页等请优先读 [`ui-spec.md`](./ui-spec.md)。  
-> **最后更新**：2026-07-12（外部结算流程定稿：主列表无【结算】、导入写已结算、外部无未结算样例）  
-> **对应 Git**：见文末「Git 状态」；远程 https://github.com/carrielilian/49game.git `main`
+> **最后更新**：2026-07-13（厂商收入申请付款、mock 样例、结算三页时间筛选说明）  
+> **对应 Git**：见文末「Git 状态」；远程 https://github.com/carrielilian/49game.git `main`（本地可能有未推送改动）
 
 ---
 
@@ -117,6 +117,7 @@
 - `components/Pagination.tsx` + `DataTable.tsx` 集成。
 - 默认 **20 条/页**；可选 10/20/30/50/100/200。
 - 居中：共 X 条 + 每页条数 + 页码；当前页浅蓝底 `#eef2fc`、蓝字 `#4165d7`。
+- **无数据时也显示分页**（「共 0 条」+ 条数下拉 + 页码 1）。
 - 筛选或数据长度变化时重置到第 1 页；统计页切换查询维度时用 `key={dimension}` 重置分页。
 
 ### 7. UI 样式要点（详见 ui-spec.md）
@@ -151,7 +152,8 @@
 | 添加/编辑厂商 | 厂商名称、联系人、手机、邮箱、单位地址、发票信息、开户名称、开户银行、**开户银行所在地**、支行名称、银行卡号（**11 项**） | `VendorForm` → `validateVendorForm` + `VENDOR_REQUIRED` |
 
 **组件**：
-- `FormFields.tsx` → `FieldError`（class `agf-form-error`）、`FieldHint`（class `agf-form-hint`）
+- `FormFields.tsx` → `FieldError`（class `agf-form-error`）、`FieldHint`（class `agf-form-hint`）；**顺序：灰色 FieldHint 在上，红色 FieldError 在下**
+- `PercentInput`：渠道费/分成下方先「请输入0-100的整数」，再校验红字
 - `VendorForm.tsx` → `agf-form-grid__error`
 - **Modal.tsx** → `Toast` 支持 `type="error" | "success"`（失败红、成功绿；**无**深色默认样式）；显示 3 秒
 
@@ -242,11 +244,11 @@
 - 小标题：**内部渠道** / **外部渠道**（非「勾选」后缀）；标题位置不缩进。
 - 说明（`FieldHint`，标题下方 12px 灰字）：
   - 内部：「请勾选支持的内部渠道，并填写该渠道下对应的游戏ID」
-  - 外部：「请勾选支持的外部渠道」
-- **内部渠道行**：`[勾选] 渠道名称 [渠道游戏ID 输入框]` 单行；行整体左缩进 `48px`（`agf-channel-row`）；输入框宽 **200px**。
-- **外部渠道行**：仅 `[勾选] 渠道名称`，**无**渠道游戏ID 输入框。
-- **校验**：仅内部渠道；勾选后「渠道游戏ID」必填，未勾选不校验；`validateChannelsForm`；失败 Toast「请完善所有信息」。
+  - 外部：「请勾选支持的外部渠道，并填写该渠道下对应的游戏ID」
+- **内外渠道行结构一致**：`[勾选] 渠道名称 [渠道游戏ID 输入框]` 单行；行左缩进 `48px`（`agf-channel-row`）；输入框宽 **200px**。
+- **校验**：内外部渠道勾选后「渠道游戏ID」**必填**；未勾选不校验；`validateChannelsForm`；失败 Toast「请完善所有信息」。
 - 厂商名称与「内部渠道」标题间距收紧（`agf-channel-drawer-meta`）。
+- 外部导入匹配：`externalImport.ts` 按外部渠道名 + `channelGameId` 解析游戏。
 
 **操作记录抽屉**：顶部 `agf-drawer-meta` 仅显示游戏ID/游戏名称；表格 `agf-table-wrap` 外框；列：操作人、操作时间、结算公式。
 
@@ -265,10 +267,10 @@
 | 申请付款状态 | 未申请 / 已申请；漏斗 |
 
 - **无主列表勾选列**。
-- **内部 / 退款**：主列表有【结算】按钮；「数据拉取」写入未结算记录（待结算金额 + 公式，收入/时间为空）；【结算】处理当前筛选未结算行（`isUnsettledSettlement` → `settleRecords` → `calcRecordSettlementIncome`）。
-- **外部**：主列表**无**【结算】按钮；结算仅在「导入并结算」弹窗内完成；「确认导入」写入**已结算**记录（结算收入=弹窗内结果，结算时间=确认导入时间）；主列表**不应出现**未结算数据。
+- **内部 / 退款**：主列表【数据拉取】【结算】均为 primary；见 **§20** 完整规则；结算仅处理**本页主列表**未结算行。
+- **外部**：主列表**无**【结算】按钮；结算仅在「导入并结算」弹窗内完成；「确认导入」写入**已结算**记录。
 - **已移除**列表列「总收入」。
-- 顶部查询：`MonthRangePicker` + `ListSearchFields`（**`gameAndVendor`**）；默认 `2025-05 - 2025-06`。
+- 顶部查询：`MonthRangePicker` + `ListSearchFields`（**`gameAndVendor`**）；默认 **`getRecentTwoMonthsRange()`**（上个月 + 当前月）。
 
 ### 15. 列表布局与表格边框（2026-07-10 本轮）
 
@@ -330,9 +332,106 @@
 3. **结算三页主列表**：去勾选；结算时间无漏斗；未结算时结算时间/收入为 `-`；内部/退款页【结算】批量处理当前列表未结算行并按公式算收入；外部主列表无【结算】。
 4. **外部导入**：确认导入写入**已结算**主列表；结算收入=弹窗内结算结果，结算时间=确认导入时间；弹窗内【结算】必需。
 5. **结算三页列**：游戏名称后新增厂商ID、厂商名称；查询栏 `gameAndVendor`。
-6. **样例未结算**：仅 S008（内部 2025-06）保留为未结算，用于验收内部主列表【结算】；外部样例全部已结算。
+6. **样例未结算**：初始 mock **无**未结算记录；内部未结算数据仅通过【数据拉取】写入；外部样例全部已结算。
 
 **本轮改动文件**：`ExternalSettlementPage.tsx`、`InternalSettlementPage.tsx`、`utils/settlement.ts`、`data/store.tsx`、`data/mock-data.ts`、`style.css`。
+
+### 20. 本次对话汇总（2026-07-13）
+
+#### A. 内部收入结算 / 内部退款结算 — 【数据拉取】【结算】
+
+| 项 | 规则 |
+|----|------|
+| 样式 | 两按钮均为 **primary** |
+| 页面独立 | `internal` / `refund` **互不影响**（各自 `type` 数据、各自按钮状态） |
+| 按钮状态 | 存 `store.internalSettlementButtons`；**切换菜单/页面不重置**；**仅浏览器刷新**恢复初始 |
+| 数据拉取 | 会话内成功 1 次后禁用；校验财务中心（mock：`financeCenter.ts`） |
+| 拉取失败 | 红 Toast「财务中心还未结算完成」 |
+| 拉取成功 | 绿 Toast「已从财务中心拉取待结算数据」；拉取**上一自然月**（`getPreviousMonthKey`）；按已勾选内外部渠道 + 渠道游戏ID；启用【结算】；时间筛选切至上月 |
+| 结算 | 初始禁用；拉取成功后启用；会话内成功 1 次后再禁用 |
+| 结算校验 | 本页主列表未结算游戏均需有公式；否则红 Toast「{游戏名}未设置结算公式」（多游戏「、」连接） |
+| 结算成功 | 绿 Toast「结算成功」；仅结算**本页主列表**当前未结算行 |
+
+工具：`utils/financeCenter.ts`；按钮状态仅存 `store.internalSettlementButtons`（已删除 `utils/internalMonthlyState.ts`）
+
+#### B. 结算三页时间默认
+
+- 外部/内部/退款结算：`MonthRangePicker` 默认 **`getRecentTwoMonthsRange()`** = **上个月 + 当前月**（如 2026-07 时为 `2026-06 - 2026-07`）。
+- 数据统计仍用 `getSampleMonthRange()`（mock 2025-05/06）。
+
+#### C. 厂商收入（`VendorIncomePage` + `balance.ts`）
+
+| 字段 | 公式 |
+|------|------|
+| 累计收入 | 内部+外部已结算「结算收入」之和 |
+| 累计退款 | 内部退款已结算「结算退款」之和 |
+| 账户总收入 | 累计收入 − 累计退款 |
+| 账户余额 | 内外部未申请结算收入之和 − 退款未申请结算退款之和 − **预付分成款** |
+
+字段说明：**不在列表上方展示**；面包屑「厂商收入」右侧 **?**（`VendorIncomeFieldHelp`）→ Modal「厂商收入字段说明」；`plain` 无分割线、无底部按钮；× / 遮罩 / Esc 关闭。
+
+#### D. 支持渠道抽屉
+
+- **外部渠道**也支持填写渠道游戏ID，布局/校验与内部一致。
+
+#### E. 表单与列表 UI
+
+- 灰色 `FieldHint` 在上、红色 `FieldError` 在下（含 `PercentInput`、游戏名称字段）。
+- **列表无数据仍显示分页**（共 0 条）。
+
+#### F. 改动文件（§20 上午轮）
+
+`InternalSettlementPage.tsx`、`ExternalSettlementPage.tsx`、`store.tsx`、`utils/financeCenter.ts`、`utils/monthRange.ts`、`utils/balance.ts`、`FormulaListPage.tsx`、`FormFields.tsx`、`GameListPage.tsx`、`VendorIncomePage.tsx`、`components/VendorIncomeFieldHelp.tsx`、`components/AdminLayout.tsx`、`components/DataTable.tsx`、`index.tsx`、`style.css`、`ui-spec.md`、`conversation-memory.md`
+
+### 21. 本次对话汇总（2026-07-13 下午）
+
+#### A. 结算 mock 与时间筛选
+
+- 初始结算样例 **S001–S021 + S022–S025** 的 `incomeTime` 仅 **2025-05 / 2025-06**；**无 2026 年**初始数据。
+- 结算三页默认 `getRecentTwoMonthsRange()`（上个月+当前月，如 2026-07 为 `2026-06 - 2026-07`）时列表可能为空；查 mock 请手动选 **`2025-05 - 2025-06`**。
+- 已**移除**未结算样例 **S008**；内部未结算仅通过【数据拉取】产生。
+
+#### B. 厂商收入 — 【申请付款】（`VendorIncomePage` + `utils/vendorPaymentApply.ts`）
+
+**操作列**
+
+| 账户余额 | 操作列 |
+|----------|--------|
+| > 0 | 显示【申请付款】链接（主题色 `agf-btn--link`） |
+| ≤ 0 | 显示 `-` |
+
+**账户余额列**：正文黑色，与其他数字列一致（不加蓝/加粗）。
+
+**点击校验（优先级，红 Toast，不弹窗）**
+
+| 顺序 | 条件 | 提示 |
+|------|------|------|
+| 1 | 银行五字段未填全 | 未填写银行信息 |
+| 2 | 该厂商存在游戏合同预付分成款 ≤ 0 | **{游戏名称}未补充预付分成款信息**（`getGameName` / `onlineName`） |
+| 3 | 付款管理存在该厂商 `status=待付款` | 存在一笔未付款的记录 |
+
+**二次确认 Modal**（校验通过后）
+
+- `plain` + **`compact`**（`max-width: 480px`，`width: auto`）；无上下灰线。
+- 本会话内 **内部收入【结算】**（`internalSettlementButtons.internal.settleCompleted`）与 **外部导入弹窗【结算】**（`externalSettlementButtons.settleCompleted`）**均未完成**时：
+  - 第一行：`{上月 YYYY-MM}内部渠道收入还未结算，是否继续申请付款？`
+  - 第二行：`申请付款金额：{余额}元`
+- 两者均已完成：仅第二行金额文案。
+- 按钮：取消 / 确认申请；成功绿 Toast「申请付款成功，账户余额已清零」。
+
+#### C. Mock 验收样例
+
+| 厂商 | 用途 |
+|------|------|
+| **1004 / 1006 / 1008** | 余额 > 0，信息齐全，可走完整申请（S022–S025 增补未申请收入） |
+| **1005** | 游戏 **4009 音乐节奏** 合同预付分成款 = **0** → 点【申请付款】测「音乐节奏未补充预付分成款信息」 |
+| **1001** | 有 P002「待付款」；余额为负，操作列 `-` |
+
+#### D. 改动文件（本轮）
+
+`VendorIncomePage.tsx`、`utils/vendorPaymentApply.ts`、`data/mock-data.ts`、`data/store.tsx`（`externalSettlementButtons`）、`ExternalSettlementPage.tsx`、`components/Modal.tsx`（`compact`）、`style.css`、`ui-spec.md`、`conversation-memory.md`
+
+---
 
 ### 19. 本次对话汇总（2026-07-11 ~ 07-12）
 
@@ -349,7 +448,7 @@
 2. 弹窗流程：选渠道 → 上传报表 → 弹窗内【结算】（必需）→【确认导入】。
 3. 确认导入写入主列表为**已结算**：`settled: true`；结算收入=弹窗内结果；结算时间=确认导入时间（`formatDateTime()`）。
 4. 未完成弹窗结算时【确认导入】禁用；提示「请先完成弹窗内结算，再确认导入」。
-5. 外部主列表**不要有未结算数据**；mock S009 已改为已结算；仅内部 S008 保留未结算样例。
+5. 外部主列表**不要有未结算数据**；初始 mock 结算记录均为已结算；内部未结算仅来自【数据拉取】。
 
 **实现**：`importExternal`（`store.tsx`）写已结算记录；`ExternalSettlementPage` 的 `canConfirmImport` 要求 `settlementIncome != null`。
 
@@ -366,10 +465,10 @@ src/prototypes/agent-game-finance/
 │   ├── DataTable.tsx, Pagination.tsx, ListSearchFields.tsx
 │   ├── FormFields.tsx, VendorForm.tsx, Modal.tsx
 │   ├── FilterBar.tsx, ColumnFilter.tsx, StatusBadge.tsx
-│   ├── MonthRangePicker.tsx
+│   ├── MonthRangePicker.tsx, VendorIncomeFieldHelp.tsx
 │   └── AdminLayout.tsx, Sidebar.tsx, SettlementLetterDrawer.tsx
-├── data/types.ts, mock-data.ts, store.tsx   # store 含 getGameName / getVendorName
-├── utils/listKeyword.ts, columnFilters.ts, balance.ts, settlement.ts, monthRange.ts, invoiceTax.ts, externalImport.ts
+├── data/types.ts, mock-data.ts, store.tsx   # internalSettlementButtons / externalSettlementButtons
+├── utils/listKeyword.ts, columnFilters.ts, balance.ts, settlement.ts, monthRange.ts, invoiceTax.ts, externalImport.ts, financeCenter.ts, vendorPaymentApply.ts
 └── pages/
     ├── GameListPage.tsx      # 游戏 CRUD、合同、操作记录
     ├── VendorListPage.tsx
@@ -389,10 +488,12 @@ src/resources/agent-game-finance/
 ## 数据与 ID 规则
 
 - 厂商 ID 从 **1001** 起；游戏 ID 从 **4001** 起（`store.tsx` 内 `nextNumericId`）。
-- Mock 约 12 条游戏；结算样例 **S001–S021**，收入时间主要为 **2025-05 / 2025-06**。
+- Mock 结算样例 **S001–S025**（含 S022–S025 厂商收入验收），收入时间主要为 **2025-05 / 2025-06**；**无 2026 年初始结算数据**。
 - **默认渠道费**（样例公式）：外部 **0%**、内部 **5%**（`makeFormula`）。
 - 数据统计页默认查 `2025-05 - 2025-06`，否则列表可能「暂无数据」。
-- **未结算样例**：仅 **S008**（内部）；外部样例（含 S009）全部已结算。
+- **结算三页**默认查近两个月（如 `2026-06 - 2026-07`），与 mock 月份不一致时会「暂无数据」，需手动改 `2025-05 - 2025-06`。
+- **未结算样例**：初始 mock **无**未结算记录（已移除 S008）；内部未结算仅通过【数据拉取】产生。
+- **厂商收入 mock**：1004/1006/1008 余额 > 0 可申请；1005/4009 预付分成款 = 0 测拦截；1001 有 P002 待付款。
 
 **游戏名称字段**（勿混用）：
 
@@ -411,7 +512,7 @@ src/resources/agent-game-finance/
 - 合同抽屉中付款代理金、委托开发费用**暂未**做必填校验（仅预付分成款必填）。
 - 结算三页列表「结算公式」列用 `displaySettlementFormula` 去前缀；结算公式管理列表仍保留「内部渠道：/外部渠道：」两行。
 - 历史结算记录 `formulaText` 字段文案可能与列表实时计算略有差异；导入弹窗不再含「总收入」列。
-- **外部收入结算主列表禁止未结算数据**；mock 仅 S008（内部）为未结算，供内部【结算】验收。
+- **外部收入结算主列表禁止未结算数据**；初始 mock 均为已结算；内部【结算】验收依赖【数据拉取】后的未结算行。
 
 ---
 
@@ -428,8 +529,8 @@ src/resources/agent-game-finance/
 |----|-----|
 | 远程 | https://github.com/carrielilian/49game.git |
 | 分支 | `main` |
-| 上一版已推 | `1366449` — 完善结算三页交互、外部导入与列表规范 |
-| **当前最新** | `90e2863` — 完善外部收入结算：主列表去掉结算按钮，确认导入写入已结算记录并同步文档 |
+| 远程最新（对话开始时拉取） | `e1167e5` |
+| **本地** | 2026-07-13 本轮改动**尚未推送**（用户说「推送到 git」时再 commit/push） |
 
 ---
 
@@ -452,7 +553,7 @@ src/resources/agent-game-finance/
 15. **游戏名称**：「游戏ID / 游戏名称」一律 `onlineName`（`getGameName`）；「合同游戏名称」才用 `name`。  
 16. 游戏添加/编辑：先「游戏名称」后「合同游戏名称」，带 `FieldHint`；编辑时归属厂商只读。  
 17. 结算公式列表：新游戏同步空公式、未配置 `-`、公式列内外两行。  
-18. 支持渠道：内部勾选+填 ID（勾选必填）；外部仅勾选；小标题「内部渠道」「外部渠道」。  
+18. 支持渠道：内部/外部均为勾选+填 ID（勾选后必填）；小标题「内部渠道」「外部渠道」。  
 19. 结算三页列表无「总收入」；列为「待结算金额」；申请付款状态「未申请/已申请」。  
 20. 列表/抽屉/弹窗表格：`--agf-gutter 24px` + `agf-table-wrap` 灰色实线外框；分页在边框外。
 21. 外部导入：渠道**单选**；无运营游戏禁止上传；上传后切列表态 + `外部渠道：` meta + DataTable 分页。
@@ -463,4 +564,15 @@ src/resources/agent-game-finance/
 26. **内部/退款**主列表有【结算】；**外部**主列表无【结算】；结算时间无漏斗；内部未结算时收入/时间 `-`。
 27. 结算三页查询 `gameAndVendor`；列含厂商ID、厂商名称（分两列，在游戏列右侧）。
 28. 外部确认导入写**已结算**记录；结算时间=确认导入时间；弹窗内【结算】必需；分页下方留白 16+24px。
-29. **外部收入结算主列表禁止未结算数据**；勿再加外部未结算 mock；仅内部 S008 可作未结算样例。
+29. **外部收入结算主列表禁止未结算数据**；初始 mock 均为已结算；内部未结算仅来自【数据拉取】，勿再加静态未结算 mock。
+30. **内部/退款结算**：两页独立；按钮状态 `internalSettlementButtons`；**切换页面不重置、浏览器刷新重置**；拉取上月数据；结算仅本页主列表未结算行。
+31. **厂商收入**：账户总收入=累计收入−累计退款；账户余额=未申请结算收入−未申请退款−预付；字段说明见面包屑 **?** Modal。
+32. **结算三页时间默认**：`getRecentTwoMonthsRange()` = 上个月 + 当前月。
+33. **支持渠道**：内外部均勾选+填渠道游戏ID（勾选后必填）。
+34. **FieldHint 在上、FieldError 在下**；PercentInput 同理。
+35. **DataTable 无数据也显示分页**（共 0 条）。
+36. **结算 mock 月份**：初始数据仅 2025-05/06；结算三页默认近两个月，查 mock 需手动改时间范围。
+37. **厂商收入申请付款**：余额 > 0 才显示按钮；校验银行→预付（按游戏名）→待付款；确认 Modal `plain`+`compact` 两行文案。
+38. **厂商收入样式**：余额列黑色；操作列【申请付款】主题蓝链接。
+39. **外部结算完成态**：`externalSettlementButtons.settleCompleted`，导入弹窗【结算】成功后置 true（会话内保持）。
+40. **vendorPaymentApply.ts**：申请付款拦截逻辑集中在此工具。

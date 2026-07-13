@@ -14,7 +14,7 @@ import {
 } from '../utils/columnFilters';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
-import { getSampleMonthRange, isMonthInRange } from '../utils/monthRange';
+import { getRecentTwoMonthsRange, isMonthInRange } from '../utils/monthRange';
 import {
   buildMockImportRows,
   calculateImportRow,
@@ -48,9 +48,18 @@ const IMPORT_PREVIEW_COLUMNS: Column<ImportPreviewRow>[] = [
 ];
 
 export function ExternalSettlementPage() {
-  const { settlements, formulas, games, vendors, getGameName, getVendorName, importExternal } = useAppStore();
+  const {
+    settlements,
+    formulas,
+    games,
+    vendors,
+    getGameName,
+    getVendorName,
+    importExternal,
+    setExternalSettlementButtons,
+  } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
-  const [monthRange, setMonthRange] = useState(getSampleMonthRange);
+  const [monthRange, setMonthRange] = useState(getRecentTwoMonthsRange);
   const [channelFilter, setChannelFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
@@ -133,6 +142,7 @@ export function ExternalSettlementPage() {
       showErrorToast('部分数据无法结算，请检查标红提示');
       return;
     }
+    setExternalSettlementButtons({ settleCompleted: true });
     showToast('结算成功', 'success');
   };
 

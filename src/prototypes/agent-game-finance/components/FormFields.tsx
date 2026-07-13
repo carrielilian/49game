@@ -69,8 +69,8 @@ export function PercentInput({
           />
           <span className="agf-input-affix__suffix">%</span>
         </div>
+        <FieldHint>请输入0-100的整数</FieldHint>
         <FieldError message={error} />
-        <p className="agf-form-hint">请输入0-100的整数</p>
       </div>
     </div>
   );

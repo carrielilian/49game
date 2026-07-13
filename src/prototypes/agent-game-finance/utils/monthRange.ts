@@ -12,13 +12,29 @@ export function parseYearMonth(ym: string): { year: number; month: number } {
   return { year: y, month: m };
 }
 
-/** 默认查询近一个月（上一自然月） */
-export function getDefaultMonthRange(): MonthRange {
-  const d = new Date();
+/** 上一自然月，格式 YYYY-MM（内部结算【数据拉取】写入的收入时间） */
+export function getPreviousMonthKey(date = new Date()): string {
+  const d = new Date(date);
   d.setDate(1);
   d.setMonth(d.getMonth() - 1);
-  const ym = formatYearMonth(d.getFullYear(), d.getMonth() + 1);
+  return formatYearMonth(d.getFullYear(), d.getMonth() + 1);
+}
+
+/** 默认查询近一个月（上一自然月） */
+export function getDefaultMonthRange(): MonthRange {
+  const ym = getPreviousMonthKey();
   return { start: ym, end: ym };
+}
+
+/** 近两个月：上个月 + 当前月 */
+export function getRecentTwoMonthsRange(date = new Date()): MonthRange {
+  const startDate = new Date(date);
+  startDate.setDate(1);
+  startDate.setMonth(startDate.getMonth() - 1);
+  return {
+    start: formatYearMonth(startDate.getFullYear(), startDate.getMonth() + 1),
+    end: formatYearMonth(date.getFullYear(), date.getMonth() + 1),
+  };
 }
 
 /** 原型样例数据月份范围（mock 结算数据覆盖 2025-05 ~ 2025-06） */

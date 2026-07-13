@@ -9,6 +9,7 @@
 import React, { useMemo } from 'react';
 import { defineHashPageRoute, useHashPage } from '../../common/useHashPage';
 import { AdminLayout } from './components/AdminLayout';
+import { VendorIncomeFieldHelp } from './components/VendorIncomeFieldHelp';
 import type { MenuGroup } from './components/Sidebar';
 import { AppProvider } from './data/store';
 import { ExternalSettlementPage } from './pages/ExternalSettlementPage';
@@ -88,8 +89,8 @@ function PageContent({ pageId }: { pageId: string }) {
     case 'game-list': return <GameListPage />;
     case 'formula-list': return <FormulaListPage />;
     case 'external-settlement': return <ExternalSettlementPage />;
-    case 'internal-settlement': return <InternalSettlementPage type="internal" />;
-    case 'internal-refund': return <InternalSettlementPage type="refund" />;
+    case 'internal-settlement': return <InternalSettlementPage key="internal-settlement" type="internal" />;
+    case 'internal-refund': return <InternalSettlementPage key="internal-refund" type="refund" />;
     case 'vendor-income': return <VendorIncomePage />;
     case 'payment-list': return <PaymentListPage />;
     case 'stats-vendor': return <StatisticsPage mode="vendor" />;
@@ -111,6 +112,7 @@ function AppShell() {
       activePage={page}
       onNavigate={setPage}
       breadcrumbs={breadcrumbs}
+      breadcrumbExtra={page === 'vendor-income' ? <VendorIncomeFieldHelp /> : undefined}
     >
       <PageContent pageId={page} />
     </AdminLayout>

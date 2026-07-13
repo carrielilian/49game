@@ -40,7 +40,8 @@ export const INITIAL_GAMES: Game[] = [
 
 export const INITIAL_CONTRACTS: Contract[] = INITIAL_GAMES.map((g, i) => ({
   gameId: g.id,
-  prepayment: [500000, 300000, 200000, 400000, 600000, 350000, 150000, 450000, 250000, 380000, 100000, 280000][i],
+  // 4009（厂商 1005）预付分成款为 0，用于验收「{游戏名称}未补充预付分成款信息」
+  prepayment: [500000, 300000, 200000, 400000, 600000, 350000, 150000, 450000, 0, 380000, 100000, 280000][i],
   agencyPayment: [80000, 50000, 30000, 60000, 90000, 45000, 20000, 70000, 35000, 55000, 15000, 40000][i],
   developmentFee: [120000, 80000, 0, 100000, 150000, 90000, 60000, 110000, 70000, 95000, 0, 85000][i],
   contractDescription: ['标准代理合同，按月结算', '含独家代理条款', '', '委托开发+联运', ''][i % 5] ?? '',
@@ -127,8 +128,12 @@ export const INITIAL_SETTLEMENTS: SettlementRecord[] = [
   { id: 'S019', type: 'external', incomeTime: '2025-06', gameId: '4010', channel: '快爆游IOS', grossRevenue: 295000, settlementAmount: 295000, settlementIncome: 132750, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2025-07-04 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1006' },
   { id: 'S020', type: 'refund', incomeTime: '2025-06', gameId: '4001', channel: '快爆付费', grossRevenue: 8000, settlementAmount: 7600, settlementIncome: 3800, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2025-07-05 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1001' },
   { id: 'S021', type: 'internal', incomeTime: '2025-06', gameId: '4012', channel: '游戏盒付费', grossRevenue: 58000, settlementAmount: 55100, settlementIncome: 27550, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2025-07-05 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1008' },
-  { id: 'S008', type: 'internal', incomeTime: '2025-06', gameId: '4003', channel: '快爆付费', grossRevenue: 52000, settlementAmount: 52000, settlementIncome: 0, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', paymentApplyStatus: '未申请', settled: false, vendorId: '1002' },
   { id: 'S009', type: 'external', incomeTime: '2025-06', gameId: '4010', channel: '快爆游IOS', grossRevenue: 88000, settlementAmount: 88000, settlementIncome: 39600, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2025-07-04 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1006' },
+  // 以下 4 条供厂商收入「申请付款」验收：账户余额 > 0，无待付款记录，银行/预付信息齐全
+  { id: 'S022', type: 'internal', incomeTime: '2025-06', gameId: '4008', channel: '游戏盒内购', grossRevenue: 1157895, settlementAmount: 1100000, settlementIncome: 550000, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2025-07-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1004' },
+  { id: 'S023', type: 'external', incomeTime: '2025-06', gameId: '4009', channel: '快爆游IOS', grossRevenue: 688889, settlementAmount: 688889, settlementIncome: 310000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2025-07-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1005' },
+  { id: 'S024', type: 'internal', incomeTime: '2025-06', gameId: '4010', channel: '快爆付费', grossRevenue: 736842, settlementAmount: 700000, settlementIncome: 350000, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2025-07-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1006' },
+  { id: 'S025', type: 'external', incomeTime: '2025-06', gameId: '4012', channel: '纯游外放', grossRevenue: 577778, settlementAmount: 577778, settlementIncome: 260000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2025-07-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1008' },
 ];
 
 export const INITIAL_PAYMENTS: PaymentRequest[] = [
