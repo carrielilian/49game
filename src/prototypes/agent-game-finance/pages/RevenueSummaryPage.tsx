@@ -94,21 +94,21 @@ const DIMENSION_OPTIONS: { value: QueryDimension; label: string }[] = [
 ];
 
 export function RevenueSummaryPage() {
-  const { settlements, getVendorName, getGameName } = useAppStore();
+  const { scopedSettlements, getVendorName, getGameName } = useAppStore();
   const [dimension, setDimension] = useState<QueryDimension>('game');
   const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
 
   const rows = useMemo(
     () => buildSummaryRows(
-      settlements,
+      scopedSettlements,
       dimension,
       monthRange,
       search,
       getVendorName,
       getGameName,
     ),
-    [settlements, dimension, monthRange, search, getVendorName, getGameName],
+    [scopedSettlements, dimension, monthRange, search, getVendorName, getGameName],
   );
 
   const columns = dimension === 'game'

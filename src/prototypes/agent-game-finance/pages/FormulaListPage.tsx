@@ -122,7 +122,7 @@ function TaxRateField({
 }
 
 export function FormulaListPage() {
-  const { games, formulas, formulaLogs, getVendorName, getVendor, getGame, updateFormula } = useAppStore();
+  const { scopedGames, formulas, formulaLogs, getVendorName, getVendor, getGame, updateFormula } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [formulaDrawer, setFormulaDrawer] = useState(false);
   const [channelDrawer, setChannelDrawer] = useState(false);
@@ -133,7 +133,7 @@ export function FormulaListPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
-  const rows = games.filter((g) => matchesListSearch(search, {
+  const rows = scopedGames.filter((g) => matchesListSearch(search, {
     gameId: g.id,
     gameName: g.onlineName,
     vendorId: g.vendorId,

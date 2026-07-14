@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { DataTable, DualCell, type Column } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
@@ -49,15 +49,20 @@ const IMPORT_PREVIEW_COLUMNS: Column<ImportPreviewRow>[] = [
 
 export function ExternalSettlementPage() {
   const {
-    settlements,
+    scopedSettlements,
     formulas,
-    games,
-    vendors,
+    scopedGames,
+    scopedVendors,
     getGameName,
     getVendorName,
     importExternal,
     setExternalSettlementButtons,
   } = useAppStore();
+  const scopedGameIds = useMemo(() => new Set(scopedGames.map((g) => g.id)), [scopedGames]);
+  const scopedFormulas = useMemo(
+    () => formulas.filter((f) => scopedGameIds.has(f.gameId)),
+    [formulas, scopedGameIds],
+  );
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [monthRange, setMonthRange] = useState(getRecentTwoMonthsRange);
   const [channelFilter, setChannelFilter] = useState('');
@@ -73,7 +78,7 @@ export function ExternalSettlementPage() {
   const canConfirmImport =
     importUploaded && preview.every((r) => r.gameId && r.formulaText && r.formulaText !== '-' && r.settlementIncome != null && !r.error);
 
-  const data = settlements.filter((s) => {
+  const data = scopedSettlements.filter((s) => {
     if (s.type !== 'external') return false;
     if (!isMonthInRange(s.incomeTime, monthRange)) return false;
     if (!matchesListSearch(search, {
@@ -115,7 +120,7 @@ export function ExternalSettlementPage() {
       showErrorToast('请先选择外部渠道类型');
       return;
     }
-    if (!hasChannelEnabledGames(selectedChannel, formulas)) {
+    if (!hasChannelEnabledGames(selectedChannel, scopedFormulas)) {
       showErrorToast('当前渠道不存在运营游戏');
       return;
     }
@@ -123,9 +128,9 @@ export function ExternalSettlementPage() {
   };
 
   const handleFileChange = () => {
-    if (!selectedChannel || !hasChannelEnabledGames(selectedChannel, formulas)) return;
-    const raw = buildMockImportRows(selectedChannel, formulas);
-    const rows = enrichImportRowsOnParse(raw, formulas, games, vendors);
+    if (!selectedChannel || !hasChannelEnabledGames(selectedChannel, scopedFormulas)) return;
+    const raw = buildMockImportRows(selectedChannel, scopedFormulas);
+    const rows = enrichImportRowsOnParse(raw, scopedFormulas, scopedGames, scopedVendors);
     setPreview(rows);
     if (fileRef.current) fileRef.current.value = '';
   };
@@ -135,7 +140,7 @@ export function ExternalSettlementPage() {
       showErrorToast('请先上传渠道报表');
       return;
     }
-    const next = preview.map((row) => calculateImportRow(row, formulas, games, vendors));
+    const next = preview.map((row) => calculateImportRow(row, scopedFormulas, scopedGames, scopedVendors));
     setPreview(next);
     const hasError = next.some((r) => r.error || !r.calculated);
     if (hasError) {

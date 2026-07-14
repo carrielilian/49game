@@ -16,7 +16,7 @@ import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 
 export function VendorListPage() {
-  const { vendors, addVendor, updateVendor } = useAppStore();
+  const { scopedVendors, addVendor, updateVendor } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [invoiceFilter, setInvoiceFilter] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -26,7 +26,7 @@ export function VendorListPage() {
   const [errors, setErrors] = useState<VendorFieldErrors>({});
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
-  const filtered = vendors.filter((v) => {
+  const filtered = scopedVendors.filter((v) => {
     if (!matchesListSearch(search, { vendorId: v.id, vendorName: v.name })) return false;
     if (invoiceFilter && v.invoiceInfo !== invoiceFilter) return false;
     return true;

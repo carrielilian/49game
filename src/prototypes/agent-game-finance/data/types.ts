@@ -1,13 +1,15 @@
 export type PaymentApplyStatus = '未申请' | '已申请';
-export type PaymentStatus = '待付款' | '已付款';
+export type PaymentStatus = '未付款' | '已付款';
 export type OperationStatus = '未上线' | '已上线';
 export type CooperationStatus = '合作中' | '合作终止';
 export type LicenseStatus = '有' | '无';
 export type SettlementType = 'external' | 'internal' | 'refund';
 export type ChannelType = 'internal' | 'external';
+export type BusinessType = '4399' | '快爆';
 
 export interface Vendor {
   id: string;
+  businessType: BusinessType;
   name: string;
   contact: string;
   phone: string;
@@ -19,6 +21,10 @@ export interface Vendor {
   bankLocation: string;
   branch: string;
   cardNumber: string;
+  /** 厂商级预付分成款；未填视为未补充 */
+  prepayment?: number;
+  /** 历史已抵扣分成款（线下手动处理），默认 0 */
+  historicalDeduction?: number;
 }
 
 export interface Game {
@@ -38,7 +44,6 @@ export interface Game {
 
 export interface Contract {
   gameId: string;
-  prepayment: number;
   agencyPayment: number;
   developmentFee: number;
   contractDescription: string;
@@ -89,6 +94,8 @@ export interface VendorBalance {
   balance: number;
   accountTotalIncome: number;
   prepayment: number;
+  deductedPrepayment: number;
+  remainingPrepayment: number;
   totalIncome: number;
   totalRefund: number;
 }
@@ -106,6 +113,8 @@ export interface PaymentRequest {
   settlementLetter?: string;
   invoice?: string;
   remark?: string;
+  /** 申请付款时标记为「已申请」的结算记录 ID */
+  settlementIds?: string[];
 }
 
 export type GameOperationLogAction = '添加游戏' | '运营状态' | '合作状态';

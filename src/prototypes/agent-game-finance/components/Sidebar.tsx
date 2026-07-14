@@ -28,7 +28,7 @@ export function Sidebar({ groups, activePage, onNavigate }: SidebarProps) {
 
   return (
     <aside className="agf-sidebar">
-      <div className="agf-sidebar__logo">代理游戏财务平台</div>
+      <div className="agf-sidebar__logo">代理游戏台账</div>
       <nav className="agf-sidebar__nav">
         {groups.map((group) => (
           <div key={group.title}>

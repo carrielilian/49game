@@ -164,7 +164,7 @@ function EditGameForm({ form, setForm, editing, getVendorName, errors, clearErro
 }
 
 export function GameListPage() {
-  const { games, vendors, contracts, gameLogs, addGame, updateGame, updateContract, getVendorName, getGame } = useAppStore();
+  const { scopedGames, scopedVendors, contracts, gameLogs, addGame, updateGame, updateContract, getVendorName, getGame } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [opStatus, setOpStatus] = useState('');
   const [licenseFilter, setLicenseFilter] = useState('');
@@ -180,7 +180,7 @@ export function GameListPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
-  const filtered = games.filter((g) => {
+  const filtered = scopedGames.filter((g) => {
     if (!matchesListSearch(search, {
       gameId: g.id,
       gameName: g.onlineName,
@@ -206,9 +206,12 @@ export function GameListPage() {
   const openContract = (gameId: string) => {
     const game = getGame(gameId);
     const c = contracts.find((x) => x.gameId === gameId) ?? {
-      gameId, prepayment: 0, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: '合作中' as const,
+      gameId, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: '合作中' as const,
     };
-    setContractForm({ ...c, cooperationStatus: c.cooperationStatus ?? game?.cooperationStatus ?? '合作中' });
+    setContractForm({
+      ...c,
+      cooperationStatus: c.cooperationStatus ?? game?.cooperationStatus ?? '合作中',
+    });
     setErrors({});
     setContractDrawer(true);
   };
@@ -231,11 +234,6 @@ export function GameListPage() {
   };
   const saveContract = () => {
     if (!contractForm) return;
-    if (Number.isNaN(contractForm.prepayment)) {
-      setErrors({ prepayment: '预付分成款不能为空' });
-      showIncompleteToast();
-      return;
-    }
     updateContract(contractForm);
     setContractDrawer(false);
   };
@@ -307,7 +305,7 @@ export function GameListPage() {
       />
       <Drawer title="添加游戏" open={addOpen} onClose={() => setAddOpen(false)} large
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setAddOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleAdd}>确定</button></>}>
-        <AddGameForm form={form} setForm={setForm} vendors={vendors} errors={errors} clearError={clearError} />
+        <AddGameForm form={form} setForm={setForm} vendors={scopedVendors} errors={errors} clearError={clearError} />
       </Drawer>
       <Drawer title="编辑游戏" open={editOpen} onClose={() => setEditOpen(false)} large
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>保存</button></>}>
@@ -318,20 +316,6 @@ export function GameListPage() {
         {contractForm && contractGame && (
           <>
             <ReadonlyField label="游戏ID / 游戏名称" value={`${contractGame.id} / ${contractGame.onlineName}`} />
-            <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">预付分成款</label>
-              <div className="agf-form-field">
-                <input
-                  type="number"
-                  className="agf-form-input"
-                  value={Number.isNaN(contractForm.prepayment) ? '' : contractForm.prepayment}
-                  onChange={(e) => {
-                    clearError('prepayment');
-                    setContractForm({ ...contractForm, prepayment: e.target.value === '' ? NaN : Number(e.target.value) });
-                  }}
-                />
-                <FieldError message={errors.prepayment} />
-              </div>
-            </div>
             <div className="agf-form-item"><label className="agf-form-label">付款代理金</label><input type="number" className="agf-form-input" value={contractForm.agencyPayment} onChange={(e) => setContractForm({ ...contractForm, agencyPayment: Number(e.target.value) })} /></div>
             <div className="agf-form-item"><label className="agf-form-label">委托开发费用</label><input type="number" className="agf-form-input" value={contractForm.developmentFee} onChange={(e) => setContractForm({ ...contractForm, developmentFee: Number(e.target.value) })} /></div>
             <div className="agf-form-item"><label className="agf-form-label">合同信息说明</label><textarea className="agf-form-textarea" value={contractForm.contractDescription} onChange={(e) => setContractForm({ ...contractForm, contractDescription: e.target.value })} /></div>

@@ -12,6 +12,7 @@ import {
   createEmptyFormula,
 } from './mock-data';
 import type {
+  BusinessType,
   Contract,
   FormulaConfig,
   FormulaOperationLog,
@@ -25,12 +26,20 @@ import type {
   VendorBalance,
 } from './types';
 import { deriveBalances } from '../utils/balance';
+import {
+  filterBalancesByBusiness,
+  filterGamesByBusiness,
+  filterPaymentsByBusiness,
+  filterSettlementsByBusiness,
+  filterVendorsByBusiness,
+  GAME_ID_BASE,
+  vendorIdsInBusiness,
+  VENDOR_ID_BASE,
+} from '../utils/businessScope';
 import type { FinanceCenterRow } from '../utils/financeCenter';
+import type { MonthRange } from '../utils/monthRange';
 import { calcRecordSettlementIncome, formatDateTime, formatFormulaText, genId } from '../utils/settlement';
 import { isFormulaConfigured } from './mock-data';
-
-const VENDOR_ID_BASE = 1001;
-const GAME_ID_BASE = 4001;
 
 function nextNumericId(items: { id: string }[], base: number): string {
   const max = items.reduce((m, item) => Math.max(m, Number.parseInt(item.id, 10) || 0), base - 1);
@@ -40,19 +49,27 @@ function nextNumericId(items: { id: string }[], base: number): string {
 interface InternalSettlementButtonState {
   pullCompleted: boolean;
   settleCompleted: boolean;
+  monthRange?: MonthRange;
 }
 
-const INITIAL_INTERNAL_SETTLEMENT_BUTTONS: Record<'internal' | 'refund', InternalSettlementButtonState> = {
-  internal: { pullCompleted: false, settleCompleted: false },
-  refund: { pullCompleted: false, settleCompleted: false },
+const INITIAL_INTERNAL_SETTLEMENT_BUTTONS: Record<BusinessType, Record<'internal' | 'refund', InternalSettlementButtonState>> = {
+  '4399': {
+    internal: { pullCompleted: false, settleCompleted: false },
+    refund: { pullCompleted: false, settleCompleted: false },
+  },
+  '快爆': {
+    internal: { pullCompleted: false, settleCompleted: false },
+    refund: { pullCompleted: false, settleCompleted: false },
+  },
 };
 
 interface ExternalSettlementButtonState {
   settleCompleted: boolean;
 }
 
-const INITIAL_EXTERNAL_SETTLEMENT_BUTTONS: ExternalSettlementButtonState = {
-  settleCompleted: false,
+const INITIAL_EXTERNAL_SETTLEMENT_BUTTONS: Record<BusinessType, ExternalSettlementButtonState> = {
+  '4399': { settleCompleted: false },
+  '快爆': { settleCompleted: false },
 };
 
 interface AppState {
@@ -68,6 +85,13 @@ interface AppState {
 }
 
 interface AppContextValue extends AppState {
+  businessType: BusinessType;
+  setBusinessType: (type: BusinessType) => void;
+  scopedVendors: Vendor[];
+  scopedGames: Game[];
+  scopedSettlements: SettlementRecord[];
+  scopedPayments: PaymentRequest[];
+  scopedBalances: VendorBalance[];
   getVendor: (id: string) => Vendor | undefined;
   getGame: (id: string) => Game | undefined;
   getVendorName: (id: string) => string;
@@ -84,30 +108,53 @@ interface AppContextValue extends AppState {
   settleRecords: (ids: string[]) => void;
   applyPayment: (vendorId: string) => boolean;
   markPaid: (paymentId: string, data: Partial<PaymentRequest>) => void;
+  updatePayment: (paymentId: string, data: Partial<PaymentRequest>) => void;
   recalcBalances: () => void;
-  internalSettlementButtons: Record<'internal' | 'refund', InternalSettlementButtonState>;
+  internalSettlementButtons: Record<BusinessType, Record<'internal' | 'refund', InternalSettlementButtonState>>;
   setInternalSettlementButtons: (
     type: 'internal' | 'refund',
-    state: InternalSettlementButtonState,
+    state: Partial<InternalSettlementButtonState>,
   ) => void;
-  externalSettlementButtons: ExternalSettlementButtonState;
-  setExternalSettlementButtons: (state: ExternalSettlementButtonState) => void;
+  externalSettlementButtons: Record<BusinessType, ExternalSettlementButtonState>;
+  setExternalSettlementButtons: (state: Partial<ExternalSettlementButtonState>) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+function normalizePaymentStatus(p: PaymentRequest): PaymentRequest {
+  if ((p.status as string) === '待付款') return { ...p, status: '未付款' };
+  return p;
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [businessType, setBusinessType] = useState<BusinessType>('4399');
   const [vendors, setVendors] = useState(INITIAL_VENDORS);
   const [games, setGames] = useState(INITIAL_GAMES);
   const [contracts, setContracts] = useState(INITIAL_CONTRACTS);
   const [formulas, setFormulas] = useState(INITIAL_FORMULAS);
   const [settlements, setSettlements] = useState(INITIAL_SETTLEMENTS);
   const [balances, setBalances] = useState(INITIAL_BALANCES);
-  const [payments, setPayments] = useState(INITIAL_PAYMENTS);
+  const [payments, setPayments] = useState(() => INITIAL_PAYMENTS.map(normalizePaymentStatus));
   const [gameLogs, setGameLogs] = useState(INITIAL_GAME_LOGS);
   const [formulaLogs, setFormulaLogs] = useState(INITIAL_FORMULA_LOGS);
   const [internalSettlementButtons, setInternalSettlementButtonsState] = useState(INITIAL_INTERNAL_SETTLEMENT_BUTTONS);
   const [externalSettlementButtons, setExternalSettlementButtonsState] = useState(INITIAL_EXTERNAL_SETTLEMENT_BUTTONS);
+
+  const scopedVendorIds = useMemo(() => vendorIdsInBusiness(vendors, businessType), [vendors, businessType]);
+  const scopedVendors = useMemo(() => filterVendorsByBusiness(vendors, businessType), [vendors, businessType]);
+  const scopedGames = useMemo(() => filterGamesByBusiness(games, scopedVendorIds), [games, scopedVendorIds]);
+  const scopedSettlements = useMemo(
+    () => filterSettlementsByBusiness(settlements, scopedVendorIds),
+    [settlements, scopedVendorIds],
+  );
+  const scopedPayments = useMemo(
+    () => filterPaymentsByBusiness(payments, scopedVendorIds),
+    [payments, scopedVendorIds],
+  );
+  const scopedBalances = useMemo(
+    () => filterBalancesByBusiness(balances, scopedVendorIds),
+    [balances, scopedVendorIds],
+  );
 
   const getVendor = useCallback((id: string) => vendors.find((v) => v.id === id), [vendors]);
   const getGame = useCallback((id: string) => games.find((g) => g.id === id), [games]);
@@ -115,20 +162,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const getGameName = useCallback((id: string) => games.find((g) => g.id === id)?.onlineName ?? id, [games]);
 
   const recalcBalances = useCallback(() => {
-    setBalances(deriveBalances(settlements, vendors, contracts, games, payments));
-  }, [settlements, vendors, contracts, games, payments]);
+    setBalances(deriveBalances(settlements, vendors, payments));
+  }, [settlements, vendors, payments]);
 
   useEffect(() => {
-    setBalances(deriveBalances(settlements, vendors, contracts, games, payments));
-  }, [settlements, vendors, contracts, games, payments]);
+    setBalances(deriveBalances(settlements, vendors, payments));
+  }, [settlements, vendors, payments]);
 
-  const addVendor = useCallback((v: Omit<Vendor, 'id'>) => {
+  const addVendor = useCallback((v: Omit<Vendor, 'id' | 'businessType'>) => {
     setVendors((prev) => {
-      const id = nextNumericId(prev, VENDOR_ID_BASE);
-      setBalances((bPrev) => [...bPrev, { vendorId: id, balance: 0, accountTotalIncome: 0, prepayment: 0, totalIncome: 0, totalRefund: 0 }]);
-      return [...prev, { ...v, id }];
+      const scoped = prev.filter((x) => x.businessType === businessType);
+      const id = nextNumericId(scoped, VENDOR_ID_BASE[businessType]);
+      setBalances((bPrev) => [...bPrev, {
+        vendorId: id, balance: 0, accountTotalIncome: 0, prepayment: 0,
+        deductedPrepayment: 0, remainingPrepayment: 0, totalIncome: 0, totalRefund: 0,
+      }]);
+      return [...prev, { ...v, id, businessType, historicalDeduction: v.historicalDeduction ?? 0 }];
     });
-  }, []);
+  }, [businessType]);
 
   const updateVendor = useCallback((v: Vendor) => {
     setVendors((prev) => prev.map((x) => (x.id === v.id ? v : x)));
@@ -136,9 +187,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addGame = useCallback((g: Omit<Game, 'id'>) => {
     setGames((prev) => {
-      const id = nextNumericId(prev, GAME_ID_BASE);
+      const vendorIds = vendorIdsInBusiness(vendors, businessType);
+      const scoped = prev.filter((x) => vendorIds.has(x.vendorId));
+      const id = nextNumericId(scoped, GAME_ID_BASE[businessType]);
       setContracts((cPrev) => [{
-        gameId: id, prepayment: 0, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: g.cooperationStatus,
+        gameId: id, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: g.cooperationStatus,
       }, ...cPrev]);
       setFormulas((fPrev) => [createEmptyFormula(id), ...fPrev]);
       setGameLogs((logs) => [{
@@ -146,7 +199,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }, ...logs]);
       return [{ ...g, id }, ...prev];
     });
-  }, []);
+  }, [businessType, vendors]);
 
   const updateGame = useCallback((g: Game) => {
     setGames((prev) => {
@@ -268,48 +321,71 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [formulas, vendors]);
 
   const applyPayment = useCallback((vendorId: string) => {
-    const bal = deriveBalances(settlements, vendors, contracts, games, payments).find((b) => b.vendorId === vendorId);
+    const vendor = vendors.find((v) => v.id === vendorId);
+    if (!vendor || vendor.businessType !== businessType) return false;
+    const bal = deriveBalances(settlements, vendors, payments).find((b) => b.vendorId === vendorId);
     if (!bal || bal.balance <= 0) return false;
+    const toApply = settlements.filter(
+      (s) => s.vendorId === vendorId && s.settled && s.paymentApplyStatus === '未申请',
+    );
+    const settlementIds = toApply.map((s) => s.id);
     setPayments((prev) => [...prev, {
-      id: genId('P'), vendorId, pendingAmount: bal.balance, status: '待付款',
-      applyTime: new Date().toLocaleString('zh-CN'),
+      id: genId('P'), vendorId, pendingAmount: bal.balance, status: '未付款',
+      applyTime: formatDateTime(),
+      settlementIds,
     }]);
     setSettlements((prev) => prev.map((s) =>
-      s.vendorId === vendorId && s.settled && s.paymentApplyStatus === '未申请'
+      settlementIds.includes(s.id)
         ? { ...s, paymentApplyStatus: '已申请' as const }
         : s,
     ));
     return true;
-  }, [settlements, vendors, contracts, games, payments]);
+  }, [businessType, settlements, vendors, payments]);
 
   const markPaid = useCallback((paymentId: string, data: Partial<PaymentRequest>) => {
     setPayments((prev) => prev.map((p) => p.id === paymentId
-      ? { ...p, ...data, status: '已付款' as const, payTime: new Date().toLocaleString('zh-CN'), actualAmount: data.actualAmount ?? p.pendingAmount }
+      ? { ...p, ...data, status: '已付款' as const, payTime: formatDateTime(), actualAmount: data.actualAmount ?? p.pendingAmount }
       : p));
+  }, []);
+
+  const updatePayment = useCallback((paymentId: string, data: Partial<PaymentRequest>) => {
+    setPayments((prev) => prev.map((p) => (p.id === paymentId ? { ...p, ...data } : p)));
   }, []);
 
   const setInternalSettlementButtons = useCallback((
     type: 'internal' | 'refund',
-    state: InternalSettlementButtonState,
+    state: Partial<InternalSettlementButtonState>,
   ) => {
-    setInternalSettlementButtonsState((prev) => ({ ...prev, [type]: state }));
-  }, []);
+    setInternalSettlementButtonsState((prev) => ({
+      ...prev,
+      [businessType]: {
+        ...prev[businessType],
+        [type]: { ...prev[businessType][type], ...state },
+      },
+    }));
+  }, [businessType]);
 
-  const setExternalSettlementButtons = useCallback((state: ExternalSettlementButtonState) => {
-    setExternalSettlementButtonsState(state);
-  }, []);
+  const setExternalSettlementButtons = useCallback((state: Partial<ExternalSettlementButtonState>) => {
+    setExternalSettlementButtonsState((prev) => ({
+      ...prev,
+      [businessType]: { ...prev[businessType], ...state },
+    }));
+  }, [businessType]);
 
   const value = useMemo<AppContextValue>(() => ({
     vendors, games, contracts, formulas, settlements, balances, payments, gameLogs, formulaLogs,
+    businessType, setBusinessType,
+    scopedVendors, scopedGames, scopedSettlements, scopedPayments, scopedBalances,
     getVendor, getGame, getVendorName, getGameName, addVendor, updateVendor, addGame, updateGame,
     updateContract, updateFormula, addGameLog, importExternal, pullInternal, settleRecords,
-    applyPayment, markPaid, recalcBalances, internalSettlementButtons, setInternalSettlementButtons,
+    applyPayment, markPaid, updatePayment, recalcBalances, internalSettlementButtons, setInternalSettlementButtons,
     externalSettlementButtons, setExternalSettlementButtons,
   }), [vendors, games, contracts, formulas, settlements, balances, payments, gameLogs, formulaLogs,
+    businessType, scopedVendors, scopedGames, scopedSettlements, scopedPayments, scopedBalances,
     internalSettlementButtons, externalSettlementButtons,
     getVendor, getGame, getVendorName, getGameName, addVendor, updateVendor, addGame, updateGame,
     updateContract, updateFormula, addGameLog, importExternal, pullInternal, settleRecords,
-    applyPayment, markPaid, recalcBalances, setInternalSettlementButtons, setExternalSettlementButtons]);
+    applyPayment, markPaid, updatePayment, recalcBalances, setInternalSettlementButtons, setExternalSettlementButtons]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

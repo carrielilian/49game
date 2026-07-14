@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
@@ -10,7 +10,7 @@ import { PAYMENT_APPLY_STATUS_FILTER_OPTIONS, selectOptions } from '../utils/col
 import { checkFinanceCenterReady, fetchFinanceCenterRows } from '../utils/financeCenter';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
-import { getPreviousMonthKey, getRecentTwoMonthsRange, isMonthInRange } from '../utils/monthRange';
+import { getPreviousMonthKey, getRecentTwoMonthsRange, isMonthInRange, type MonthRange } from '../utils/monthRange';
 import {
   displaySettlementFormula,
   formatMoney,
@@ -25,9 +25,10 @@ interface Props {
 
 export function InternalSettlementPage({ type }: Props) {
   const {
-    settlements,
+    businessType,
+    scopedSettlements,
+    scopedGames,
     formulas,
-    games,
     getGameName,
     getVendorName,
     pullInternal,
@@ -35,17 +36,47 @@ export function InternalSettlementPage({ type }: Props) {
     internalSettlementButtons,
     setInternalSettlementButtons,
   } = useAppStore();
+  const scopedGameIds = useMemo(() => new Set(scopedGames.map((g) => g.id)), [scopedGames]);
+  const scopedFormulas = useMemo(
+    () => formulas.filter((f) => scopedGameIds.has(f.gameId)),
+    [formulas, scopedGameIds],
+  );
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
-  const [monthRange, setMonthRange] = useState(getRecentTwoMonthsRange);
+  const [monthRange, setMonthRange] = useState<MonthRange>(
+    () => internalSettlementButtons[businessType][type].monthRange ?? getRecentTwoMonthsRange(),
+  );
   const [channelFilter, setChannelFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [loading, setLoading] = useState(false);
-  const { pullCompleted, settleCompleted } = internalSettlementButtons[type];
+  const { pullCompleted, settleCompleted } = internalSettlementButtons[businessType][type];
+
+  useEffect(() => {
+    const prevMonth = getPreviousMonthKey();
+    const saved = internalSettlementButtons[businessType][type].monthRange;
+    const isLegacyPullSingleMonth = saved
+      && pullCompleted
+      && saved.start === saved.end
+      && saved.start === prevMonth;
+
+    if (isLegacyPullSingleMonth || !saved) {
+      const range = getRecentTwoMonthsRange();
+      setMonthRange(range);
+      setInternalSettlementButtons(type, { monthRange: range });
+      return;
+    }
+
+    setMonthRange(saved);
+  }, [type, businessType, pullCompleted, internalSettlementButtons, setInternalSettlementButtons]);
+
+  const handleMonthRangeChange = (range: MonthRange) => {
+    setMonthRange(range);
+    setInternalSettlementButtons(type, { monthRange: range });
+  };
 
   const incomeLabel = type === 'internal' ? '结算收入' : '结算退款';
 
-  const data = settlements.filter((s) => {
+  const data = scopedSettlements.filter((s) => {
     if (s.type !== type) return false;
     if (!isMonthInRange(s.incomeTime, monthRange)) return false;
     if (!matchesListSearch(search, {
@@ -72,10 +103,11 @@ export function InternalSettlementPage({ type }: Props) {
         return;
       }
       const incomeMonthKey = getPreviousMonthKey();
-      const rows = fetchFinanceCenterRows(type, formulas, games, incomeMonthKey);
+      const rows = fetchFinanceCenterRows(type, scopedFormulas, scopedGames, incomeMonthKey);
       pullInternal(type, rows, incomeMonthKey);
-      setMonthRange({ start: incomeMonthKey, end: incomeMonthKey });
-      setInternalSettlementButtons(type, { pullCompleted: true, settleCompleted: false });
+      const range = getRecentTwoMonthsRange();
+      setMonthRange(range);
+      setInternalSettlementButtons(type, { pullCompleted: true, settleCompleted: false, monthRange: range });
       setToast({ message: '已从财务中心拉取待结算数据', type: 'success' });
     } finally {
       setLoading(false);
@@ -90,7 +122,7 @@ export function InternalSettlementPage({ type }: Props) {
       return;
     }
     const missingGameIds = [...new Set(unsettled.map((s) => s.gameId))].filter((gameId) => {
-      const formula = formulas.find((f) => f.gameId === gameId);
+      const formula = scopedFormulas.find((f) => f.gameId === gameId);
       return !isFormulaConfigured(formula);
     });
     if (missingGameIds.length > 0) {
@@ -127,7 +159,7 @@ export function InternalSettlementPage({ type }: Props) {
           </>
         }
       >
-        <MonthRangePicker value={monthRange} onChange={setMonthRange} />
+        <MonthRangePicker value={monthRange} onChange={handleMonthRangeChange} />
         <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
       </FilterBar>
       <DataTable

@@ -1,5 +1,5 @@
 /**
- * @name 代理游戏财务平台
+ * @name 代理游戏台账
  * @mode axure
  *
  * 参考资料：
@@ -60,9 +60,6 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     title: '数据统计',
     items: [
-      { id: 'stats-vendor', label: '厂商收入统计' },
-      { id: 'stats-channel', label: '渠道收入统计' },
-      { id: 'stats-game', label: '游戏收入统计' },
       { id: 'stats-summary', label: '收入汇总统计' },
     ],
   },
@@ -104,7 +101,7 @@ function PageContent({ pageId }: { pageId: string }) {
 function AppShell() {
   const { page, setPage } = useHashPage(ROUTE);
   const meta = PAGE_META[page] ?? PAGE_META['vendor-list'];
-  const breadcrumbs = useMemo(() => ['业务中台', '代理游戏财务平台', meta.group, meta.title], [meta]);
+  const breadcrumbs = useMemo(() => ['业务中台', '代理游戏台账', meta.group, meta.title], [meta]);
 
   return (
     <AdminLayout

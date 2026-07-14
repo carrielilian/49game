@@ -151,7 +151,7 @@ function StatFilterBar({
 }
 
 export function StatisticsPage({ mode }: Props) {
-  const { settlements, getVendorName, getGameName } = useAppStore();
+  const { scopedSettlements, getVendorName, getGameName } = useAppStore();
   const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
 
@@ -159,20 +159,20 @@ export function StatisticsPage({ mode }: Props) {
     rows.filter((r) => isMonthInRange(r.time, monthRange));
 
   const vendorRows = useMemo(() => {
-    const rows = buildVendorStats(settlements, getVendorName);
+    const rows = buildVendorStats(scopedSettlements, getVendorName);
     return filterByTime(rows).filter((r) =>
       matchesListSearch(search, { vendorId: r.vendorId, vendorName: r.vendorName }),
     );
-  }, [settlements, getVendorName, monthRange, search]);
+  }, [scopedSettlements, getVendorName, monthRange, search]);
 
-  const channelRows = useMemo(() => filterByTime(buildChannelStats(settlements)), [settlements, monthRange]);
+  const channelRows = useMemo(() => filterByTime(buildChannelStats(scopedSettlements)), [scopedSettlements, monthRange]);
 
   const gameRows = useMemo(() => {
-    const rows = buildGameStats(settlements, getGameName);
+    const rows = buildGameStats(scopedSettlements, getGameName);
     return filterByTime(rows).filter((r) =>
       matchesListSearch(search, { gameId: r.gameId, gameName: r.gameName }),
     );
-  }, [settlements, getGameName, monthRange, search]);
+  }, [scopedSettlements, getGameName, monthRange, search]);
 
   const filterBar = (
     <StatFilterBar
