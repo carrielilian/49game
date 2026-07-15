@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { CircleCheck, FileText } from 'lucide-react';
+import { CircleCheck, FileText, X } from 'lucide-react';
 
 export interface MockFileItem {
   id: string;
@@ -47,6 +47,10 @@ export function MockFileUpload({ accept, files, onChange }: MockFileUploadProps)
     e.target.value = '';
   };
 
+  const handleRemove = (id: string) => {
+    onChange(files.filter((f) => f.id !== id));
+  };
+
   return (
     <div className="agf-file-upload">
       <div className="agf-file-upload__toolbar">
@@ -64,6 +68,15 @@ export function MockFileUpload({ accept, files, onChange }: MockFileUploadProps)
                 {file.name}
               </button>
               <CircleCheck size={16} className="agf-file-upload__status" aria-hidden />
+              <button
+                type="button"
+                className="agf-file-upload__remove"
+                onClick={() => handleRemove(file.id)}
+                aria-label={`删除 ${file.name}`}
+                title="删除"
+              >
+                <X size={14} aria-hidden />
+              </button>
             </li>
           ))}
         </ul>

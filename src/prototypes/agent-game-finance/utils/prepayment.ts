@@ -16,15 +16,16 @@ export function sumVendorPaidActualAmount(vendorId: string, payments: PaymentReq
     .reduce((sum, p) => sum + (p.actualAmount ?? 0), 0);
 }
 
-/** 已抵扣分成款 */
+/** 已抵扣分成款 = 已付款实际付款金额之和 + 历史已抵扣分成款；若预付分成款 − 上述合计 ≤ 0，则取预付分成款 */
 export function calcDeductedPrepayment(
   prepayment: number,
   paidActualSum: number,
   historicalDeduction: number,
 ): number {
-  const net = prepayment - paidActualSum - historicalDeduction;
-  if (net > 0) return Math.round(net * 100) / 100;
-  return Math.round(prepayment * 100) / 100;
+  const consumed = paidActualSum + historicalDeduction;
+  const net = prepayment - consumed;
+  if (net <= 0) return Math.round(prepayment * 100) / 100;
+  return Math.round(consumed * 100) / 100;
 }
 
 /** 剩余未抵扣分成款 */

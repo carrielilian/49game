@@ -2,7 +2,7 @@
 
 > **用途**：在新 Cursor 对话中快速恢复本项目背景、已做决策和待办，避免重复对齐。  
 > **UI 细节**：改样式、表单、抽屉、分页等请优先读 [`ui-spec.md`](./ui-spec.md)。  
-> **最后更新**：2026-07-14（厂商预付分成管理、账户余额口径、结算函⑤条件显示）  
+> **最后更新**：2026-07-15（预付分成公式/两位小数、结算函 PDF 下载、标记付款/空状态等）  
 > **对应 Git**：见文末「Git 状态」；远程 https://github.com/carrielilian/49game.git `main`（本地可能有未推送改动）
 
 ---
@@ -618,8 +618,8 @@
 | 厂商ID / 厂商名称 | 只读 |
 | 预付分成款 * | 必填；≥0 |
 | 历史已抵扣分成款 * | 必填；默认 0；≥0；`FieldHint`「填写线下手动已处理的预付分成款」 |
-| 已抵扣分成款 | 只读；`prepayment - 已付款actualAmount之和 - historical` **>0** 时 = 该差值，否则 = `prepayment` |
-| 剩余未抵扣分成款 | 只读；`prepayment - 已抵扣` **>0** 取差值，否则 0 |
+| 已抵扣分成款 | 只读；**已付款之和 + 历史已抵扣**；若预付 − 上述合计 ≤ 0 则取预付分成款；取**已保存**值 |
+| 剩余未抵扣分成款 | 只读；**预付分成款 − 已抵扣分成款**（≤0 为 0）；取**已保存**预付分成款 |
 
 **列表新增列**（在「预付分成款」右侧）：**已抵扣分成款**、**剩余未抵扣分成款**。
 
@@ -642,11 +642,82 @@
 
 **显示规则**：仅当厂商「剩余未抵扣分成款」**> 0** 时显示「本次抵扣预付分成⑤」「剩余未抵扣预付分成」两行；否则隐藏，总计标签为 **「总计②-④：」**（不含⑤）。
 
-**P001（1003）验收**：remaining 367,800；②−④=367,800 → ⑤=367,800；总计=0；函内剩余=0。
+**P001（1003）验收**：列表剩余未抵扣 582,200；②−④=367,800 → ⑤=367,800；总计=0；函内剩余=214,400。
 
 #### E. 改动文件（本轮）
 
 `data/types.ts`、`data/mock-data.ts`、`data/store.tsx`、`utils/prepayment.ts`、`utils/balance.ts`、`utils/settlementLetter.ts`、`utils/vendorPaymentApply.ts`、`pages/VendorIncomePage.tsx`、`pages/GameListPage.tsx`、`components/SettlementLetterDrawer.tsx`、`components/VendorIncomeFieldHelp.tsx`、`ui-spec.md`、`conversation-memory.md`
+
+### 28. 本次对话汇总（2026-07-15）
+
+#### A. 付款管理 — 【标记付款】字段拆分（`PaymentListPage`）
+
+| 字段 | 规则 |
+|------|------|
+| 待付款金额 | **只读**（`ReadonlyField`）；展示 `pendingAmount` |
+| 实际付款金额 * | **可编辑**；写入 `actualAmount`；必填；>0；**精确至小数点后两位** |
+
+- 打开抽屉：实际付款金额默认 `actualAmount ?? pendingAmount`，格式化为两位（如 `255200.00`）。
+- 输入：最多两位小数；失焦 / 提交校验通过后自动格式化为两位；保存时四舍五入。
+- 校验文案：`实际付款金额不能为空` / `精确至小数点后两位` / `必须大于0`。
+
+#### B. 请款凭证 — 已上传文件可删除（`MockFileUpload`）
+
+- 列表项：文件图标 + 可点击下载文件名 + 绿色成功勾 + **× 删除**（`agf-file-upload__remove`）。
+- 删除后从列表移除；提交时同步保存（删光后对应字段清空）。
+
+#### C. 列表空状态（`DataTable`）
+
+- 无数据时：**表头保留**；表体居中展示空盒插画 +「暂无数据」；**分页仍显示**「共 0 条」。
+- 组件：`TableEmptyState`（内置于 `DataTable.tsx`）；样式 `agf-table-empty` / `agf-table-empty__icon` / `agf-table-empty__text`。
+
+#### D. 改动文件（本轮）
+
+`pages/PaymentListPage.tsx`、`components/MockFileUpload.tsx`、`components/DataTable.tsx`、`style.css`、`ui-spec.md`、`conversation-memory.md`
+
+### 29. 本次对话汇总（2026-07-15 续）
+
+#### A. 预付分成 — 已抵扣/剩余计算公式修正（`prepayment.ts`）
+
+**问题**：当「预付 − 已付款之和 − 历史」> 0 时，旧实现将**差额**写入「已抵扣分成款」，导致无已付款记录时 已抵扣=预付、剩余=0；调大预付分成款后剩余仍为 0。
+
+**修正后**：
+
+| 字段 | 规则 |
+|------|------|
+| 已抵扣分成款 | **已付款之和 + 历史已抵扣**；若预付 − 上述合计 ≤ 0，则取预付分成款 |
+| 剩余未抵扣分成款 | 预付分成款 − 已抵扣分成款（≤0 为 0） |
+
+**示例（1002 幻境，无已付款、历史=0）**：预付 600000 → 已抵扣 0、剩余 600000；改为 6000000022 保存后 → 已抵扣 0、剩余 6000000022。
+
+抽屉/列表均取**已保存**预付分成款与历史已抵扣；结算函⑤逻辑不变（`calcLetterPrepaymentDeduction` 仍用 `remainingPrepayment`）。
+
+#### B. 改动文件（本轮）
+
+`utils/prepayment.ts`、`pages/VendorIncomePage.tsx`、`components/VendorIncomeFieldHelp.tsx`、`ui-spec.md`、`conversation-memory.md`
+
+### 30. 本次对话汇总（2026-07-15 续 2）
+
+#### A. 预付分成管理 — 金额输入两位小数（`VendorIncomePage`）
+
+| 字段 | 规则 |
+|------|------|
+| 预付分成款 * | 打开/失焦/保存后格式化为两位（如 `800000.00`）；最多两位小数 |
+| 历史已抵扣分成款 * | 同上（如 `0.00`） |
+
+校验：超过两位 →「精确至小数点后两位」；与标记付款「实际付款金额」交互一致（文本输入 + 正则限制）。
+
+#### B. 结算函 — 【下载】PDF 可打开（`mockPdf.ts` + `SettlementLetterDrawer`）
+
+**问题**：旧实现将纯文本 Blob 标为 `application/pdf`，下载后打开报损坏。
+
+**修正**：`utils/mockPdf.ts` 生成 PDF 1.4 合法结构（STSongStd-Light + UniGB-UCS2-H）；中文/英文各写入结算摘要（合计②/④、支付金额、大写等）。文件名：`结算函_{厂商}.pdf` / `结算函_EN_{厂商}.pdf`。
+
+> 原型 mock：PDF 为摘要文本页，版式与抽屉内 HTML 表格不完全一致，但文件可正常打开。
+
+#### C. 改动文件（本轮）
+
+`utils/mockPdf.ts`、`components/SettlementLetterDrawer.tsx`、`pages/VendorIncomePage.tsx`、`ui-spec.md`、`conversation-memory.md`
 
 ---
 
@@ -686,7 +757,7 @@ src/prototypes/agent-game-finance/
 │   ├── BusinessTypeSelect.tsx, FilterBar.tsx（含业务类型选择）
 │   └── AdminLayout.tsx, Sidebar.tsx, SettlementLetterDrawer.tsx
 ├── data/types.ts, mock-data.ts, store.tsx   # businessType / scoped* / internalSettlementButtons 按业务分桶
-├── utils/listKeyword.ts, columnFilters.ts, balance.ts, settlement.ts, monthRange.ts, invoiceTax.ts, externalImport.ts, financeCenter.ts, vendorPaymentApply.ts, payment.ts, settlementLetter.ts, businessScope.ts, prepayment.ts
+├── utils/listKeyword.ts, columnFilters.ts, balance.ts, settlement.ts, monthRange.ts, invoiceTax.ts, externalImport.ts, financeCenter.ts, vendorPaymentApply.ts, payment.ts, settlementLetter.ts, businessScope.ts, prepayment.ts, mockPdf.ts
 └── pages/
     ├── GameListPage.tsx      # 游戏 CRUD、合同、操作记录
     ├── VendorListPage.tsx
@@ -797,20 +868,23 @@ src/resources/agent-game-finance/
 40. **vendorPaymentApply.ts**：申请付款拦截逻辑集中在此工具。  
 41. **付款管理操作列**：未付款=标记付款+结算函+请款凭证；已付款=详细信息+结算函+请款凭证。  
 42. **付款状态**：未付款/已付款（非「待付款」）；`isUnpaidPayment` 兼容历史数据。  
-43. **标记付款**：金额、付款银行、收款信息必填；不含结算函/电子发票；提交不关闭；**标记已付款关闭抽屉**；收款信息可编辑。  
-44. **请款凭证**：结算函、电子发票上传入口；标签「结算函」（非厂商盖章后缀）。  
+43. **标记付款**：**待付款金额只读** + **实际付款金额可编辑**（两位小数）；付款银行、收款信息必填；不含结算函/电子发票；提交不关闭；**标记已付款关闭抽屉**；收款信息可编辑。  
+44. **请款凭证**：结算函、电子发票 `MockFileUpload`；标签「结算函」；**已上传文件可删除**。  
 45. **详细信息**：仅已付款；含付款状态；**不含**申请付款时间/付款时间（仅列表列）；仅备注可编辑。  
-46. **MockFileUpload**：选择文件+列表+点击下载；无虚线分隔；用于请款凭证。  
-47. **结算函 1175px**：按 `settlementIds` 过滤；连续月份合并；下载中文/英文；公式①/③；⑤ 基于厂商剩余未抵扣分成款；**remaining>0** 才显示⑤行与函内剩余行，否则总计 **②-④**（无⑤）。  
-48. **updatePayment / settlementIds**：付款记录部分更新；申请付款时绑定结算 ID 列表。  
-49. **平台名称**：侧栏与面包屑用「代理游戏台账」，勿恢复「代理游戏财务」。  
-50. **数据统计侧栏**：仅显示「收入汇总统计」；其余 3 个统计页菜单隐藏、路由保留。  
-51. **内部结算拉取后时间**：保持近两个月，存 `internalSettlementButtons[businessType][type].monthRange`；勿改回拉取后切单月。  
-52. **申请付款确认弹窗**：`compact` 样式 `min-width: 420px`。
-53. **业务类型**：列表左上角 `BusinessTypeSelect`（4399/快爆）；`Vendor.businessType`；scoped 列表过滤；ID 段 100x/400x vs 200x/500x；数据互不相干。
-54. **业务类型选择框宽**：`.agf-select.agf-business-type-select` **100px**。
-55. **厂商预付分成款**：`Vendor.prepayment?`；**0 合法**；未填才拦截申请付款；在厂商收入【预付分成管理】维护；合同管理**无**此字段。
-56. **结算函⑤**：`remaining−(②−④)>0` → ⑤=②−④，否则 ⑤=remaining；函内剩余=remaining−⑤；`remaining>0` 才显示⑤相关行。
-57. **prepayment.ts**：厂商已抵扣/剩余计算、结算函 `calcLetterPrepaymentDeduction` 共用。
-58. **vendorPaymentApply**：未补充预付 = 厂商 `prepayment` 未填（非 0）。
-59. **internalSettlementButtons / externalSettlementButtons**：按 `businessType` 分桶存储。
+46. **MockFileUpload**：选择文件+列表+点击下载+**× 删除**；无虚线分隔；用于请款凭证。  
+47. **列表空状态**：`DataTable` 无数据时表头保留、表体居中空盒插画+「暂无数据」、分页仍显示共 0 条。  
+48. **结算函 1175px**：按 `settlementIds` 过滤；连续月份合并；下载中文/英文；公式①/③；⑤ 基于厂商剩余未抵扣分成款；**remaining>0** 才显示⑤行与函内剩余行，否则总计 **②-④**（无⑤）。  
+49. **updatePayment / settlementIds**：付款记录部分更新；申请付款时绑定结算 ID 列表。  
+50. **平台名称**：侧栏与面包屑用「代理游戏台账」，勿恢复「代理游戏财务」。  
+51. **数据统计侧栏**：仅显示「收入汇总统计」；其余 3 个统计页菜单隐藏、路由保留。  
+52. **内部结算拉取后时间**：保持近两个月，存 `internalSettlementButtons[businessType][type].monthRange`；勿改回拉取后切单月。  
+53. **申请付款确认弹窗**：`compact` 样式 `min-width: 420px`。
+54. **业务类型**：列表左上角 `BusinessTypeSelect`（4399/快爆）；`Vendor.businessType`；scoped 列表过滤；ID 段 100x/400x vs 200x/500x；数据互不相干。
+55. **业务类型选择框宽**：`.agf-select.agf-business-type-select` **100px**。
+56. **厂商预付分成款**：`Vendor.prepayment?`；**0 合法**；未填才拦截申请付款；在厂商收入【预付分成管理】维护；合同管理**无**此字段；**已抵扣=已付款之和+历史**（预付−合计≤0 取预付）；**剩余=预付−已抵扣**；抽屉只读项取**已保存**值。  
+57. **预付分成管理输入**：预付分成款、历史已抵扣分成款**精确至小数点后两位**（如 `800000.00`、`0.00`）。  
+58. **结算函⑤**：`remaining−(②−④)>0` → ⑤=②−④，否则 ⑤=remaining；函内剩余=remaining−⑤；`remaining>0` 才显示⑤相关行。  
+59. **prepayment.ts**：厂商已抵扣/剩余计算、结算函 `calcLetterPrepaymentDeduction` 共用。  
+60. **mockPdf.ts**：结算函【下载】生成可打开 PDF（非纯文本假 PDF）；`SettlementLetterDrawer` 中英文摘要。  
+61. **vendorPaymentApply**：未补充预付 = 厂商 `prepayment` 未填（非 0）。  
+62. **internalSettlementButtons / externalSettlementButtons**：按 `businessType` 分桶存储。

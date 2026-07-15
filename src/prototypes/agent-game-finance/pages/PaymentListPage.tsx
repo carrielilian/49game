@@ -27,12 +27,20 @@ function formatVendorReceiptInfo(vendor?: Vendor): string {
   ].join('\n');
 }
 
+function formatPayAmountInput(value: number): string {
+  return value.toFixed(2);
+}
+
+function parsePayAmount(value: string): number {
+  return Math.round(parseFloat(value.trim()) * 100) / 100;
+}
+
 function validatePayAmount(value: string): string | undefined {
   const trimmed = value.trim();
-  if (!trimmed) return '待付款金额不能为空';
-  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return '待付款金额最多保留两位小数';
+  if (!trimmed) return '实际付款金额不能为空';
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return '实际付款金额精确至小数点后两位';
   const n = parseFloat(trimmed);
-  if (Number.isNaN(n) || n <= 0) return '待付款金额必须大于0';
+  if (Number.isNaN(n) || n <= 0) return '实际付款金额必须大于0';
   return undefined;
 }
 
@@ -77,7 +85,7 @@ export function PaymentListPage() {
       remark: p.remark ?? '',
       receiptInfo: p.receiptInfo ?? formatVendorReceiptInfo(vendor),
     });
-    setPayAmount(String(p.actualAmount ?? p.pendingAmount));
+    setPayAmount(formatPayAmountInput(p.actualAmount ?? p.pendingAmount));
     setMarkErrors({});
     setMarkOpen(true);
   };
@@ -100,8 +108,14 @@ export function PaymentListPage() {
     payBank: form.payBank,
     receiptInfo: form.receiptInfo.trim(),
     remark: form.remark,
-    actualAmount: parseFloat(payAmount.trim()),
+    actualAmount: parsePayAmount(payAmount),
   });
+
+  const normalizePayAmount = () => {
+    const trimmed = payAmount.trim();
+    if (!trimmed || validatePayAmount(trimmed)) return;
+    setPayAmount(formatPayAmountInput(parseFloat(trimmed)));
+  };
 
   const clearMarkError = (key: keyof MarkFormErrors) => {
     setMarkErrors((prev) => {
@@ -123,6 +137,7 @@ export function PaymentListPage() {
       setToast({ message: '请完善所有信息', type: 'error' });
       return false;
     }
+    setPayAmount(formatPayAmountInput(parsePayAmount(payAmount)));
     return true;
   };
 
@@ -206,8 +221,9 @@ export function PaymentListPage() {
         }>
         <ReadonlyField label="厂商ID" value={current?.vendorId ?? ''} />
         <ReadonlyField label="厂商名称" value={current ? getVendorName(current.vendorId) : ''} />
+        <ReadonlyField label="待付款金额" value={formatMoney(current?.pendingAmount ?? 0)} />
         <div className="agf-form-item">
-          <label className="agf-form-label agf-form-label--required">待付款金额</label>
+          <label className="agf-form-label agf-form-label--required">实际付款金额</label>
           <div className="agf-form-field">
             <input
               className="agf-form-input"
@@ -219,6 +235,7 @@ export function PaymentListPage() {
                   clearMarkError('payAmount');
                 }
               }}
+              onBlur={normalizePayAmount}
             />
             <FieldError message={markErrors.payAmount} />
           </div>

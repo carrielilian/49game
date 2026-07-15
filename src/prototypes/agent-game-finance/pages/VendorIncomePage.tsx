@@ -18,15 +18,21 @@ import {
   getApplyPaymentBlockMessage,
 } from '../utils/vendorPaymentApply';
 
-interface PrepayForm {
-  prepayment: number;
-  historicalDeduction: number;
+function formatPrepayAmountInput(value: number): string {
+  return value.toFixed(2);
 }
 
-function parseNonNegative(value: string): number {
-  if (value.trim() === '') return NaN;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : NaN;
+function parsePrepayAmount(value: string): number {
+  return Math.round(parseFloat(value.trim()) * 100) / 100;
+}
+
+function validatePrepayAmount(value: string, label: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return `${label}不能为空`;
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return `${label}精确至小数点后两位`;
+  const n = parseFloat(trimmed);
+  if (Number.isNaN(n) || n < 0) return `${label}不能小于0`;
+  return undefined;
 }
 
 export function VendorIncomePage() {
@@ -44,7 +50,8 @@ export function VendorIncomePage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [prepayOpen, setPrepayOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState('');
-  const [prepayForm, setPrepayForm] = useState<PrepayForm>({ prepayment: NaN, historicalDeduction: 0 });
+  const [prepayAmount, setPrepayAmount] = useState('');
+  const [historicalAmount, setHistoricalAmount] = useState('');
   const [prepayErrors, setPrepayErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
@@ -57,14 +64,15 @@ export function VendorIncomePage() {
   const confirmAmount = selectedBalance?.balance ?? 0;
   const prepayVendor = selectedVendor ? getVendor(selectedVendor) : undefined;
 
+  // 公式中的「预付分成款」「历史已抵扣分成款」均取已保存值，不随未提交的表单输入变化
   const prepayPreview = useMemo(() => {
-    const prepayment = Number.isNaN(prepayForm.prepayment) ? 0 : prepayForm.prepayment;
-    const historical = Number.isNaN(prepayForm.historicalDeduction) ? 0 : prepayForm.historicalDeduction;
+    const prepayment = prepayVendor?.prepayment ?? 0;
+    const historical = prepayVendor?.historicalDeduction ?? 0;
     const paidSum = selectedVendor ? sumVendorPaidActualAmount(selectedVendor, scopedPayments) : 0;
     const deducted = calcDeductedPrepayment(prepayment, paidSum, historical);
     const remaining = calcRemainingUndeductedPrepayment(prepayment, deducted);
     return { deducted, remaining };
-  }, [prepayForm, scopedPayments, selectedVendor]);
+  }, [prepayVendor, scopedPayments, selectedVendor]);
 
   const confirmContent = useMemo(() => {
     const amountText = `申请付款金额：${formatMoney(confirmAmount)}元`;
@@ -81,12 +89,26 @@ export function VendorIncomePage() {
   const openPrepayDrawer = (vendorId: string) => {
     const vendor = getVendor(vendorId);
     setSelectedVendor(vendorId);
-    setPrepayForm({
-      prepayment: vendor?.prepayment != null && !Number.isNaN(vendor.prepayment) ? vendor.prepayment : NaN,
-      historicalDeduction: vendor?.historicalDeduction ?? 0,
-    });
+    setPrepayAmount(
+      vendor?.prepayment != null && !Number.isNaN(vendor.prepayment)
+        ? formatPrepayAmountInput(vendor.prepayment)
+        : '',
+    );
+    setHistoricalAmount(formatPrepayAmountInput(vendor?.historicalDeduction ?? 0));
     setPrepayErrors({});
     setPrepayOpen(true);
+  };
+
+  const normalizePrepayAmount = (
+    value: string,
+    setValue: (v: string) => void,
+    errorKey: string,
+    label: string,
+  ) => {
+    const trimmed = value.trim();
+    if (!trimmed || validatePrepayAmount(trimmed, label)) return;
+    setValue(formatPrepayAmountInput(parseFloat(trimmed)));
+    clearPrepayError(errorKey);
   };
 
   const clearPrepayError = (key: string) => {
@@ -101,25 +123,23 @@ export function VendorIncomePage() {
   const savePrepay = () => {
     if (!prepayVendor) return;
     const nextErrors: Record<string, string> = {};
-    if (Number.isNaN(prepayForm.prepayment)) {
-      nextErrors.prepayment = '预付分成款不能为空';
-    } else if (prepayForm.prepayment < 0) {
-      nextErrors.prepayment = '预付分成款不能小于0';
-    }
-    if (Number.isNaN(prepayForm.historicalDeduction)) {
-      nextErrors.historicalDeduction = '历史已抵扣分成款不能为空';
-    } else if (prepayForm.historicalDeduction < 0) {
-      nextErrors.historicalDeduction = '历史已抵扣分成款不能小于0';
-    }
+    const prepaymentError = validatePrepayAmount(prepayAmount, '预付分成款');
+    const historicalError = validatePrepayAmount(historicalAmount, '历史已抵扣分成款');
+    if (prepaymentError) nextErrors.prepayment = prepaymentError;
+    if (historicalError) nextErrors.historicalDeduction = historicalError;
     if (Object.keys(nextErrors).length) {
       setPrepayErrors(nextErrors);
       setToast({ message: '请完善所有信息', type: 'error' });
       return;
     }
+    const prepayment = parsePrepayAmount(prepayAmount);
+    const historicalDeduction = parsePrepayAmount(historicalAmount);
+    setPrepayAmount(formatPrepayAmountInput(prepayment));
+    setHistoricalAmount(formatPrepayAmountInput(historicalDeduction));
     updateVendor({
       ...prepayVendor,
-      prepayment: prepayForm.prepayment,
-      historicalDeduction: prepayForm.historicalDeduction,
+      prepayment,
+      historicalDeduction,
     });
     setPrepayOpen(false);
     setToast({ message: '保存成功', type: 'success' });
@@ -201,15 +221,16 @@ export function VendorIncomePage() {
               <label className="agf-form-label agf-form-label--required">预付分成款</label>
               <div className="agf-form-field">
                 <input
-                  type="number"
-                  min={0}
-                  step="0.01"
                   className="agf-form-input"
-                  value={Number.isNaN(prepayForm.prepayment) ? '' : prepayForm.prepayment}
+                  value={prepayAmount}
                   onChange={(e) => {
-                    clearPrepayError('prepayment');
-                    setPrepayForm({ ...prepayForm, prepayment: parseNonNegative(e.target.value) });
+                    const v = e.target.value;
+                    if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) {
+                      setPrepayAmount(v);
+                      clearPrepayError('prepayment');
+                    }
                   }}
+                  onBlur={() => normalizePrepayAmount(prepayAmount, setPrepayAmount, 'prepayment', '预付分成款')}
                 />
                 <FieldError message={prepayErrors.prepayment} />
               </div>
@@ -218,15 +239,21 @@ export function VendorIncomePage() {
               <label className="agf-form-label agf-form-label--required">历史已抵扣分成款</label>
               <div className="agf-form-field">
                 <input
-                  type="number"
-                  min={0}
-                  step="0.01"
                   className="agf-form-input"
-                  value={Number.isNaN(prepayForm.historicalDeduction) ? '' : prepayForm.historicalDeduction}
+                  value={historicalAmount}
                   onChange={(e) => {
-                    clearPrepayError('historicalDeduction');
-                    setPrepayForm({ ...prepayForm, historicalDeduction: parseNonNegative(e.target.value) });
+                    const v = e.target.value;
+                    if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) {
+                      setHistoricalAmount(v);
+                      clearPrepayError('historicalDeduction');
+                    }
                   }}
+                  onBlur={() => normalizePrepayAmount(
+                    historicalAmount,
+                    setHistoricalAmount,
+                    'historicalDeduction',
+                    '历史已抵扣分成款',
+                  )}
                 />
                 <FieldHint>填写线下手动已处理的预付分成款</FieldHint>
                 <FieldError message={prepayErrors.historicalDeduction} />

@@ -5,6 +5,7 @@ import { useAppStore } from '../data/store';
 import { displaySettlementFormula, formatMoney } from '../utils/settlement';
 import { buildLetterIncomeRows, buildLetterRefundRows, calcLetterPrepaymentDeduction } from '../utils/settlementLetter';
 import { calcVendorPrepaymentSummary } from '../utils/prepayment';
+import { downloadMockPdf } from '../utils/mockPdf';
 
 interface SettlementLetterDrawerProps {
   open: boolean;
@@ -116,20 +117,52 @@ function amountToChineseUpper(amount: number): string {
 
 type LetterLang = 'zh' | 'en';
 
-function downloadLetterPdf(vendorName: string, vendorId: string, lang: LetterLang) {
-  const langLabel = lang === 'zh' ? '中文' : '英文';
+function buildLetterPdfLines(
+  lang: LetterLang,
+  vendorName: string,
+  platformName: string,
+  incomeTotal: number,
+  refundTotal: number,
+  payAmount: number,
+  payAmountUpper: string,
+  showPrepayment: boolean,
+  prepaidDeduction: number,
+  remainingUndeducted: number,
+): string[] {
+  if (lang === 'en') {
+    return [
+      'Settlement Confirmation Letter (Mock)',
+      `Vendor: ${vendorName}`,
+      `Platform: ${platformName}`,
+      `Total Income (2): ${formatMoney(incomeTotal)}`,
+      `Total Refund (4): ${formatMoney(refundTotal)}`,
+      ...(showPrepayment ? [`Prepaid Deduction (5): ${formatMoney(prepaidDeduction)}`] : []),
+      `Pay Amount: ${formatMoney(payAmount)}`,
+      `Amount in words: ${payAmountUpper}`,
+      ...(showPrepayment ? [`Remaining Prepaid: ${formatMoney(remainingUndeducted)}`] : []),
+    ];
+  }
+  return [
+    '合作分成结算确认函（原型模拟）',
+    `收款方：${vendorName}`,
+    `付款方：${platformName}`,
+    `合计②：${formatMoney(incomeTotal)} 元`,
+    `合计④：${formatMoney(refundTotal)} 元`,
+    ...(showPrepayment ? [`本次抵扣预付分成⑤：${formatMoney(prepaidDeduction)} 元`] : []),
+    `支付金额：${formatMoney(payAmount)} 元`,
+    `支付金额（大写）：${payAmountUpper}`,
+    ...(showPrepayment ? [`剩余未抵扣预付分成：${formatMoney(remainingUndeducted)} 元`] : []),
+  ];
+}
+
+function downloadLetterPdf(
+  vendorName: string,
+  vendorId: string,
+  lang: LetterLang,
+  lines: string[],
+) {
   const suffix = lang === 'zh' ? '' : '_EN';
-  const blob = new Blob([`结算函 PDF 模拟内容（${langLabel}）`], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `结算函${suffix}_${vendorName || vendorId}.pdf`;
-  a.rel = 'noopener';
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadMockPdf(`结算函${suffix}_${vendorName || vendorId}.pdf`, lines);
 }
 
 export function SettlementLetterDrawer({ open, onClose, vendorId, amount, settlementIds }: SettlementLetterDrawerProps) {
@@ -194,6 +227,21 @@ export function SettlementLetterDrawer({ open, onClose, vendorId, amount, settle
     incomeTotal,
     refundTotal,
   );
+  const payAmountUpper = amountToChineseUpper(payAmount);
+  const vendorName = vendor?.name ?? vendorId;
+
+  const downloadLines = (lang: LetterLang) => buildLetterPdfLines(
+    lang,
+    vendorName,
+    PLATFORM_NAME,
+    incomeTotal,
+    refundTotal,
+    payAmount,
+    payAmountUpper,
+    showPrepaymentDeductionRows,
+    prepaidDeduction,
+    remainingUndeducted,
+  );
 
   return (
     <Drawer title="结算函" open={open} onClose={onClose} width={1175}>
@@ -220,7 +268,7 @@ export function SettlementLetterDrawer({ open, onClose, vendorId, amount, settle
                   type="button"
                   className="agf-settlement-letter__download-item"
                   onClick={() => {
-                    downloadLetterPdf(vendor?.name ?? '', vendorId, 'zh');
+                    downloadLetterPdf(vendorName, vendorId, 'zh', downloadLines('zh'));
                     setDownloadOpen(false);
                   }}
                 >
@@ -230,7 +278,7 @@ export function SettlementLetterDrawer({ open, onClose, vendorId, amount, settle
                   type="button"
                   className="agf-settlement-letter__download-item"
                   onClick={() => {
-                    downloadLetterPdf(vendor?.name ?? '', vendorId, 'en');
+                    downloadLetterPdf(vendorName, vendorId, 'en', downloadLines('en'));
                     setDownloadOpen(false);
                   }}
                 >
@@ -316,7 +364,7 @@ export function SettlementLetterDrawer({ open, onClose, vendorId, amount, settle
             )}
             <tr>
               <th className="agf-settlement-letter__label-cell">支付金额（大写）</th>
-              <td colSpan={4} className="agf-settlement-letter__content-cell">{amountToChineseUpper(payAmount)}</td>
+              <td colSpan={4} className="agf-settlement-letter__content-cell">{payAmountUpper}</td>
             </tr>
             <tr>
               <th className="agf-settlement-letter__label-cell">
