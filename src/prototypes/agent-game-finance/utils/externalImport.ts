@@ -3,22 +3,21 @@ import { isFormulaConfigured } from '../data/mock-data';
 import { resolveFollowInvoiceTax } from './invoiceTax';
 import { calcSettlement, formatFormulaText, genId } from './settlement';
 
-export function resolveGameFromChannelGameId(
-  formulas: FormulaConfig[],
+/** 按上传报表「游戏名称 + 厂商名称」匹配游戏（游戏名称取 onlineName） */
+export function resolveGameFromImportRow(
   games: Game[],
-  channelGameId: string,
-  channelName: string,
+  vendors: Vendor[],
+  gameName: string,
+  vendorName: string,
 ): { gameId: string; game: Game } | null {
-  for (const f of formulas) {
-    const ch = f.channels.find(
-      (c) => c.type === 'external' && c.name === channelName && c.enabled && c.channelGameId === channelGameId,
-    );
-    if (ch) {
-      const game = games.find((g) => g.id === f.gameId);
-      if (game) return { gameId: f.gameId, game };
-    }
-  }
-  return null;
+  const trimmedGame = gameName.trim();
+  const trimmedVendor = vendorName.trim();
+  if (!trimmedGame || !trimmedVendor) return null;
+  const vendor = vendors.find((v) => v.name === trimmedVendor);
+  if (!vendor) return null;
+  const game = games.find((g) => g.vendorId === vendor.id && g.onlineName === trimmedGame);
+  if (!game) return null;
+  return { gameId: game.id, game };
 }
 
 function getExternalTax(formula: FormulaConfig, vendor: Vendor | undefined): number {
@@ -45,9 +44,9 @@ export function calculateImportRow(
   games: Game[],
   vendors: Vendor[],
 ): ImportPreviewRow {
-  const resolved = resolveGameFromChannelGameId(formulas, games, row.channelGameId, row.channel);
+  const resolved = resolveGameFromImportRow(games, vendors, row.gameName, row.vendorName);
   if (!resolved) {
-    return { ...row, calculated: false, error: '未匹配到游戏，请检查渠道游戏ID' };
+    return { ...row, calculated: false, error: '未匹配到游戏，请检查游戏名称与厂商名称' };
   }
   const formula = formulas.find((f) => f.gameId === resolved.gameId);
   if (!formula || !isFormulaConfigured(formula)) {
@@ -55,6 +54,7 @@ export function calculateImportRow(
       ...row,
       gameId: resolved.gameId,
       gameName: resolved.game.onlineName,
+      vendorName: vendors.find((v) => v.id === resolved.game.vendorId)?.name ?? row.vendorName,
       calculated: false,
       error: '该游戏尚未配置结算公式',
     };
@@ -66,6 +66,7 @@ export function calculateImportRow(
     ...row,
     gameId: resolved.gameId,
     gameName: resolved.game.onlineName,
+    vendorName: vendor?.name ?? row.vendorName,
     formulaText,
     settlementIncome,
     calculated: true,
@@ -73,33 +74,32 @@ export function calculateImportRow(
   };
 }
 
-export function hasChannelEnabledGames(channelName: string, formulas: FormulaConfig[]): boolean {
-  return formulas.some((f) =>
-    f.channels.some(
-      (c) => c.type === 'external' && c.name === channelName && c.enabled && c.channelGameId,
-    ),
-  );
-}
-
-/** 模拟解析上传表格（字段：渠道游戏ID、收入时间、待结算收入） */
+/** 模拟解析上传表格（字段：收入时间、游戏名称、厂商名称、待结算金额） */
 export function buildMockImportRows(
   channel: string,
   formulas: FormulaConfig[],
+  games: Game[],
+  vendors: Vendor[],
 ): ImportPreviewRow[] {
   const rows: ImportPreviewRow[] = [];
-  const months = ['2025-05', '2025-06', '2025-07'];
+  const months = ['2026-06', '2026-07', '2026-08'];
 
-  const matched = formulas.flatMap((f) =>
-    f.channels
-      .filter((c) => c.type === 'external' && c.name === channel && c.enabled && c.channelGameId)
-      .map((c) => ({ channelGameId: c.channelGameId! })),
-  );
+  const matched = formulas
+    .filter((f) => isFormulaConfigured(f))
+    .flatMap((f) => {
+      const game = games.find((g) => g.id === f.gameId);
+      if (!game) return [];
+      const vendor = vendors.find((v) => v.id === game.vendorId);
+      if (!vendor) return [];
+      return [{ game, vendor }];
+    });
   const picks = matched.slice(0, 3);
-  picks.forEach(({ channelGameId }, i) => {
+  picks.forEach(({ game, vendor }, i) => {
     rows.push({
       id: genId('IP'),
-      channelGameId,
       incomeTime: months[i % months.length],
+      gameName: game.onlineName,
+      vendorName: vendor.name,
       pendingAmount: Math.round(Math.random() * 80000 + 10000),
       channel,
       calculated: false,
@@ -116,16 +116,18 @@ export function enrichImportRowsOnParse(
 ): ImportPreviewRow[] {
   return rows.map((row) => {
     if (row.error) return row;
-    const resolved = resolveGameFromChannelGameId(formulas, games, row.channelGameId, row.channel);
+    const resolved = resolveGameFromImportRow(games, vendors, row.gameName, row.vendorName);
     if (!resolved) {
-      return { ...row, calculated: false, error: '未匹配到游戏，请检查渠道游戏ID' };
+      return { ...row, calculated: false, error: '未匹配到游戏，请检查游戏名称与厂商名称' };
     }
     const formula = formulas.find((f) => f.gameId === resolved.gameId);
     if (!formula || !isFormulaConfigured(formula)) {
+      const vendor = vendors.find((v) => v.id === resolved.game.vendorId);
       return {
         ...row,
         gameId: resolved.gameId,
         gameName: resolved.game.onlineName,
+        vendorName: vendor?.name ?? row.vendorName,
         calculated: false,
         formulaText: '-',
         settlementIncome: undefined,
@@ -138,6 +140,7 @@ export function enrichImportRowsOnParse(
       ...row,
       gameId: resolved.gameId,
       gameName: resolved.game.onlineName,
+      vendorName: vendor?.name ?? row.vendorName,
       calculated: false,
       formulaText,
       settlementIncome: undefined,

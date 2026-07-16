@@ -3,8 +3,8 @@ import { ChevronDown } from 'lucide-react';
 import { Drawer } from './Modal';
 import { useAppStore } from '../data/store';
 import { displaySettlementFormula, formatMoney } from '../utils/settlement';
-import { buildLetterIncomeRows, buildLetterRefundRows, calcLetterPrepaymentDeduction } from '../utils/settlementLetter';
-import { calcVendorPrepaymentSummary } from '../utils/prepayment';
+import { buildLetterIncomeRows, buildLetterRefundRows, calcGameLetterPrepaymentDeduction, calcLetterPrepaymentDeduction } from '../utils/settlementLetter';
+import { calcGamePrepaymentSummary, calcVendorPrepaymentSummary } from '../utils/prepayment';
 import { downloadMockPdf } from '../utils/mockPdf';
 
 interface SettlementLetterDrawerProps {
@@ -13,6 +13,9 @@ interface SettlementLetterDrawerProps {
   vendorId: string;
   amount: number;
   settlementIds?: string[];
+  /** 游戏付款管理：按游戏维度计算预付抵扣 */
+  gameId?: string;
+  useGamePayments?: boolean;
 }
 
 const PLATFORM_NAME = '四三九九网络股份有限公司';
@@ -165,9 +168,12 @@ function downloadLetterPdf(
   downloadMockPdf(`结算函${suffix}_${vendorName || vendorId}.pdf`, lines);
 }
 
-export function SettlementLetterDrawer({ open, onClose, vendorId, amount, settlementIds }: SettlementLetterDrawerProps) {
-  const { getVendor, getGameName, games, settlements, payments } = useAppStore();
+export function SettlementLetterDrawer({
+  open, onClose, vendorId, amount, settlementIds, gameId, useGamePayments,
+}: SettlementLetterDrawerProps) {
+  const { getVendor, getGame, getGameName, games, settlements, payments, gamePayments } = useAppStore();
   const vendor = getVendor(vendorId);
+  const game = gameId ? getGame(gameId) : undefined;
   const [downloadOpen, setDownloadOpen] = useState(false);
   const downloadRef = useRef<HTMLDivElement>(null);
 
@@ -200,13 +206,13 @@ export function SettlementLetterDrawer({ open, onClose, vendorId, amount, settle
       };
     }
 
-    const vendorGame = games.find((g) => g.vendorId === vendorId);
-    if (!vendorGame) return { incomeRows: [], refundRows: [] };
+    const fallbackGame = gameId ? games.find((g) => g.id === gameId) : games.find((g) => g.vendorId === vendorId);
+    if (!fallbackGame) return { incomeRows: [], refundRows: [] };
 
     return {
       incomeRows: [{
         id: 'fallback',
-        productName: `《${getGameName(vendorGame.id)}》H5游戏`,
+        productName: `《${getGameName(fallbackGame.id)}》快爆付费`,
         period: '2025.06',
         revenue: amount,
         formula: '①* (1-5%-0%) *50%',
@@ -214,19 +220,18 @@ export function SettlementLetterDrawer({ open, onClose, vendorId, amount, settle
       }],
       refundRows: [],
     };
-  }, [amount, games, getGameName, settlementIds, settlements, vendorId]);
+  }, [amount, gameId, games, getGameName, settlementIds, settlements, vendorId]);
 
   const incomeTotal = incomeRows.reduce((sum, row) => sum + row.settlementAmount, 0);
   const refundTotal = refundRows.reduce((sum, row) => sum + row.settlementRefund, 0);
-  const vendorRemainingPrepayment = calcVendorPrepaymentSummary(vendor, vendorId, payments).remainingPrepayment;
+  const prepaymentSummary = useGamePayments && gameId
+    ? calcGamePrepaymentSummary(game, gameId, gamePayments)
+    : calcVendorPrepaymentSummary(vendor, vendorId, payments);
+  const vendorRemainingPrepayment = prepaymentSummary.remainingPrepayment;
   const showPrepaymentDeductionRows = vendorRemainingPrepayment > 0;
-  const { deduction: prepaidDeduction, remainingUndeducted, payAmount } = calcLetterPrepaymentDeduction(
-    vendor,
-    vendorId,
-    payments,
-    incomeTotal,
-    refundTotal,
-  );
+  const { deduction: prepaidDeduction, remainingUndeducted, payAmount } = useGamePayments && gameId
+    ? calcGameLetterPrepaymentDeduction(game, gameId, gamePayments, incomeTotal, refundTotal)
+    : calcLetterPrepaymentDeduction(vendor, vendorId, payments, incomeTotal, refundTotal);
   const payAmountUpper = amountToChineseUpper(payAmount);
   const vendorName = vendor?.name ?? vendorId;
 

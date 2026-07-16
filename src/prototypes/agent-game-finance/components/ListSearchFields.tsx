@@ -8,9 +8,11 @@ interface ListSearchFieldsProps {
   onChange: (value: ListSearchQuery) => void;
   /** 游戏管理：额外展示「合同游戏名称」搜索 */
   showContractName?: boolean;
+  /** 与厂商相关搜索同显时，隐藏「厂商ID」输入（如游戏收入管理页） */
+  hideVendorId?: boolean;
 }
 
-export function ListSearchFields({ mode, value, onChange, showContractName }: ListSearchFieldsProps) {
+export function ListSearchFields({ mode, value, onChange, showContractName, hideVendorId }: ListSearchFieldsProps) {
   const patch = (key: keyof ListSearchQuery, next: string) => onChange({ ...value, [key]: next });
 
   return (
@@ -33,12 +35,14 @@ export function ListSearchFields({ mode, value, onChange, showContractName }: Li
       )}
       {(mode === 'vendor' || mode === 'gameAndVendor') && (
         <>
-          <input
-            className="agf-input"
-            placeholder={SEARCH_FIELD_PLACEHOLDER.vendorId}
-            value={value.vendorId ?? ''}
-            onChange={(e) => patch('vendorId', e.target.value)}
-          />
+          {!hideVendorId && (
+            <input
+              className="agf-input"
+              placeholder={SEARCH_FIELD_PLACEHOLDER.vendorId}
+              value={value.vendorId ?? ''}
+              onChange={(e) => patch('vendorId', e.target.value)}
+            />
+          )}
           <input
             className="agf-input"
             placeholder={SEARCH_FIELD_PLACEHOLDER.vendorName}

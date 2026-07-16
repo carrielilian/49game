@@ -9,16 +9,18 @@
 import React, { useMemo } from 'react';
 import { defineHashPageRoute, useHashPage } from '../../common/useHashPage';
 import { AdminLayout } from './components/AdminLayout';
+import { GameIncomeFieldHelp } from './components/GameIncomeFieldHelp';
 import { VendorIncomeFieldHelp } from './components/VendorIncomeFieldHelp';
 import type { MenuGroup } from './components/Sidebar';
 import { AppProvider } from './data/store';
 import { ExternalSettlementPage } from './pages/ExternalSettlementPage';
 import { FormulaListPage } from './pages/FormulaListPage';
+import { GameIncomePage } from './pages/GameIncomePage';
 import { GameListPage } from './pages/GameListPage';
+import { GamePaymentListPage } from './pages/GamePaymentListPage';
 import { InternalSettlementPage } from './pages/InternalSettlementPage';
 import { PaymentListPage } from './pages/PaymentListPage';
 import { RevenueSummaryPage } from './pages/RevenueSummaryPage';
-import { StatisticsPage } from './pages/StatisticsPage';
 import { VendorIncomePage } from './pages/VendorIncomePage';
 import { VendorListPage } from './pages/VendorListPage';
 import './style.css';
@@ -30,31 +32,28 @@ const ROUTE = defineHashPageRoute([
   { id: 'external-settlement', title: '外部收入结算' },
   { id: 'internal-settlement', title: '内部收入结算' },
   { id: 'internal-refund', title: '内部退款结算' },
-  { id: 'vendor-income', title: '厂商收入' },
-  { id: 'payment-list', title: '付款管理' },
-  { id: 'stats-vendor', title: '厂商收入统计' },
-  { id: 'stats-channel', title: '渠道收入统计' },
-  { id: 'stats-game', title: '游戏收入统计' },
+  { id: 'game-income', title: '游戏收入管理' },
+  { id: 'game-payment-list', title: '游戏付款管理' },
   { id: 'stats-summary', title: '收入汇总统计' },
 ], { defaultPageId: 'vendor-list' });
 
 const MENU_GROUPS: MenuGroup[] = [
   {
-    title: '游戏管理',
+    title: '游戏支付管理',
     items: [
       { id: 'vendor-list', label: '厂商管理' },
       { id: 'game-list', label: '游戏管理' },
     ],
   },
   {
-    title: '财务管理',
+    title: '财务分成管理',
     items: [
       { id: 'formula-list', label: '结算公式管理' },
       { id: 'external-settlement', label: '外部收入结算' },
       { id: 'internal-settlement', label: '内部收入结算' },
       { id: 'internal-refund', label: '内部退款结算' },
-      { id: 'vendor-income', label: '厂商收入' },
-      { id: 'payment-list', label: '付款管理' },
+      { id: 'game-income', label: '游戏收入管理' },
+      { id: 'game-payment-list', label: '游戏付款管理' },
     ],
   },
   {
@@ -66,17 +65,16 @@ const MENU_GROUPS: MenuGroup[] = [
 ];
 
 const PAGE_META: Record<string, { group: string; title: string }> = {
-  'vendor-list': { group: '游戏管理', title: '厂商管理' },
-  'game-list': { group: '游戏管理', title: '游戏管理' },
-  'formula-list': { group: '财务管理', title: '结算公式管理' },
-  'external-settlement': { group: '财务管理', title: '外部收入结算' },
-  'internal-settlement': { group: '财务管理', title: '内部收入结算' },
-  'internal-refund': { group: '财务管理', title: '内部退款结算' },
-  'vendor-income': { group: '财务管理', title: '厂商收入' },
-  'payment-list': { group: '财务管理', title: '付款管理' },
-  'stats-vendor': { group: '数据统计', title: '厂商收入统计' },
-  'stats-channel': { group: '数据统计', title: '渠道收入统计' },
-  'stats-game': { group: '数据统计', title: '游戏收入统计' },
+  'vendor-list': { group: '游戏支付管理', title: '厂商管理' },
+  'game-list': { group: '游戏支付管理', title: '游戏管理' },
+  'formula-list': { group: '财务分成管理', title: '结算公式管理' },
+  'external-settlement': { group: '财务分成管理', title: '外部收入结算' },
+  'internal-settlement': { group: '财务分成管理', title: '内部收入结算' },
+  'internal-refund': { group: '财务分成管理', title: '内部退款结算' },
+  'vendor-income': { group: '财务分成管理', title: '厂商收入' },
+  'payment-list': { group: '财务分成管理', title: '厂商付款管理' },
+  'game-income': { group: '财务分成管理', title: '游戏收入管理' },
+  'game-payment-list': { group: '财务分成管理', title: '游戏付款管理' },
   'stats-summary': { group: '数据统计', title: '收入汇总统计' },
 };
 
@@ -90,9 +88,8 @@ function PageContent({ pageId }: { pageId: string }) {
     case 'internal-refund': return <InternalSettlementPage key="internal-refund" type="refund" />;
     case 'vendor-income': return <VendorIncomePage />;
     case 'payment-list': return <PaymentListPage />;
-    case 'stats-vendor': return <StatisticsPage mode="vendor" />;
-    case 'stats-channel': return <StatisticsPage mode="channel" />;
-    case 'stats-game': return <StatisticsPage mode="game" />;
+    case 'game-income': return <GameIncomePage />;
+    case 'game-payment-list': return <GamePaymentListPage />;
     case 'stats-summary': return <RevenueSummaryPage />;
     default: return <VendorListPage />;
   }
@@ -109,7 +106,11 @@ function AppShell() {
       activePage={page}
       onNavigate={setPage}
       breadcrumbs={breadcrumbs}
-      breadcrumbExtra={page === 'vendor-income' ? <VendorIncomeFieldHelp /> : undefined}
+      breadcrumbExtra={
+        page === 'vendor-income' ? <VendorIncomeFieldHelp />
+          : page === 'game-income' ? <GameIncomeFieldHelp />
+            : undefined
+      }
     >
       <PageContent pageId={page} />
     </AdminLayout>

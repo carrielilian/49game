@@ -3,6 +3,7 @@ export type PaymentStatus = '未付款' | '已付款';
 export type OperationStatus = '未上线' | '已上线';
 export type CooperationStatus = '合作中' | '合作终止';
 export type LicenseStatus = '有' | '无';
+export type GamePayer = '4399' | '纯游' | '游乐' | '游戏之家' | '香港4399' | '游家时代';
 export type SettlementType = 'external' | 'internal' | 'refund';
 export type ChannelType = 'internal' | 'external';
 export type BusinessType = '4399' | '快爆';
@@ -15,6 +16,8 @@ export interface Vendor {
   phone: string;
   email: string;
   address: string;
+  /** 支持币种，默认人民币 */
+  currency: ContractCurrency;
   invoiceInfo: string;
   accountName: string;
   bank: string;
@@ -34,19 +37,39 @@ export interface Game {
   vendorId: string;
   launchDate: string;
   manager: string;
+  /** 付款方 */
+  payer?: GamePayer;
   license: LicenseStatus;
   operationStatus: OperationStatus;
   cooperationStatus: CooperationStatus;
   remark?: string;
   licenseFee?: number;
   licensePayer?: string;
+  /** 游戏添加时间，用于列表默认排序 */
+  createdAt: string;
+  /** 游戏级预付分成款；未填视为未补充 */
+  prepayment?: number;
+  /** 历史已抵扣分成款（线下手动处理），默认 0 */
+  historicalDeduction?: number;
 }
+
+export type ContractCurrency = '人民币' | '美金';
+export type CooperationContent = '游戏代理金' | '预付分成款' | '委托开发费';
 
 export interface Contract {
   gameId: string;
-  agencyPayment: number;
-  developmentFee: number;
-  contractDescription: string;
+  contractNumber: string;
+  contractAmount?: number;
+  /** 合作内容多选 */
+  cooperationContents: CooperationContent[];
+  /** 已付游戏代理金（勾选游戏代理金时） */
+  paidAgencyFee?: number;
+  /** 已付预付分成款（勾选预付分成款时） */
+  paidPrepayment?: number;
+  /** 已付委托开发费（勾选委托开发费时） */
+  paidDevelopmentFee?: number;
+  /** 补充说明 */
+  supplementalNote: string;
   cooperationStatus: CooperationStatus;
 }
 
@@ -100,11 +123,24 @@ export interface VendorBalance {
   totalRefund: number;
 }
 
+export interface GameBalance {
+  gameId: string;
+  balance: number;
+  accountTotalIncome: number;
+  prepayment: number;
+  deductedPrepayment: number;
+  remainingPrepayment: number;
+  totalIncome: number;
+  totalRefund: number;
+}
+
 export interface PaymentRequest {
   id: string;
   vendorId: string;
   pendingAmount: number;
   actualAmount?: number;
+  /** 实际付款美金（选填） */
+  actualAmountUsd?: number;
   status: PaymentStatus;
   applyTime: string;
   payTime?: string;
@@ -117,7 +153,25 @@ export interface PaymentRequest {
   settlementIds?: string[];
 }
 
-export type GameOperationLogAction = '添加游戏' | '运营状态' | '合作状态';
+export interface GamePaymentRequest {
+  id: string;
+  gameId: string;
+  pendingAmount: number;
+  actualAmount?: number;
+  /** 实际付款美金（选填） */
+  actualAmountUsd?: number;
+  status: PaymentStatus;
+  applyTime: string;
+  payTime?: string;
+  payBank?: string;
+  receiptInfo?: string;
+  settlementLetter?: string;
+  invoice?: string;
+  remark?: string;
+  settlementIds?: string[];
+}
+
+export type GameOperationLogAction = '添加游戏' | '运营状态' | '合作状态' | '合同变更';
 
 export interface GameOperationLog {
   id: string;
@@ -126,6 +180,8 @@ export interface GameOperationLog {
   time: string;
   action: GameOperationLogAction;
   status?: string;
+  /** 合同金额/已付变更等多行说明 */
+  detail?: string;
 }
 
 export interface FormulaOperationLog {
@@ -138,12 +194,14 @@ export interface FormulaOperationLog {
 
 export interface ImportPreviewRow {
   id: string;
-  channelGameId: string;
   incomeTime: string;
+  /** 上传报表「游戏名称」，匹配 onlineName */
+  gameName: string;
+  /** 上传报表「厂商名称」 */
+  vendorName: string;
   pendingAmount: number;
   channel: string;
   gameId?: string;
-  gameName?: string;
   formulaText?: string;
   settlementIncome?: number;
   calculated: boolean;

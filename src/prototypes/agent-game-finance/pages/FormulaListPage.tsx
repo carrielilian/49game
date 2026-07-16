@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { DataTable, DualCell } from '../components/DataTable';
-import { FieldError, FieldHint, FormSectionTitle, PercentInput, ReadonlyField } from '../components/FormFields';
+import { DecimalPercentInput, FormSectionTitle, PercentInput, ReadonlyField } from '../components/FormFields';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { useAppStore } from '../data/store';
 import { isFormulaConfigured } from '../data/mock-data';
-import type { FormulaChannel, FormulaConfig, TaxMode } from '../data/types';
+import type { FormulaConfig, TaxMode } from '../data/types';
 import { formatFormulaText } from '../utils/settlement';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
@@ -31,25 +31,15 @@ function needsTaxInput(mode: TaxMode, invoiceInfo: string): boolean {
   return isOtherInvoice(invoiceInfo) || taxRateFromInvoice(invoiceInfo) === null;
 }
 
-function validateChannelsForm(channels: FormulaChannel[]): FieldErrors {
-  const errors: FieldErrors = {};
-  for (const ch of channels) {
-    if (ch.enabled && !ch.channelGameId?.trim()) {
-      errors[`channel-${ch.id}`] = '渠道游戏ID不能为空';
-    }
-  }
-  return errors;
-}
-
 function validateFormulaForm(f: FormulaConfig, invoiceInfo: string): FieldErrors {
   const errors: FieldErrors = {};
   if (needsTaxInput(f.internalTaxMode, invoiceInfo) && !Number.isFinite(f.internalTax)) {
-    errors.internalTax = '税率不能为空';
+    errors.internalTax = '扣税点不能为空';
   }
   if (!Number.isFinite(f.internalChannelFee)) errors.internalChannelFee = '渠道费不能为空';
   if (!Number.isFinite(f.internalShare)) errors.internalShare = '分成不能为空';
   if (needsTaxInput(f.externalTaxMode, invoiceInfo) && !Number.isFinite(f.externalTax)) {
-    errors.externalTax = '税率不能为空';
+    errors.externalTax = '扣税点不能为空';
   }
   if (!Number.isFinite(f.externalChannelFee)) errors.externalChannelFee = '渠道费不能为空';
   if (!Number.isFinite(f.externalShare)) errors.externalShare = '分成不能为空';
@@ -79,7 +69,7 @@ function TaxRateField({
   return (
     <>
       <div className="agf-form-item">
-        <label className="agf-form-label agf-form-label--required">税率</label>
+        <label className="agf-form-label agf-form-label--required">扣税点</label>
         <div className="agf-radio-group">
           {(['跟随发票', '自定义'] as TaxMode[]).map((opt) => (
             <label key={opt} className="agf-radio-item">
@@ -96,24 +86,19 @@ function TaxRateField({
       </div>
       {mode === '跟随发票' && mapped !== null && (
         <div className="agf-form-item">
-          <label className="agf-form-label">税率</label>
+          <label className="agf-form-label">扣税点</label>
           <div className="agf-form-readonly-value">{formatTaxPercent(mapped)}</div>
         </div>
       )}
       {needInput && (
         <div className="agf-form-item">
-          <label className="agf-form-label agf-form-label--required">税率</label>
+          <label className="agf-form-label agf-form-label--required">扣税点</label>
           <div className="agf-form-field">
-            <input
-              type="number"
-              step="0.0001"
-              min={0}
-              className="agf-form-input"
-              placeholder="请输入税率，如 0.06"
-              value={Number.isFinite(tax) ? tax : ''}
-              onChange={(e) => onTaxChange(e.target.value === '' ? NaN : Number(e.target.value))}
+            <DecimalPercentInput
+              value={tax}
+              onChange={onTaxChange}
+              error={error}
             />
-            <FieldError message={error} />
           </div>
         </div>
       )}
@@ -125,7 +110,6 @@ export function FormulaListPage() {
   const { scopedGames, formulas, formulaLogs, getVendorName, getVendor, getGame, updateFormula } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [formulaDrawer, setFormulaDrawer] = useState(false);
-  const [channelDrawer, setChannelDrawer] = useState(false);
   const [logDrawer, setLogDrawer] = useState(false);
   const [editing, setEditing] = useState<FormulaConfig | null>(null);
   const [effectiveFormula, setEffectiveFormula] = useState('-');
@@ -164,14 +148,6 @@ export function FormulaListPage() {
     setEditing(next);
     setFormulaDrawer(true);
   };
-  const openChannels = (gameId: string) => {
-    const f = formulas.find((x) => x.gameId === gameId);
-    if (f) {
-      setErrors({});
-      setEditing({ ...f, channels: f.channels.map((c) => ({ ...c })) });
-      setChannelDrawer(true);
-    }
-  };
   const openLogs = (gameId: string) => { setSelectedGameId(gameId); setLogDrawer(true); };
 
   const saveFormula = () => {
@@ -186,26 +162,6 @@ export function FormulaListPage() {
     }
     updateFormula(editing);
     setFormulaDrawer(false);
-  };
-  const saveChannels = () => {
-    if (!editing) return;
-    const next = validateChannelsForm(editing.channels);
-    if (Object.keys(next).length) {
-      setErrors(next);
-      setToast({ message: '请完善所有信息', type: 'error' });
-      return;
-    }
-    updateFormula(editing);
-    setChannelDrawer(false);
-  };
-
-  const updateChannel = (index: number, patch: Partial<FormulaChannel>) => {
-    if (!editing) return;
-    const ch = editing.channels[index];
-    if (patch.enabled === false) clearError(`channel-${ch.id}`);
-    const channels = [...editing.channels];
-    channels[index] = { ...ch, ...patch };
-    setEditing({ ...editing, channels });
   };
 
   const logs = formulaLogs.filter((l) => l.gameId === selectedGameId);
@@ -250,7 +206,6 @@ export function FormulaListPage() {
           { key: 'ops', title: '操作', render: (r) => (
             <div className="agf-actions">
               <button type="button" className="agf-btn agf-btn--link" onClick={() => openFormula(r.id)}>结算公式</button>
-              <button type="button" className="agf-btn agf-btn--link" onClick={() => openChannels(r.id)}>支持渠道</button>
               <button type="button" className="agf-btn agf-btn--link" onClick={() => openLogs(r.id)}>操作记录</button>
             </div>
           ) },
@@ -261,7 +216,7 @@ export function FormulaListPage() {
         {editing && editingGame && (
           <>
             <div className="agf-form-readonly-grid">
-              <ReadonlyField label="游戏ID / 游戏名称" value={`${editing.gameId}/${editingGame.onlineName}`} />
+              <ReadonlyField label="游戏ID / 游戏名称" value={`${editing.gameId} / ${editingGame.onlineName}`} />
               <ReadonlyField label="厂商ID" value={editingGame.vendorId} />
               <ReadonlyField label="厂商名称" value={getVendorName(editingGame.vendorId)} />
               <ReadonlyField label="结算公式" value={effectiveFormula} multiline />
@@ -317,76 +272,13 @@ export function FormulaListPage() {
           </>
         )}
       </Drawer>
-      <Drawer title="支持渠道" open={channelDrawer} onClose={() => setChannelDrawer(false)} large
-        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setChannelDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveChannels}>保存</button></>}>
-        {editing && editingGame && (
-          <>
-            <div className="agf-form-readonly-grid agf-channel-drawer-meta">
-              <ReadonlyField label="游戏ID / 游戏名称" value={`${editing.gameId}/${editingGame.onlineName}`} />
-              <ReadonlyField label="厂商名称" value={getVendorName(editingGame.vendorId)} />
-            </div>
-            <FormSectionTitle>内部渠道</FormSectionTitle>
-            <FieldHint>请勾选支持的内部渠道，并填写该渠道下对应的游戏ID</FieldHint>
-            {editing.channels.map((ch, i) => ch.type !== 'internal' ? null : (
-              <div key={ch.id} className="agf-channel-row">
-                <label className="agf-channel-row__check">
-                  <input
-                    type="checkbox"
-                    checked={ch.enabled}
-                    onChange={(e) => updateChannel(i, { enabled: e.target.checked })}
-                  />
-                </label>
-                <span className="agf-channel-row__name">{ch.name}</span>
-                <div className="agf-channel-row__field">
-                  <input
-                    className="agf-form-input"
-                    placeholder="渠道游戏ID"
-                    value={ch.channelGameId ?? ''}
-                    onChange={(e) => {
-                      clearError(`channel-${ch.id}`);
-                      updateChannel(i, { channelGameId: e.target.value });
-                    }}
-                  />
-                  <FieldError message={errors[`channel-${ch.id}`]} />
-                </div>
-              </div>
-            ))}
-            <FormSectionTitle>外部渠道</FormSectionTitle>
-            <FieldHint>请勾选支持的外部渠道，并填写该渠道下对应的游戏ID</FieldHint>
-            {editing.channels.map((ch, i) => ch.type !== 'external' ? null : (
-              <div key={ch.id} className="agf-channel-row">
-                <label className="agf-channel-row__check">
-                  <input
-                    type="checkbox"
-                    checked={ch.enabled}
-                    onChange={(e) => updateChannel(i, { enabled: e.target.checked })}
-                  />
-                </label>
-                <span className="agf-channel-row__name">{ch.name}</span>
-                <div className="agf-channel-row__field">
-                  <input
-                    className="agf-form-input"
-                    placeholder="渠道游戏ID"
-                    value={ch.channelGameId ?? ''}
-                    onChange={(e) => {
-                      clearError(`channel-${ch.id}`);
-                      updateChannel(i, { channelGameId: e.target.value });
-                    }}
-                  />
-                  <FieldError message={errors[`channel-${ch.id}`]} />
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-      </Drawer>
       <Drawer title="操作记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
         {(() => {
           const logGame = getGame(selectedGameId);
           return (
             <>
               {logGame && (
-                <div className="agf-drawer-meta">游戏ID / 游戏名称：{logGame.id}/{logGame.onlineName}</div>
+                <div className="agf-drawer-meta">游戏ID / 游戏名称：{logGame.id} / {logGame.onlineName}</div>
               )}
               {logs.length === 0 ? <div className="agf-empty">暂无记录</div> : (
                 <div className="agf-table-wrap">

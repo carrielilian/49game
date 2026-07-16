@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface ColumnFilterConfig {
   type: 'select' | 'text';
@@ -18,12 +19,42 @@ function FilterIcon() {
 
 export function ColumnFilter({ title, filter }: { title: string; filter: ColumnFilterConfig }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    setMenuStyle({
+      position: 'fixed',
+      top: rect.bottom + 10,
+      left: rect.left + rect.width / 2,
+      transform: 'translateX(-50%)',
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const onLayoutChange = () => updateMenuPosition();
+    window.addEventListener('resize', onLayoutChange);
+    window.addEventListener('scroll', onLayoutChange, true);
+    return () => {
+      window.removeEventListener('resize', onLayoutChange);
+      window.removeEventListener('scroll', onLayoutChange, true);
+    };
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -34,42 +65,45 @@ export function ColumnFilter({ title, filter }: { title: string; filter: ColumnF
     ? [{ label: '全部', value: '' }, ...(filter.options ?? [])]
     : [];
 
+  const menu = open ? (
+    <div ref={menuRef} className="agf-col-filter__menu" style={menuStyle}>
+      {filter.type === 'select' ? (
+        selectOptions.map((opt) => (
+          <button
+            key={opt.value || '__all__'}
+            type="button"
+            className={`agf-col-filter__item${filter.value === opt.value ? ' agf-col-filter__item--active' : ''}`}
+            onClick={() => { filter.onChange(opt.value); setOpen(false); }}
+          >
+            {opt.label}
+          </button>
+        ))
+      ) : (
+        <div className="agf-col-filter__search">
+          <input
+            className="agf-col-filter__input"
+            placeholder={filter.placeholder ?? '请输入'}
+            value={filter.value}
+            onChange={(e) => filter.onChange(e.target.value)}
+            autoFocus
+          />
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
-    <div className="agf-col-filter" ref={ref}>
+    <div className="agf-col-filter" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={`agf-col-filter__trigger${active ? ' agf-col-filter__trigger--active' : ''}${open ? ' agf-col-filter__trigger--open' : ''}`}
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((prev) => !prev)}
       >
         <span>{title}</span>
         <FilterIcon />
       </button>
-      {open && (
-        <div className="agf-col-filter__menu">
-          {filter.type === 'select' ? (
-            selectOptions.map((opt) => (
-              <button
-                key={opt.value || '__all__'}
-                type="button"
-                className={`agf-col-filter__item${filter.value === opt.value ? ' agf-col-filter__item--active' : ''}`}
-                onClick={() => { filter.onChange(opt.value); setOpen(false); }}
-              >
-                {opt.label}
-              </button>
-            ))
-          ) : (
-            <div className="agf-col-filter__search">
-              <input
-                className="agf-col-filter__input"
-                placeholder={filter.placeholder ?? '请输入'}
-                value={filter.value}
-                onChange={(e) => filter.onChange(e.target.value)}
-                autoFocus
-              />
-            </div>
-          )}
-        </div>
-      )}
+      {menu && createPortal(menu, document.body)}
     </div>
   );
 }

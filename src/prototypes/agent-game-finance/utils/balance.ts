@@ -1,10 +1,14 @@
-import type { PaymentRequest, SettlementRecord, Vendor, VendorBalance } from '../data/types';
+import type { Game, GamePaymentRequest, PaymentRequest, SettlementRecord, Vendor, VendorBalance, GameBalance } from '../data/types';
 import {
   calcDeductedPrepayment,
+  calcGamePrepaymentSummary,
   calcRemainingUndeductedPrepayment,
   calcVendorPrepaymentSummary,
+  getGameHistoricalDeduction,
+  getGamePrepayment,
   getVendorHistoricalDeduction,
   getVendorPrepayment,
+  sumGamePaidActualAmount,
   sumVendorPaidActualAmount,
 } from './prepayment';
 
@@ -67,4 +71,47 @@ export function calcVendorBalanceFromSettlements(
   return Math.round((internalIncome + externalIncome - unappliedRefund) * 100) / 100;
 }
 
-export { calcDeductedPrepayment, calcRemainingUndeductedPrepayment, getVendorPrepayment, getVendorHistoricalDeduction, sumVendorPaidActualAmount };
+/** 游戏收入各字段口径（同厂商收入，按 gameId 聚合） */
+export function deriveGameBalances(
+  settlements: SettlementRecord[],
+  games: Game[],
+  gamePayments: GamePaymentRequest[],
+): GameBalance[] {
+  return games.map((g) => {
+    const gameSettled = settlements.filter((s) => s.gameId === g.id && s.settled);
+    const totalIncome = gameSettled
+      .filter((s) => s.type === 'internal' || s.type === 'external')
+      .reduce((sum, s) => sum + s.settlementIncome, 0);
+    const totalRefund = gameSettled
+      .filter((s) => s.type === 'refund')
+      .reduce((sum, s) => sum + s.settlementIncome, 0);
+
+    const internalIncome = gameSettled
+      .filter((s) => s.type === 'internal' && isUnappliedSettlement(s))
+      .reduce((sum, s) => sum + s.settlementIncome, 0);
+    const externalIncome = gameSettled
+      .filter((s) => s.type === 'external' && isUnappliedSettlement(s))
+      .reduce((sum, s) => sum + s.settlementIncome, 0);
+    const unappliedRefund = gameSettled
+      .filter((s) => s.type === 'refund' && isUnappliedSettlement(s))
+      .reduce((sum, s) => sum + s.settlementIncome, 0);
+
+    const balance = Math.round((internalIncome + externalIncome - unappliedRefund) * 100) / 100;
+    const accountTotalIncome = Math.round((totalIncome - totalRefund) * 100) / 100;
+
+    const { prepayment, deductedPrepayment, remainingPrepayment } = calcGamePrepaymentSummary(g, g.id, gamePayments);
+
+    return {
+      gameId: g.id,
+      balance,
+      accountTotalIncome,
+      prepayment,
+      deductedPrepayment,
+      remainingPrepayment,
+      totalIncome,
+      totalRefund,
+    };
+  });
+}
+
+export { calcDeductedPrepayment, calcRemainingUndeductedPrepayment, getVendorPrepayment, getVendorHistoricalDeduction, sumVendorPaidActualAmount, getGamePrepayment, getGameHistoricalDeduction, sumGamePaidActualAmount };

@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ColumnFilter, type ColumnFilterConfig } from './ColumnFilter';
+import { ColumnSort, type ColumnSortConfig } from './ColumnSort';
 import { DEFAULT_PAGE_SIZE, Pagination } from './Pagination';
 
 export interface Column<T> {
   key: string;
   title: string;
+  header?: React.ReactNode;
   render?: (row: T, index: number) => React.ReactNode;
   width?: string;
   filter?: ColumnFilterConfig;
+  sort?: ColumnSortConfig;
 }
 
 interface DataTableProps<T> {
@@ -61,7 +64,8 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
             <tr>
               {columns.map((col) => (
                 <th key={col.key} style={col.width ? { width: col.width } : undefined}>
-                  {col.filter ? <ColumnFilter title={col.title} filter={col.filter} /> : col.title}
+                  {col.header ?? (col.sort ? <ColumnSort title={col.title} sort={col.sort} />
+                    : col.filter ? <ColumnFilter title={col.title} filter={col.filter} /> : col.title)}
                 </th>
               ))}
             </tr>
@@ -104,4 +108,25 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
 /** 列表「游戏ID / 游戏名称」：单行 `ID / 名称` */
 export function DualCell({ main, sub }: { main: string; sub: string }) {
   return <span>{sub} / {main}</span>;
+}
+
+/** 列表多行时间列：表头与单元格上下堆叠 */
+export function TimeStackHeader({ labels }: { labels: string[] }) {
+  return (
+    <div className="agf-time-stack agf-time-stack--header">
+      {labels.map((label) => (
+        <div key={label} className="agf-time-stack__line">{label}</div>
+      ))}
+    </div>
+  );
+}
+
+export function TimeStackCell({ lines }: { lines: React.ReactNode[] }) {
+  return (
+    <div className="agf-time-stack">
+      {lines.map((line, i) => (
+        <div key={i} className="agf-time-stack__line">{line}</div>
+      ))}
+    </div>
+  );
 }

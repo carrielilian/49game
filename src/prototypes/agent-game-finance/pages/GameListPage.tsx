@@ -1,60 +1,128 @@
 import React, { useMemo, useState } from 'react';
 import { DataTable, DualCell } from '../components/DataTable';
-import { FieldError, FieldHint, ReadonlyField } from '../components/FormFields';
+import { CurrencyInput, FieldError, FieldHint, ReadonlyField } from '../components/FormFields';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { StatusBadge } from '../components/StatusBadge';
+import { SupportChannelsDrawer } from '../components/SupportChannelsDrawer';
 import { useAppStore } from '../data/store';
-import type { Contract, Game, GameOperationLog } from '../data/types';
+import type { Contract, CooperationContent, Game, GameOperationLog, GamePayer } from '../data/types';
 import {
-  COOPERATION_STATUS_FILTER_OPTIONS,
-  LICENSE_FILTER_OPTIONS,
   OPERATION_STATUS_FILTER_OPTIONS,
+  GAME_PAYER_FILTER_OPTIONS,
 } from '../utils/columnFilters';
+import { formatPaidDisplay, getPaidAmount } from '../utils/contractLog';
+import { formatCurrencyMoney } from '../utils/settlement';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 
-const EMPTY_GAME: Omit<Game, 'id'> = {
-  name: '', onlineName: '', vendorId: '', manager: '', license: '有', remark: '',
+const COOPERATION_OPTIONS: CooperationContent[] = ['游戏代理金', '预付分成款', '委托开发费'];
+
+const PAID_FIELD_META: Record<CooperationContent, { key: keyof ContractAmountFields; label: string; hint: string }> = {
+  游戏代理金: { key: 'paidAgencyFee', label: '已付游戏代理金', hint: '请输入目前已支付的游戏代理金' },
+  预付分成款: { key: 'paidPrepayment', label: '已付预付分成款', hint: '请输入目前已支付的预付分成款' },
+  委托开发费: { key: 'paidDevelopmentFee', label: '已付委托开发费', hint: '请输入目前已支付的委托开发费' },
+};
+
+type ContractAmountFields = {
+  contractAmount: string;
+  paidAgencyFee: string;
+  paidPrepayment: string;
+  paidDevelopmentFee: string;
+};
+
+const EMPTY_CONTRACT_AMOUNTS: ContractAmountFields = {
+  contractAmount: '',
+  paidAgencyFee: '',
+  paidPrepayment: '',
+  paidDevelopmentFee: '',
+};
+
+function formatContractAmount(value: number): string {
+  return value.toFixed(2);
+}
+
+function contractAmountToField(c: Pick<Contract, 'contractAmount' | 'contractNumber'>): string {
+  if (c.contractAmount == null || Number.isNaN(c.contractAmount)) return '';
+  if (c.contractAmount === 0 && !c.contractNumber.trim()) return '';
+  return formatContractAmount(c.contractAmount);
+}
+
+function parseContractAmount(value: string): number {
+  return Math.round(parseFloat(value.trim()) * 100) / 100;
+}
+
+function validateContractAmount(value: string, label: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return `${label}不能为空`;
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return `${label}精确至小数点后两位`;
+  const n = parseFloat(trimmed);
+  if (Number.isNaN(n) || n < 0) return `${label}不能小于0`;
+  return undefined;
+}
+
+function normalizeContractAmount(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || validateContractAmount(trimmed, '金额')) return trimmed;
+  return formatContractAmount(parseFloat(trimmed));
+}
+
+const EMPTY_GAME: Omit<Game, 'id' | 'createdAt'> = {
+  name: '', onlineName: '', vendorId: '', manager: '', payer: undefined, license: '有', remark: '',
   launchDate: '', operationStatus: '未上线', cooperationStatus: '合作中',
 };
 
-const ADD_GAME_REQUIRED: { key: keyof Omit<Game, 'id'>; label: string }[] = [
+const GAME_PAYER_OPTIONS: GamePayer[] = ['4399', '纯游', '游乐', '游戏之家', '香港4399', '游家时代'];
+
+type GameFormData = Omit<Game, 'id' | 'createdAt'>;
+
+const ADD_GAME_REQUIRED: { key: keyof GameFormData; label: string }[] = [
   { key: 'onlineName', label: '游戏名称' },
   { key: 'name', label: '合同游戏名称' },
-  { key: 'manager', label: '游戏负责人' },
   { key: 'vendorId', label: '归属厂商' },
+  { key: 'payer', label: '付款方' },
 ];
 
-const EDIT_GAME_REQUIRED: { key: keyof Omit<Game, 'id'>; label: string }[] = [
+const EDIT_GAME_REQUIRED: { key: keyof GameFormData; label: string }[] = [
   { key: 'onlineName', label: '游戏名称' },
   { key: 'name', label: '合同游戏名称' },
-  { key: 'manager', label: '游戏负责人' },
+  { key: 'payer', label: '付款方' },
 ];
 
 type FieldErrors = Record<string, string>;
 
 function validateGameForm(
-  form: Omit<Game, 'id'>,
-  required: { key: keyof Omit<Game, 'id'>; label: string }[],
+  form: GameFormData,
+  required: { key: keyof GameFormData; label: string }[],
 ): FieldErrors {
   const errors: FieldErrors = {};
   for (const { key, label } of required) {
     const v = form[key];
-    if (typeof v === 'string' && !v.trim()) errors[key] = `${label}不能为空`;
+    if (v == null || (typeof v === 'string' && !v.trim())) errors[key] = `${label}不能为空`;
   }
   return errors;
 }
 
 function renderGameLogAction(log: GameOperationLog) {
   if (log.action === '添加游戏') return '添加游戏';
+  if (log.action === '合同变更' && log.detail) {
+    return <span className="agf-log-detail">{log.detail}</span>;
+  }
   if (log.status) return <StatusBadge text={log.status} />;
   return log.action;
 }
 
+type PaidSortKey = 'paidAgencyFee' | 'paidPrepayment' | 'paidDevelopmentFee';
+
+const PAID_SORT_META: Record<PaidSortKey, { content: CooperationContent }> = {
+  paidAgencyFee: { content: '游戏代理金' },
+  paidPrepayment: { content: '预付分成款' },
+  paidDevelopmentFee: { content: '委托开发费' },
+};
+
 function GameNameFields({ form, set, errors }: {
-  form: Omit<Game, 'id'>;
-  set: (key: keyof Omit<Game, 'id'>, value: string) => void;
+  form: GameFormData;
+  set: (key: keyof GameFormData, value: string) => void;
   errors: FieldErrors;
 }) {
   return (
@@ -77,26 +145,71 @@ function GameNameFields({ form, set, errors }: {
   );
 }
 
+function PayerField({ value, onChange, error }: {
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
+  return (
+    <div className="agf-form-item">
+      <label className="agf-form-label agf-form-label--required">付款方</label>
+      <div className="agf-form-field">
+        <select className="agf-form-input" value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">请选择</option>
+          {GAME_PAYER_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+        <FieldError message={error} />
+      </div>
+    </div>
+  );
+}
+
+function ManagerField({ form, set, errors }: {
+  form: GameFormData;
+  set: (key: keyof GameFormData, value: string) => void;
+  errors: FieldErrors;
+}) {
+  return (
+    <div className="agf-form-item"><label className="agf-form-label">游戏负责人</label>
+      <div className="agf-form-field">
+        <input className="agf-form-input" value={form.manager} onChange={(e) => set('manager', e.target.value)} />
+        <FieldError message={errors.manager} />
+      </div>
+    </div>
+  );
+}
+
+function LicenseField({ form, setForm, name }: {
+  form: GameFormData;
+  setForm: React.Dispatch<React.SetStateAction<GameFormData>>;
+  name: string;
+}) {
+  return (
+    <div className="agf-form-item"><label className="agf-form-label">版号</label>
+      <div className="agf-radio-group">
+        <label className="agf-radio-item"><input type="radio" name={name} checked={form.license === '有'} onChange={() => setForm({ ...form, license: '有' })} />有</label>
+        <label className="agf-radio-item"><input type="radio" name={name} checked={form.license === '无'} onChange={() => setForm({ ...form, license: '无' })} />无</label>
+      </div>
+    </div>
+  );
+}
+
 function AddGameForm({ form, setForm, vendors, errors, clearError }: {
-  form: Omit<Game, 'id'>;
-  setForm: React.Dispatch<React.SetStateAction<Omit<Game, 'id'>>>;
+  form: GameFormData;
+  setForm: React.Dispatch<React.SetStateAction<GameFormData>>;
   vendors: { id: string; name: string }[];
   errors: FieldErrors;
   clearError: (key: string) => void;
 }) {
-  const set = (key: keyof Omit<Game, 'id'>, value: string) => {
+  const set = (key: keyof GameFormData, value: string) => {
     clearError(key);
     setForm({ ...form, [key]: value });
   };
   return (
     <>
       <GameNameFields form={form} set={set} errors={errors} />
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label>
-        <div className="agf-form-field">
-          <input className="agf-form-input" value={form.manager} onChange={(e) => set('manager', e.target.value)} />
-          <FieldError message={errors.manager} />
-        </div>
-      </div>
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">归属厂商</label>
         <div className="agf-form-field">
           <select className="agf-form-input" value={form.vendorId} onChange={(e) => set('vendorId', e.target.value)}>
@@ -106,12 +219,16 @@ function AddGameForm({ form, setForm, vendors, errors, clearError }: {
           <FieldError message={errors.vendorId} />
         </div>
       </div>
-      <div className="agf-form-item"><label className="agf-form-label">版号</label>
-        <div className="agf-radio-group">
-          <label className="agf-radio-item"><input type="radio" name="license" checked={form.license === '有'} onChange={() => setForm({ ...form, license: '有' })} />有</label>
-          <label className="agf-radio-item"><input type="radio" name="license" checked={form.license === '无'} onChange={() => setForm({ ...form, license: '无' })} />无</label>
-        </div>
-      </div>
+      <PayerField
+        value={form.payer ?? ''}
+        error={errors.payer}
+        onChange={(value) => {
+          clearError('payer');
+          setForm({ ...form, payer: (value || undefined) as GamePayer | undefined });
+        }}
+      />
+      <ManagerField form={form} set={set} errors={errors} />
+      <LicenseField form={form} setForm={setForm} name="license" />
       <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
         <div className="agf-radio-group">
           <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => setForm({ ...form, operationStatus: '未上线' })} />未上线</label>
@@ -124,14 +241,14 @@ function AddGameForm({ form, setForm, vendors, errors, clearError }: {
 }
 
 function EditGameForm({ form, setForm, editing, getVendorName, errors, clearError }: {
-  form: Omit<Game, 'id'>;
-  setForm: React.Dispatch<React.SetStateAction<Omit<Game, 'id'>>>;
+  form: GameFormData;
+  setForm: React.Dispatch<React.SetStateAction<GameFormData>>;
   editing: Game;
   getVendorName: (id: string) => string;
   errors: FieldErrors;
   clearError: (key: string) => void;
 }) {
-  const set = (key: keyof Omit<Game, 'id'>, value: string) => {
+  const set = (key: keyof GameFormData, value: string) => {
     clearError(key);
     setForm({ ...form, [key]: value });
   };
@@ -139,19 +256,17 @@ function EditGameForm({ form, setForm, editing, getVendorName, errors, clearErro
     <>
       <ReadonlyField label="游戏ID" value={editing.id} />
       <GameNameFields form={form} set={set} errors={errors} />
-      <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">游戏负责人</label>
-        <div className="agf-form-field">
-          <input className="agf-form-input" value={form.manager} onChange={(e) => set('manager', e.target.value)} />
-          <FieldError message={errors.manager} />
-        </div>
-      </div>
       <ReadonlyField label="归属厂商" value={`${editing.vendorId} / ${getVendorName(editing.vendorId)}`} />
-      <div className="agf-form-item"><label className="agf-form-label">版号</label>
-        <div className="agf-radio-group">
-          <label className="agf-radio-item"><input type="radio" name="edit-license" checked={form.license === '有'} onChange={() => setForm({ ...form, license: '有' })} />有</label>
-          <label className="agf-radio-item"><input type="radio" name="edit-license" checked={form.license === '无'} onChange={() => setForm({ ...form, license: '无' })} />无</label>
-        </div>
-      </div>
+      <PayerField
+        value={form.payer ?? ''}
+        error={errors.payer}
+        onChange={(value) => {
+          clearError('payer');
+          setForm({ ...form, payer: (value || undefined) as GamePayer | undefined });
+        }}
+      />
+      <ManagerField form={form} set={set} errors={errors} />
+      <LicenseField form={form} setForm={setForm} name="edit-license" />
       <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
         <div className="agf-radio-group">
           <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => setForm({ ...form, operationStatus: '未上线' })} />未上线</label>
@@ -164,21 +279,44 @@ function EditGameForm({ form, setForm, editing, getVendorName, errors, clearErro
 }
 
 export function GameListPage() {
-  const { scopedGames, scopedVendors, contracts, gameLogs, addGame, updateGame, updateContract, getVendorName, getGame } = useAppStore();
+  const {
+    scopedGames,
+    scopedVendors,
+    contracts,
+    formulas,
+    gameLogs,
+    addGame,
+    updateGame,
+    updateContract,
+    updateFormula,
+    getVendorName,
+    getVendor,
+    getGame,
+  } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
+  const [payerFilter, setPayerFilter] = useState('');
   const [opStatus, setOpStatus] = useState('');
-  const [licenseFilter, setLicenseFilter] = useState('');
-  const [coopFilter, setCoopFilter] = useState('');
+  const [sortKey, setSortKey] = useState<PaidSortKey | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [contractDrawer, setContractDrawer] = useState(false);
+  const [channelDrawer, setChannelDrawer] = useState(false);
+  const [channelGameId, setChannelGameId] = useState('');
   const [logDrawer, setLogDrawer] = useState(false);
   const [editing, setEditing] = useState<Game | null>(null);
   const [form, setForm] = useState(EMPTY_GAME);
   const [contractForm, setContractForm] = useState<Contract | null>(null);
+  const [contractAmountFields, setContractAmountFields] = useState<ContractAmountFields>(EMPTY_CONTRACT_AMOUNTS);
+  const [contractErrors, setContractErrors] = useState<FieldErrors>({});
   const [selectedGameId, setSelectedGameId] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  const contractByGameId = useMemo(
+    () => new Map(contracts.map((c) => [c.gameId, c])),
+    [contracts],
+  );
 
   const filtered = scopedGames.filter((g) => {
     if (!matchesListSearch(search, {
@@ -188,10 +326,47 @@ export function GameListPage() {
       vendorId: g.vendorId,
       vendorName: getVendorName(g.vendorId),
     })) return false;
-    if (licenseFilter && g.license !== licenseFilter) return false;
+    if (payerFilter && g.payer !== payerFilter) return false;
     if (opStatus && g.operationStatus !== opStatus) return false;
-    if (coopFilter && g.cooperationStatus !== coopFilter) return false;
     return true;
+  });
+
+  const togglePaidSort = (key: PaidSortKey) => {
+    if (sortKey === key) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortKey(key);
+    setSortOrder('desc');
+  };
+
+  const tableData = useMemo(() => {
+    const list = [...filtered];
+    if (sortKey) {
+      const { content } = PAID_SORT_META[sortKey];
+      list.sort((a, b) => {
+        const av = getPaidAmount(contractByGameId.get(a.id), sortKey, content);
+        const bv = getPaidAmount(contractByGameId.get(b.id), sortKey, content);
+        const diff = av - bv;
+        return sortOrder === 'asc' ? diff : -diff;
+      });
+      return list;
+    }
+    return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [filtered, sortKey, sortOrder, contractByGameId]);
+
+  const renderPaidCell = (game: Game, key: PaidSortKey, content: CooperationContent) => {
+    const c = contractByGameId.get(game.id);
+    const text = c ? formatPaidDisplay(c, key, content) : '-';
+    if (text === '-') return '-';
+    const currency = getVendor(game.vendorId)?.currency ?? '人民币';
+    return formatCurrencyMoney(parseFloat(text), currency);
+  };
+
+  const paidSortConfig = (key: PaidSortKey) => ({
+    active: sortKey === key,
+    order: sortOrder,
+    onToggle: () => togglePaidSort(key),
   });
 
   const clearError = (key: string) => setErrors((prev) => {
@@ -201,21 +376,54 @@ export function GameListPage() {
     return next;
   });
 
+  const clearContractError = (key: string) => setContractErrors((prev) => {
+    if (!prev[key]) return prev;
+    const next = { ...prev };
+    delete next[key];
+    return next;
+  });
+
   const openAdd = () => { setForm(EMPTY_GAME); setErrors({}); setAddOpen(true); };
-  const openEdit = (g: Game) => { setEditing(g); setForm({ ...g }); setErrors({}); setEditOpen(true); };
+  const openEdit = (g: Game) => {
+    const { id: _id, createdAt: _createdAt, ...rest } = g;
+    setEditing(g);
+    setForm(rest);
+    setErrors({});
+    setEditOpen(true);
+  };
   const openContract = (gameId: string) => {
     const game = getGame(gameId);
     const c = contracts.find((x) => x.gameId === gameId) ?? {
-      gameId, agencyPayment: 0, developmentFee: 0, contractDescription: '', cooperationStatus: '合作中' as const,
+      gameId,
+      contractNumber: '',
+      cooperationContents: [] as CooperationContent[],
+      supplementalNote: '',
+      cooperationStatus: '合作中' as const,
     };
     setContractForm({
       ...c,
+      cooperationContents: c.cooperationContents ?? [],
       cooperationStatus: c.cooperationStatus ?? game?.cooperationStatus ?? '合作中',
     });
-    setErrors({});
+    setContractAmountFields({
+      contractAmount: contractAmountToField(c),
+      paidAgencyFee: c.cooperationContents?.includes('游戏代理金')
+        ? formatContractAmount(c.paidAgencyFee ?? 0) : '',
+      paidPrepayment: c.cooperationContents?.includes('预付分成款')
+        ? formatContractAmount(c.paidPrepayment ?? 0) : '',
+      paidDevelopmentFee: c.cooperationContents?.includes('委托开发费')
+        ? formatContractAmount(c.paidDevelopmentFee ?? 0) : '',
+    });
+    setContractErrors({});
     setContractDrawer(true);
   };
   const openLogs = (gameId: string) => { setSelectedGameId(gameId); setLogDrawer(true); };
+  const openChannels = (gameId: string) => {
+    if (formulas.find((x) => x.gameId === gameId)) {
+      setChannelGameId(gameId);
+      setChannelDrawer(true);
+    }
+  };
 
   const showIncompleteToast = () => setToast({ message: '请完善所有信息', type: 'error' });
 
@@ -232,9 +440,65 @@ export function GameListPage() {
     updateGame({ ...editing, ...form, vendorId: editing.vendorId });
     setEditOpen(false);
   };
+  const toggleCooperationContent = (item: CooperationContent, checked: boolean) => {
+    if (!contractForm) return;
+    const meta = PAID_FIELD_META[item];
+    const nextContents = checked
+      ? [...contractForm.cooperationContents, item]
+      : contractForm.cooperationContents.filter((x) => x !== item);
+    setContractForm({ ...contractForm, cooperationContents: nextContents });
+    if (!checked) {
+      clearContractError(meta.key);
+      clearContractError('cooperationContents');
+      setContractAmountFields((prev) => ({ ...prev, [meta.key]: '' }));
+    }
+  };
+
   const saveContract = () => {
     if (!contractForm) return;
-    updateContract(contractForm);
+    const nextErrors: FieldErrors = {};
+    if (!contractForm.contractNumber.trim()) nextErrors.contractNumber = '合同编号不能为空';
+    if (!contractForm.cooperationContents.length) {
+      nextErrors.cooperationContents = '合作内容不能为空';
+    }
+
+    const contractAmountErr = validateContractAmount(contractAmountFields.contractAmount, '合同金额');
+    if (contractAmountErr) nextErrors.contractAmount = contractAmountErr;
+
+    for (const item of contractForm.cooperationContents) {
+      const { key, label } = PAID_FIELD_META[item];
+      const err = validateContractAmount(contractAmountFields[key], label);
+      if (err) nextErrors[key] = err;
+    }
+
+    if (Object.keys(nextErrors).length) {
+      setContractErrors(nextErrors);
+      showIncompleteToast();
+      return;
+    }
+
+    const normalizedAmounts = {
+      contractAmount: formatContractAmount(parseContractAmount(contractAmountFields.contractAmount)),
+      paidAgencyFee: contractForm.cooperationContents.includes('游戏代理金')
+        ? formatContractAmount(parseContractAmount(contractAmountFields.paidAgencyFee)) : '',
+      paidPrepayment: contractForm.cooperationContents.includes('预付分成款')
+        ? formatContractAmount(parseContractAmount(contractAmountFields.paidPrepayment)) : '',
+      paidDevelopmentFee: contractForm.cooperationContents.includes('委托开发费')
+        ? formatContractAmount(parseContractAmount(contractAmountFields.paidDevelopmentFee)) : '',
+    };
+    setContractAmountFields((prev) => ({ ...prev, ...normalizedAmounts }));
+
+    updateContract({
+      ...contractForm,
+      contractNumber: contractForm.contractNumber.trim(),
+      contractAmount: parseContractAmount(normalizedAmounts.contractAmount),
+      paidAgencyFee: contractForm.cooperationContents.includes('游戏代理金')
+        ? parseContractAmount(normalizedAmounts.paidAgencyFee) : undefined,
+      paidPrepayment: contractForm.cooperationContents.includes('预付分成款')
+        ? parseContractAmount(normalizedAmounts.paidPrepayment) : undefined,
+      paidDevelopmentFee: contractForm.cooperationContents.includes('委托开发费')
+        ? parseContractAmount(normalizedAmounts.paidDevelopmentFee) : undefined,
+    });
     setContractDrawer(false);
   };
 
@@ -243,7 +507,12 @@ export function GameListPage() {
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()),
   [gameLogs, selectedGameId]);
   const contractGame = contractForm ? getGame(contractForm.gameId) : null;
+  const contractCurrency = contractGame
+    ? (getVendor(contractGame.vendorId)?.currency ?? '人民币')
+    : '人民币';
   const logGame = selectedGameId ? getGame(selectedGameId) : null;
+  const channelGame = channelGameId ? getGame(channelGameId) : null;
+  const channelFormula = channelGameId ? formulas.find((x) => x.gameId === channelGameId) : undefined;
 
   return (
     <div className="agf-card">
@@ -254,23 +523,40 @@ export function GameListPage() {
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
-        data={filtered}
+        data={tableData}
         columns={[
+          {
+            key: 'payer',
+            title: '付款方',
+            filter: {
+              type: 'select',
+              value: payerFilter,
+              onChange: setPayerFilter,
+              options: GAME_PAYER_FILTER_OPTIONS,
+            },
+            render: (r) => r.payer ?? '-',
+          },
           { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.onlineName} sub={r.id} /> },
           { key: 'contractName', title: '合同游戏名称', render: (r) => r.name },
           { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
           { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
-          { key: 'manager', title: '游戏负责人', render: (r) => r.manager },
           {
-            key: 'license',
-            title: '版号',
-            filter: {
-              type: 'select',
-              value: licenseFilter,
-              onChange: setLicenseFilter,
-              options: LICENSE_FILTER_OPTIONS,
-            },
-            render: (r) => r.license,
+            key: 'paidAgencyFee',
+            title: '已付游戏代理金',
+            sort: paidSortConfig('paidAgencyFee'),
+            render: (r) => renderPaidCell(r, 'paidAgencyFee', '游戏代理金'),
+          },
+          {
+            key: 'paidPrepayment',
+            title: '已付预付分成款',
+            sort: paidSortConfig('paidPrepayment'),
+            render: (r) => renderPaidCell(r, 'paidPrepayment', '预付分成款'),
+          },
+          {
+            key: 'paidDevelopmentFee',
+            title: '已付委托开发费',
+            sort: paidSortConfig('paidDevelopmentFee'),
+            render: (r) => renderPaidCell(r, 'paidDevelopmentFee', '委托开发费'),
           },
           {
             key: 'op',
@@ -283,21 +569,11 @@ export function GameListPage() {
             },
             render: (r) => <StatusBadge text={r.operationStatus} />,
           },
-          {
-            key: 'coop',
-            title: '合作状态',
-            filter: {
-              type: 'select',
-              value: coopFilter,
-              onChange: setCoopFilter,
-              options: COOPERATION_STATUS_FILTER_OPTIONS,
-            },
-            render: (r) => <StatusBadge text={r.cooperationStatus} />,
-          },
           { key: 'ops', title: '操作', render: (r) => (
             <div className="agf-actions">
               <button type="button" className="agf-btn agf-btn--link" onClick={() => openEdit(r)}>编辑</button>
               <button type="button" className="agf-btn agf-btn--link" onClick={() => openContract(r.id)}>合同管理</button>
+              <button type="button" className="agf-btn agf-btn--link" onClick={() => openChannels(r.id)}>支持渠道</button>
               <button type="button" className="agf-btn agf-btn--link" onClick={() => openLogs(r.id)}>操作记录</button>
             </div>
           ) },
@@ -316,9 +592,88 @@ export function GameListPage() {
         {contractForm && contractGame && (
           <>
             <ReadonlyField label="游戏ID / 游戏名称" value={`${contractGame.id} / ${contractGame.onlineName}`} />
-            <div className="agf-form-item"><label className="agf-form-label">付款代理金</label><input type="number" className="agf-form-input" value={contractForm.agencyPayment} onChange={(e) => setContractForm({ ...contractForm, agencyPayment: Number(e.target.value) })} /></div>
-            <div className="agf-form-item"><label className="agf-form-label">委托开发费用</label><input type="number" className="agf-form-input" value={contractForm.developmentFee} onChange={(e) => setContractForm({ ...contractForm, developmentFee: Number(e.target.value) })} /></div>
-            <div className="agf-form-item"><label className="agf-form-label">合同信息说明</label><textarea className="agf-form-textarea" value={contractForm.contractDescription} onChange={(e) => setContractForm({ ...contractForm, contractDescription: e.target.value })} /></div>
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">合同编号</label>
+              <div className="agf-form-field">
+                <input
+                  className="agf-form-input"
+                  value={contractForm.contractNumber}
+                  onChange={(e) => {
+                    clearContractError('contractNumber');
+                    setContractForm({ ...contractForm, contractNumber: e.target.value });
+                  }}
+                />
+                <FieldError message={contractErrors.contractNumber} />
+              </div>
+            </div>
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">合同金额</label>
+              <div className="agf-form-field">
+                <CurrencyInput
+                  currency={contractCurrency}
+                  value={contractAmountFields.contractAmount}
+                  onChange={(v) => {
+                    clearContractError('contractAmount');
+                    setContractAmountFields({ ...contractAmountFields, contractAmount: v });
+                  }}
+                  onBlur={() => setContractAmountFields((prev) => ({
+                    ...prev,
+                    contractAmount: normalizeContractAmount(prev.contractAmount),
+                  }))}
+                />
+                <FieldError message={contractErrors.contractAmount} />
+              </div>
+            </div>
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">合作内容</label>
+              <div className="agf-form-field">
+                <div className="agf-checkbox-group">
+                  {COOPERATION_OPTIONS.map((opt) => (
+                    <label key={opt} className="agf-checkbox-item">
+                      <input
+                        type="checkbox"
+                        checked={contractForm.cooperationContents.includes(opt)}
+                        onChange={(e) => toggleCooperationContent(opt, e.target.checked)}
+                      />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+                <FieldError message={contractErrors.cooperationContents} />
+              </div>
+            </div>
+            {contractForm.cooperationContents.map((item) => {
+              const { key, label, hint } = PAID_FIELD_META[item];
+              return (
+                <div key={item} className="agf-form-item">
+                  <label className="agf-form-label agf-form-label--required">{label}</label>
+                  <div className="agf-form-field">
+                    <CurrencyInput
+                      currency={contractCurrency}
+                      value={contractAmountFields[key]}
+                      onChange={(v) => {
+                        clearContractError(key);
+                        setContractAmountFields({ ...contractAmountFields, [key]: v });
+                      }}
+                      onBlur={() => setContractAmountFields((prev) => ({
+                        ...prev,
+                        [key]: normalizeContractAmount(prev[key]),
+                      }))}
+                    />
+                    <FieldHint>{hint}</FieldHint>
+                    <FieldError message={contractErrors[key]} />
+                  </div>
+                </div>
+              );
+            })}
+            <div className="agf-form-item">
+              <label className="agf-form-label">补充说明</label>
+              <textarea
+                className="agf-form-textarea"
+                value={contractForm.supplementalNote}
+                onChange={(e) => setContractForm({ ...contractForm, supplementalNote: e.target.value })}
+              />
+            </div>
             <div className="agf-form-item"><label className="agf-form-label">合作状态</label>
               <div className="agf-radio-group">
                 <label className="agf-radio-item"><input type="radio" name="contract-cooperationStatus" checked={contractForm.cooperationStatus === '合作中'} onChange={() => setContractForm({ ...contractForm, cooperationStatus: '合作中' })} />合作中</label>
@@ -328,6 +683,17 @@ export function GameListPage() {
           </>
         )}
       </Drawer>
+      {channelGame && (
+        <SupportChannelsDrawer
+          open={channelDrawer}
+          onClose={() => setChannelDrawer(false)}
+          gameId={channelGame.id}
+          gameName={channelGame.onlineName}
+          vendorName={getVendorName(channelGame.vendorId)}
+          formula={channelFormula}
+          onSave={updateFormula}
+        />
+      )}
       <Drawer title="操作记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
         {logGame && (
           <div className="agf-drawer-meta">游戏ID / 游戏名称：{logGame.id} / {logGame.onlineName}</div>

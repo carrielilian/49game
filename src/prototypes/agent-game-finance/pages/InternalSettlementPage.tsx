@@ -13,10 +13,11 @@ import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../u
 import { getPreviousMonthKey, getRecentTwoMonthsRange, isMonthInRange, type MonthRange } from '../utils/monthRange';
 import {
   displaySettlementFormula,
-  formatMoney,
+  formatCurrencyMoney,
   formatSettlementIncome,
   formatSettlementTime,
   isUnsettledSettlement,
+  SETTLEMENT_CURRENCY,
 } from '../utils/settlement';
 
 interface Props {
@@ -185,7 +186,7 @@ export function InternalSettlementPage({ type }: Props) {
             },
             render: (r) => r.channel,
           },
-          { key: 'settleAmt', title: '待结算金额', render: (r) => formatMoney(r.settlementAmount) },
+          { key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
           { key: 'settleInc', title: incomeLabel, render: (r) => formatSettlementIncome(r) },
           { key: 'formula', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
           { key: 'settleTime', title: '结算时间', render: (r) => formatSettlementTime(r) },

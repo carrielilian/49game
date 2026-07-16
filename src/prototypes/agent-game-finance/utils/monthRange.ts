@@ -37,9 +37,9 @@ export function getRecentTwoMonthsRange(date = new Date()): MonthRange {
   };
 }
 
-/** 原型样例数据月份范围（mock 结算数据覆盖 2025-05 ~ 2025-06） */
+/** 原型样例数据月份范围（与结算三页默认近两个月对齐：2026-06 ~ 2026-07） */
 export function getSampleMonthRange(): MonthRange {
-  return { start: '2025-05', end: '2025-06' };
+  return { start: '2026-06', end: '2026-07' };
 }
 
 export function isMonthInRange(month: string, range: MonthRange): boolean {

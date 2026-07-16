@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Vendor } from '../data/types';
+import type { ContractCurrency, Vendor } from '../data/types';
 
 type VendorFormData = Omit<Vendor, 'id'>;
 
@@ -17,12 +17,11 @@ const BANK_OPTIONS = ['中国工商银行', '招商银行', '建设银行', '农
 const LOCATION_OPTIONS = ['北京市', '上海市', '广东省', '浙江省', '四川省', '湖北省', '江苏省'];
 const INVOICE_OPTIONS = ['增值税专用发票（6%）', '增值税专用发票（3%）', '增值税专用发票（1%）', '普通发票', '其他'];
 
+const CURRENCY_OPTIONS: ContractCurrency[] = ['人民币', '美金'];
+
 export const VENDOR_REQUIRED: { key: keyof VendorFormData; label: string }[] = [
   { key: 'name', label: '厂商名称（公司名称）' },
-  { key: 'contact', label: '联系人' },
-  { key: 'phone', label: '手机' },
-  { key: 'email', label: '邮箱' },
-  { key: 'address', label: '单位地址' },
+  { key: 'currency', label: '支持币种' },
   { key: 'invoiceInfo', label: '发票信息' },
   { key: 'accountName', label: '开户名称' },
   { key: 'bank', label: '开户银行' },
@@ -112,9 +111,9 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
             <tr>
               <th><GridLabel>厂商ID</GridLabel></th>
               <th><GridLabel required>厂商名称（公司名称）</GridLabel></th>
-              <th><GridLabel required>联系人</GridLabel></th>
-              <th><GridLabel required>手机</GridLabel></th>
-              <th><GridLabel required>邮箱</GridLabel></th>
+              <th><GridLabel>联系人</GridLabel></th>
+              <th><GridLabel>手机</GridLabel></th>
+              <th><GridLabel>邮箱</GridLabel></th>
             </tr>
           </thead>
           <tbody>
@@ -126,11 +125,21 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
               <td><GridInput value={form.email} onChange={set('email')} error={errors.email} /></td>
             </tr>
             <tr>
-              <th colSpan={3}><GridLabel required>单位地址</GridLabel></th>
+              <th colSpan={2}><GridLabel>单位地址</GridLabel></th>
+              <th><GridLabel required>支持币种</GridLabel></th>
               <th colSpan={2}><GridLabel required>发票信息</GridLabel></th>
             </tr>
             <tr>
-              <td colSpan={3}><GridInput value={form.address} onChange={set('address')} error={errors.address} /></td>
+              <td colSpan={2}><GridInput value={form.address} onChange={set('address')} error={errors.address} /></td>
+              <td>
+                <GridSelect
+                  value={form.currency}
+                  onChange={set('currency')}
+                  options={CURRENCY_OPTIONS}
+                  placeholder="请选择"
+                  error={errors.currency}
+                />
+              </td>
               <td colSpan={2}><GridSelect value={form.invoiceInfo} onChange={set('invoiceInfo')} options={INVOICE_OPTIONS} error={errors.invoiceInfo} /></td>
             </tr>
           </tbody>
@@ -170,6 +179,7 @@ export const EMPTY_VENDOR_FORM: VendorFormData = {
   phone: '',
   email: '',
   address: '',
+  currency: '人民币',
   invoiceInfo: '',
   accountName: '',
   bank: '',
@@ -180,5 +190,5 @@ export const EMPTY_VENDOR_FORM: VendorFormData = {
 
 export function vendorToForm(v: Vendor): VendorFormData {
   const { id: _id, ...rest } = v;
-  return rest;
+  return { ...rest, currency: rest.currency ?? '人民币' };
 }

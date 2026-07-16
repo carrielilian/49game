@@ -19,28 +19,27 @@ import {
   buildMockImportRows,
   calculateImportRow,
   enrichImportRowsOnParse,
-  hasChannelEnabledGames,
 } from '../utils/externalImport';
-import { displaySettlementFormula, formatMoney, formatSettlementIncome, formatSettlementTime } from '../utils/settlement';
+import { displaySettlementFormula, formatCurrencyMoney, formatSettlementIncome, formatSettlementTime, SETTLEMENT_CURRENCY } from '../utils/settlement';
 
 const EMPTY_IMPORT: ImportPreviewRow[] = [];
 
 const IMPORT_PREVIEW_COLUMNS: Column<ImportPreviewRow>[] = [
-  { key: 'channelGameId', title: '渠道游戏ID', render: (r) => r.channelGameId },
   { key: 'incomeTime', title: '收入时间', render: (r) => r.incomeTime },
   {
     key: 'game',
     title: '游戏ID / 游戏名称',
-    render: (r) => (r.gameId ? <DualCell main={r.gameName ?? ''} sub={r.gameId} /> : '-'),
+    render: (r) => (r.gameId ? <DualCell main={r.gameName} sub={r.gameId} /> : r.gameName || '-'),
   },
-  { key: 'pendingAmount', title: '待结算收入', render: (r) => formatMoney(r.pendingAmount) },
+  { key: 'vendorName', title: '厂商名称', render: (r) => r.vendorName || '-' },
+  { key: 'pendingAmount', title: '待结算金额', render: (r) => formatCurrencyMoney(r.pendingAmount, SETTLEMENT_CURRENCY) },
   { key: 'formulaText', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
   {
     key: 'settlementIncome',
     title: '结算收入',
     render: (r) => (
       <>
-        {r.settlementIncome != null ? formatMoney(r.settlementIncome) : '-'}
+        {r.settlementIncome != null ? formatCurrencyMoney(r.settlementIncome, SETTLEMENT_CURRENCY) : '-'}
         {r.error && <div className="agf-form-error">{r.error}</div>}
       </>
     ),
@@ -120,16 +119,12 @@ export function ExternalSettlementPage() {
       showErrorToast('请先选择外部渠道类型');
       return;
     }
-    if (!hasChannelEnabledGames(selectedChannel, scopedFormulas)) {
-      showErrorToast('当前渠道不存在运营游戏');
-      return;
-    }
     fileRef.current?.click();
   };
 
   const handleFileChange = () => {
-    if (!selectedChannel || !hasChannelEnabledGames(selectedChannel, scopedFormulas)) return;
-    const raw = buildMockImportRows(selectedChannel, scopedFormulas);
+    if (!selectedChannel) return;
+    const raw = buildMockImportRows(selectedChannel, scopedFormulas, scopedGames, scopedVendors);
     const rows = enrichImportRowsOnParse(raw, scopedFormulas, scopedGames, scopedVendors);
     setPreview(rows);
     if (fileRef.current) fileRef.current.value = '';
@@ -198,7 +193,7 @@ export function ExternalSettlementPage() {
             },
             render: (r) => r.channel,
           },
-          { key: 'settleAmt', title: '待结算金额', render: (r) => formatMoney(r.settlementAmount) },
+          { key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
           { key: 'settleInc', title: '结算收入', render: (r) => formatSettlementIncome(r) },
           { key: 'formula', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
           { key: 'settleTime', title: '结算时间', render: (r) => formatSettlementTime(r) },
@@ -267,7 +262,7 @@ export function ExternalSettlementPage() {
 
             <div className="agf-import-section">
               <div className="agf-import-section__title">上传报表</div>
-              <FieldHint>表格字段：渠道游戏ID、收入时间、待结算收入</FieldHint>
+              <FieldHint>表格字段：收入时间、游戏名称、厂商名称、待结算金额</FieldHint>
               <input
                 ref={fileRef}
                 type="file"

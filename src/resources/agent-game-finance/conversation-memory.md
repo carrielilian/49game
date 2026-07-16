@@ -2,7 +2,7 @@
 
 > **用途**：在新 Cursor 对话中快速恢复本项目背景、已做决策和待办，避免重复对齐。  
 > **UI 细节**：改样式、表单、抽屉、分页等请优先读 [`ui-spec.md`](./ui-spec.md)。  
-> **最后更新**：2026-07-15（预付分成公式/两位小数、结算函 PDF 下载、标记付款/空状态等）  
+> **最后更新**：2026-07-16（侧栏隐藏厂商收入/付款、收入汇总结算付款金额、结算公式复合输入、操作记录秒级时间）  
 > **对应 Git**：见文末「Git 状态」；远程 https://github.com/carrielilian/49game.git `main`（本地可能有未推送改动）
 
 ---
@@ -76,38 +76,42 @@
 | 游戏名称 | `onlineName` | 上线后正式名称（如 `星际探险OL`） |
 | 合同游戏名称 | `name` | 签约合同用名（如 `星际探险`） |
 
-**添加顺序**：游戏名称* → 合同游戏名称* → 游戏负责人* → 归属厂商*（下拉） → 版号(radio) → 运营状态(radio，默认未上线) → 备注。
+**添加顺序**（2026-07-16 更新，见 §31-E / §35）：游戏名称* → 合同游戏名称* → 归属厂商* → **付款方*** → 游戏负责人（选填）→ 版号 → 运营状态 → 备注。
 
-**编辑顺序**：游戏 ID(只读) → 游戏名称* → 合同游戏名称* → 游戏负责人* → 归属厂商(只读，`厂商ID / 厂商名称`) → 版号 → 运营状态 → 备注；**不含**上线时间、合作状态；保存时 `vendorId` 保持原值。
+**编辑顺序**：游戏 ID(只读) → 游戏名称* → 合同游戏名称* → 归属厂商(只读) → **付款方*** → 游戏负责人 → 版号 → 运营状态 → 备注。
 
 **字段说明**（输入框下方，`FieldHint` / `agf-form-hint`，12px 弱化色）：
 - 游戏名称：「游戏上线后所使用的正式名称」
 - 合同游戏名称：「签约合同所使用的游戏名称」
 
-**校验拆分**：`ADD_GAME_REQUIRED`（含归属厂商）/ `EDIT_GAME_REQUIRED`（不含厂商）；共享 `GameNameFields` 组件。
+**校验拆分**：`ADD_GAME_REQUIRED` / `EDIT_GAME_REQUIRED` 均含**付款方**；共享 `GameNameFields` 组件。
 
 ### 4. 合同管理抽屉
 
+> **2026-07-16 现行规范**见 **§32**（合作内容/复合型金额）、**§33**（支持币种迁至厂商）。
+
 **字段顺序**：
 
-1. 游戏 ID / 游戏名称 — 只读，格式 `4001 / 星际探险OL`（取 `onlineName`），无分割线  
-2. 付款代理金  
-3. 委托开发费用  
-4. 合同信息说明（textarea）  
-5. 合作状态 — radio 合作中/合作终止，默认合作中  
+1. 游戏 ID / 游戏名称 — 只读  
+2. 合同编号 *  
+3. 合同金额 * — `CurrencyInput`；前缀取归属厂商 `Vendor.currency`（￥/$）  
+4. 合作内容 * — 多选：游戏代理金、预付分成款、委托开发费  
+5. 已付* 字段 — 随合作内容勾选显示（复合型输入 + FieldHint）  
+6. 补充说明 — 选填  
+7. 合作状态 — 保存同步游戏 + 操作日志  
 
-**已移除**：版号费、版号支付方、运营状态、**预付分成款**（改由厂商收入「预付分成管理」维护）。
+**已移除**：版号费(已支付)、已抵扣预付分成款、合同内支持币种编辑、原「合同信息说明」（改「补充说明」）。
 
-**类型**（`data/types.ts`）：`gameId, agencyPayment, developmentFee, contractDescription, cooperationStatus`。  
-保存合作状态时同步游戏列表并写操作记录（`store.tsx` → `updateContract`）。
+**类型**（`data/types.ts`）：`contractNumber, contractAmount, cooperationContents, paidAgencyFee?, paidPrepayment?, paidDevelopmentFee?, supplementalNote, cooperationStatus`。
 
 ### 5. 操作记录
 
-- 类型：**添加游戏 | 运营状态变更 | 合作状态变更**。
-- 「操作」列：添加游戏 → 固定文案「添加游戏」；状态变更 → `StatusBadge` 显示最新状态。
-- 排序：**时间新→旧**。类型 `GameOperationLog` 使用 `action` + 可选 `status`。
-- 游戏 4001 示例 mock：合作中(2024-06-01) → 已上线(2024-03-15) → 添加游戏(2024-03-01)。
-- 写入点：`addGame`、`updateGame`（运营状态）、`updateContract`（合作状态）。
+- 类型：**添加游戏 | 运营状态 | 合作状态 | 合同变更**。
+- 「操作」列：添加游戏 →「添加游戏」；运营/合作状态 → `StatusBadge`；**合同变更** → 多行纯文本（`agf-log-detail`，`white-space: pre-line`）。
+- **合同变更**（`updateContract` → `buildContractChangeDetail`）：当合同**合同金额**、**已付游戏代理金**、**已付预付分成款**、**已付委托开发费**任一变更时写入；格式 `"字段名"变更为"值"`，多字段换行；未填写显示 `"-"`（不含币种符号）。
+- 排序：**时间新→旧**。类型 `GameOperationLog` 使用 `action` + 可选 `status` / `detail`。
+- 游戏 4001 示例 mock：含合同变更示例（`GL005`）。
+- 写入点：`addGame`、`updateGame`（运营状态）、`updateContract`（合作状态 + 合同变更）。
 - 抽屉顶部：只读游戏信息 `游戏ID / 游戏名称：4001 / 星际探险OL`（`onlineName`，`agf-drawer-meta`，与表头「操作人」左对齐）。
 - 操作记录抽屉内表格**暂无分页**；表格用 `agf-table-wrap` 灰色边框（与主列表一致）。
 
@@ -145,10 +149,13 @@
 
 | 场景 | 必填字段 | 实现 |
 |------|----------|------|
-| 添加游戏 | 游戏名称、合同游戏名称、游戏负责人、归属厂商 | `GameListPage` → `validateGameForm(ADD_GAME_REQUIRED)` |
-| 编辑游戏 | 游戏名称、合同游戏名称、游戏负责人（归属厂商只读，不校验） | `GameListPage` → `validateGameForm(EDIT_GAME_REQUIRED)` |
+| 添加游戏 | 游戏名称、合同游戏名称、归属厂商、**付款方** | `GameListPage` → `validateGameForm(ADD_GAME_REQUIRED)` |
+| 编辑游戏 | 游戏名称、合同游戏名称、**付款方**（归属厂商只读，不校验） | `GameListPage` → `validateGameForm(EDIT_GAME_REQUIRED)` |
 | 预付分成管理 | 预付分成款、历史已抵扣分成款 | `VendorIncomePage` 抽屉；≥0；失败 Toast「请完善所有信息」 |
-| 添加/编辑厂商 | 厂商名称、联系人、手机、邮箱、单位地址、发票信息、开户名称、开户银行、**开户银行所在地**、支行名称、银行卡号（**11 项**） | `VendorForm` → `validateVendorForm` + `VENDOR_REQUIRED` |
+| 添加/编辑厂商 | 厂商名称、**支持币种**、发票信息、开户名称、开户银行、**开户银行所在地**、支行名称、银行卡号（**8 项**）；联系人/手机/邮箱/单位地址**选填** | `VendorForm` → `validateVendorForm` + `VENDOR_REQUIRED` |
+| 合同管理 | 合同编号、合同金额、合作内容（≥1）；已勾选合作内容对应已付金额 | `GameListPage` → `saveContract`；`CurrencyInput` + `agf-checkbox-group` |
+
+> **2026-07-16**：游戏负责人选填；**付款方必填**（添加/编辑）；厂商联系信息 4 项选填。**支持币种**在厂商管理维护。合同抽屉见 §32/§33。
 
 **组件**：
 - `FormFields.tsx` → `FieldError`（class `agf-form-error`）、`FieldHint`（class `agf-form-hint`）；**顺序：灰色 FieldHint 在上，红色 FieldError 在下**
@@ -166,36 +173,24 @@
 - **表头样式**：`font-weight: 700` 加粗（`.agf-table th`）。
 - **操作记录抽屉**：表格上方 `agf-drawer-meta` 显示当前游戏，与表头「操作人」左对齐（**不用** 168px 表单布局）。
 
-### 11. 数据统计（2026-07-09 本轮）
+### 11. 数据统计（2026-07-09 起；2026-07-16 精简）
 
-**导航**：侧栏「数据统计」下**仅显示**「收入汇总统计」（`stats-summary`）；厂商/渠道/游戏收入统计（`stats-vendor` / `stats-channel` / `stats-game`）**菜单已隐藏**，路由仍可通过 hash 直达。
+**导航**：侧栏「数据统计」下**仅**「收入汇总统计」（`stats-summary`）。**已删除**厂商/渠道/游戏收入统计三页（`StatisticsPage.tsx`、`stats-vendor` / `stats-channel` / `stats-game` 路由）。
 
-**时间查询**：顶部 `MonthRangePicker`（`components/MonthRangePicker.tsx` + `utils/monthRange.ts`）；表头「时间」列**无**漏斗筛选。数据最小维度为**月**。
-
-**默认时间范围**：数据统计 4 页均用 `getSampleMonthRange()` → **`2025-05 - 2025-06`**（对齐 mock 结算样例）；`getDefaultMonthRange()` 仍为上一自然月，供其他场景。
-
-**厂商 / 渠道 / 游戏收入统计**（`StatisticsPage.tsx`，`mode` 入参）：
-
-| 页面 | 列表字段 |
-|------|----------|
-| 厂商收入统计 | 时间、厂商ID、厂商名称、总收入、结算收入、结算退款 |
-| 渠道收入统计 | 时间、渠道、总收入、结算收入、结算退款 |
-| 游戏收入统计 | 时间、游戏ID / 游戏名称、总收入、结算收入、结算退款 |
-
-- 已移除「累计流水」列。
-- **总收入**（三页口径一致）：已结算内部/外部记录的 `grossRevenue` 合计（不含退款流水）。
-- **结算收入 / 结算退款**：分别汇总 `settlementIncome`（非 refund / refund）。
-- 厂商/游戏页额外支持 `ListSearchFields`（vendor / game）；渠道页仅时间范围。
+**时间查询**：顶部 `MonthRangePicker`；表头「时间」列无漏斗筛选。默认 `getSampleMonthRange()` → **2026-06 - 2026-07**（与结算 mock 对齐）。
 
 **收入汇总统计**（`RevenueSummaryPage.tsx`）：
 
-- 查询栏：查询维度（游戏/渠道/厂商）+ 时间 + `ListSearchFields`（`gameAndVendor`）。
-- 底层数据含：时间、游戏、厂商、渠道（聚合用）；列表列随维度切换：
-  - **游戏**：时间、游戏ID / 游戏名称、总收入、结算收入、结算退款
-  - **渠道**：时间、渠道、总收入、结算收入、结算退款
-  - **厂商**：时间、厂商ID、厂商名称、总收入、结算收入、结算退款
-- **总收入** = 结算收入 − 结算退款（与本三节三页口径不同，勿混用）。
-- Mock 结算扩充至 S001–S021（`mock-data.ts`），覆盖 2025-05/06 多样例。
+- 查询维度：游戏 / 渠道 / 厂商 + `ListSearchFields`（`gameAndVendor`）
+- **支付金额**：= 合同三项已付之和（`calcContractPaymentTotal`）；币种取归属厂商；千分位 + ￥/$
+- **总收入** = 结算收入 − 结算退款（内部仍按结算记录聚合，**列表不再展示**结算收入/结算退款列）
+- **结算付款金额**（列表列）：游戏付款管理**已付款**记录 **`actualAmount`** 按维度累加；时间按 **付款时间** 月份对齐行「时间」；固定 **￥** + 千分位
+  - **游戏**：该游戏当月已付款实际金额之和
+  - **厂商**：该厂商下游戏当月之和
+  - **渠道**：该渠道当月结算涉及游戏（`paymentGameIds`）的当月已付款之和
+- 列表列（三维度）：时间、维度列、**支付金额**、**总收入**、**结算付款金额**（已移除结算收入、结算退款列）
+
+（历史）厂商/渠道/游戏收入统计三页已于 2026-07-16 移除，口径不再维护。
 
 **列头筛选样式**：`ColumnFilter` 下拉项 `font-weight: 400`，不继承表头加粗。
 
@@ -216,7 +211,9 @@
 | 游戏ID / 游戏名称 | `DualCell`，名称取 `onlineName` |
 | 厂商ID / 厂商名称 | 分两列 |
 | 结算公式 | 两行正文：`内部渠道：…` / `外部渠道：…`；未配置显示 `-` |
-| 操作 | 结算公式、支持渠道、操作记录 |
+| 操作 | 结算公式、操作记录 |
+
+> **2026-07-16**：【支持渠道】已迁至游戏管理，见 §31-B。
 
 - **数据来源**：与游戏管理同步；`addGame` 时 `createEmptyFormula` 写入空公式。
 - **初始状态**：新游戏公式为空，列表显示 `-`，配置保存后才展示文案（`isFormulaConfigured`）。
@@ -225,16 +222,17 @@
 **结算公式设置抽屉**
 
 - 去掉只读区与分区之间的灰色分割线；「内部/外部渠道结算公式设置」小标题 `font-weight: 700`。
-- 「税点」更名为「税率」，改为单选：**跟随发票 / 自定义**（内外渠道各自独立 `internalTaxMode` / `externalTaxMode`）。
-- **跟随发票**：按厂商 `invoiceInfo` 映射只读税率；发票为「其他」时显示输入框。
+- 「税点」曾更名「税率」，现表单标签统一为 **扣税点**；单选：**跟随发票 / 自定义**（内外渠道各自独立 `internalTaxMode` / `externalTaxMode`）。
+- **跟随发票**：按厂商 `invoiceInfo` 映射只读扣税点；发票为「其他」时显示复合输入框。
   - 专票 6% → 0%；专票 3% → 3.36%；专票 1% → 5.6%；普通发票 → 6.72%。
-- **自定义**：显示税率输入框。
-- 渠道费/分成：百分数输入 0–100 整数，`%` 后缀，必填；存储仍为小数。
+- **自定义 / 其他**：`DecimalPercentInput` 手输百分数（最多两位小数，右侧 `%` 后缀）。
+- 渠道费/分成：`PercentInput`（0–100 整数，复合 `%` 后缀）；存储仍为小数；下方灰字「请输入0-100的整数」。
+- 复合输入组件：`PercentAffixInput` / `DecimalPercentInput`；前缀（￥/$）与后缀（%）背景统一灰 `#f5f7fa`。
 - 顶部只读区：游戏ID/游戏名称、厂商ID/名称、当前结算公式（内外两行，无则 `-`）。
 - 已移除抽屉底部独立「发票设置」区块（原 `invoiceMode` / `customInvoice`）。
 - 工具：`utils/invoiceTax.ts`；厂商发票选项补「普通发票」。
 
-**支持渠道**（`FormulaListPage` 支持渠道抽屉）
+**支持渠道**（2026-07-16 起：`SupportChannelsDrawer` + **游戏管理**入口；仅内部渠道，见 §31-B）
 
 - 小标题：**内部渠道** / **外部渠道**（非「勾选」后缀）；标题位置不缩进。
 - 说明（`FieldHint`，标题下方 12px 灰字）：
@@ -245,7 +243,7 @@
 - 厂商名称与「内部渠道」标题间距收紧（`agf-channel-drawer-meta`）。
 - 外部导入匹配：`externalImport.ts` 按外部渠道名 + `channelGameId` 解析游戏。
 
-**操作记录抽屉**：顶部 `agf-drawer-meta` 仅显示游戏ID/游戏名称；表格 `agf-table-wrap` 外框；列：操作人、操作时间、结算公式。
+**操作记录抽屉**：顶部 `agf-drawer-meta` 仅显示游戏ID/游戏名称；表格 `agf-table-wrap` 外框；列：操作人、**操作时间**（`YYYY-MM-DD HH:mm:ss`）、结算公式/操作；新建记录用 `formatDateTime()`。
 
 **结算三页**（外部收入 / 内部收入 / 内部退款）
 
@@ -353,7 +351,7 @@
 #### B. 结算三页时间默认
 
 - 外部/内部/退款结算：`MonthRangePicker` 默认 **`getRecentTwoMonthsRange()`** = **上个月 + 当前月**（如 2026-07 时为 `2026-06 - 2026-07`）。
-- 数据统计仍用 `getSampleMonthRange()`（mock 2025-05/06）。
+- 数据统计仍用 `getSampleMonthRange()`（mock **2026-06/07**）。
 
 #### C. 厂商收入（`VendorIncomePage` + `balance.ts`）
 
@@ -383,8 +381,7 @@
 
 #### A. 结算 mock 与时间筛选
 
-- 初始结算样例 **S001–S021 + S022–S025** 的 `incomeTime` 仅 **2025-05 / 2025-06**；**无 2026 年**初始数据。
-- 结算三页默认 `getRecentTwoMonthsRange()`（上个月+当前月，如 2026-07 为 `2026-06 - 2026-07`）时列表可能为空；查 mock 请手动选 **`2025-05 - 2025-06`**。
+- 初始结算样例 **S001–S027**（4399）+ **S301–S307**（快爆）的 `incomeTime` 为 **2026-06 / 2026-07**；与结算三页默认近两个月一致，打开即可见数据。
 - 已**移除**未结算样例 **S008**；内部未结算仅通过【数据拉取】产生。
 
 #### B. 厂商收入 — 【申请付款】（`VendorIncomePage` + `utils/vendorPaymentApply.ts`）
@@ -404,7 +401,7 @@
 |------|------|------|
 | 1 | 银行五字段未填全 | 未填写银行信息 |
 | 2 | 厂商**未填写**预付分成款（`Vendor.prepayment` 未填；**0 合法**） | **{厂商名称}未补充预付分成款信息** |
-| 3 | 付款管理存在该厂商 `status=未付款`（兼容历史 `待付款`） | 存在一笔未付款的记录 |
+| 3 | 厂商付款管理存在该厂商 `status=未付款`（兼容历史 `待付款`） | 存在一笔未付款的记录 |
 
 **二次确认 Modal**（校验通过后）
 
@@ -430,7 +427,7 @@
 
 ### 22. 本次对话汇总（2026-07-14）
 
-#### A. 付款管理 — 操作列（`PaymentListPage`）
+#### A. 厂商付款管理 — 操作列（`PaymentListPage`）
 
 | 状态 | 操作（顺序） |
 |------|-------------|
@@ -438,7 +435,7 @@
 | 已付款 | 【详细信息】→【结算函】→【请款凭证】 |
 
 - 付款状态枚举：**未付款** / **已付款**（`types.ts`；历史 mock `待付款` 由 `normalizePaymentStatus` 兼容）。
-- 列表列名：**待付款金额**、**实际付款金额**；申请付款时间 / 付款时间**精确到秒**。
+- 列表列名：**待付款金额**、**实际付款金额**；申请时间 / 付款时间**精确到秒**。
 
 #### B. 【标记付款】抽屉（730px `large`）
 
@@ -516,10 +513,10 @@
 
 ### 24. 本次对话汇总（2026-07-14 下午续）
 
-#### A. 付款管理 — 详细信息抽屉补全
+#### A. 厂商付款管理 — 详细信息抽屉补全
 
 - 补充只读字段：**付款状态**。
-- 申请付款时间、付款时间**仅在列表展示**，详细信息抽屉不含。
+- 申请时间、付款时间**仅在列表展示**，详细信息抽屉不含。
 - 字段顺序：厂商ID → 厂商名称 → 付款状态 → 待付款金额 → 实际付款金额 → 付款银行 → 收款信息 → 备注。
 
 #### B. 改动文件（本轮）
@@ -599,7 +596,7 @@
 
 #### E. 改动文件（本轮）
 
-`data/types.ts`、`data/mock-data.ts`、`data/store.tsx`、`utils/businessScope.ts`、`utils/settlementLetter.ts`、`utils/vendorPaymentApply.ts`、`utils/balance.ts`、`components/BusinessTypeSelect.tsx`、`components/FilterBar.tsx`、`components/SettlementLetterDrawer.tsx`、`pages/*ListPage.tsx`、`pages/InternalSettlementPage.tsx`、`pages/ExternalSettlementPage.tsx`、`pages/VendorIncomePage.tsx`、`pages/StatisticsPage.tsx`、`pages/RevenueSummaryPage.tsx`、`pages/GameListPage.tsx`、`style.css`、`ui-spec.md`、`conversation-memory.md`
+`data/types.ts`、`data/mock-data.ts`、`data/store.tsx`、`utils/businessScope.ts`、`utils/settlementLetter.ts`、`utils/vendorPaymentApply.ts`、`utils/balance.ts`、`components/BusinessTypeSelect.tsx`、`components/FilterBar.tsx`、`components/SettlementLetterDrawer.tsx`、`pages/*ListPage.tsx`、`pages/InternalSettlementPage.tsx`、`pages/ExternalSettlementPage.tsx`、`pages/VendorIncomePage.tsx`、`pages/RevenueSummaryPage.tsx`、`pages/GameListPage.tsx`、`style.css`、`ui-spec.md`、`conversation-memory.md`
 
 ### 27. 本次对话汇总（2026-07-14 晚间续）
 
@@ -618,7 +615,7 @@
 | 厂商ID / 厂商名称 | 只读 |
 | 预付分成款 * | 必填；≥0 |
 | 历史已抵扣分成款 * | 必填；默认 0；≥0；`FieldHint`「填写线下手动已处理的预付分成款」 |
-| 已抵扣分成款 | 只读；**已付款之和 + 历史已抵扣**；若预付 − 上述合计 ≤ 0 则取预付分成款；取**已保存**值 |
+| 已抵扣分成款 | 只读；**已付款待付款金额之和 + 历史已抵扣**；若预付 − 上述合计 ≤ 0 则取预付分成款；取**已保存**值 |
 | 剩余未抵扣分成款 | 只读；**预付分成款 − 已抵扣分成款**（≤0 为 0）；取**已保存**预付分成款 |
 
 **列表新增列**（在「预付分成款」右侧）：**已抵扣分成款**、**剩余未抵扣分成款**。
@@ -650,7 +647,7 @@
 
 ### 28. 本次对话汇总（2026-07-15）
 
-#### A. 付款管理 — 【标记付款】字段拆分（`PaymentListPage`）
+#### A. 厂商付款管理 — 【标记付款】字段拆分（`PaymentListPage`）
 
 | 字段 | 规则 |
 |------|------|
@@ -685,7 +682,7 @@
 
 | 字段 | 规则 |
 |------|------|
-| 已抵扣分成款 | **已付款之和 + 历史已抵扣**；若预付 − 上述合计 ≤ 0，则取预付分成款 |
+| 已抵扣分成款 | **已付款待付款金额之和 + 历史已抵扣**；若预付 − 上述合计 ≤ 0，则取预付分成款 |
 | 剩余未抵扣分成款 | 预付分成款 − 已抵扣分成款（≤0 为 0） |
 
 **示例（1002 幻境，无已付款、历史=0）**：预付 600000 → 已抵扣 0、剩余 600000；改为 6000000022 保存后 → 已抵扣 0、剩余 6000000022。
@@ -719,6 +716,364 @@
 
 `utils/mockPdf.ts`、`components/SettlementLetterDrawer.tsx`、`pages/VendorIncomePage.tsx`、`ui-spec.md`、`conversation-memory.md`
 
+### 31. 本次对话汇总（2026-07-16）
+
+#### A. 侧栏与面包屑分组更名（`index.tsx`）
+
+| 原名称 | 新名称 |
+|--------|--------|
+| 游戏管理 | **游戏支付管理** |
+| 财务管理 | **财务分成管理** |
+
+面包屑第三段 `PAGE_META.group` 同步；子菜单名称不变（厂商管理、游戏管理、结算公式管理等）。
+
+#### B. 渠道清单与支持渠道（`mock-data.ts`、`SupportChannelsDrawer.tsx`）
+
+| 项 | 规则 |
+|----|------|
+| 内部渠道 | 移除 **H5游戏**；现 6 项：快爆付费、快爆内购、游戏盒付费、游戏盒内购、快爆小游戏广告、49广告联盟 |
+| 外部渠道 | 新增 **游乐外放**；现 5 项：纯游外放、游乐外放、游乐IOS、快爆游IOS、49外放 |
+| 支持渠道抽屉 | **仅内部渠道**（勾选 + 渠道游戏ID）；**无**外部渠道填写区块 |
+| 入口迁移 | 自结算公式管理操作列迁至 **游戏管理** 操作列（编辑 → 合同管理 → **支持渠道** → 操作记录） |
+| 组件 | `components/SupportChannelsDrawer.tsx`；`FormulaListPage` 操作列仅「结算公式」「操作记录」 |
+
+#### C. 外部收入 — 导入并结算（`ExternalSettlementPage`、`externalImport.ts`）
+
+| 项 | 规则 |
+|----|------|
+| 上传报表字段 | **收入时间、游戏名称、厂商名称、待结算金额**（非渠道游戏ID） |
+| 匹配规则 | 游戏名称 = `onlineName` + 厂商名称 = `Vendor.name` |
+| 移除校验 | 不再判断「该渠道是否有勾选游戏」；选渠道即可上传 |
+| 预览列表列 | 收入时间 → 游戏ID/游戏名称 → **厂商名称** → 待结算金额 → 结算公式 → 结算收入（**无**渠道游戏ID 列） |
+
+#### D. 厂商管理 — 选填字段（`VendorForm.tsx`）
+
+联系人、手机、邮箱、单位地址改为**选填**；必填 **8 项**：厂商名称、**支持币种**、发票信息、银行信息 5 项。
+
+#### E. 游戏管理 — 列表与表单（`GameListPage.tsx`）
+
+> **2026-07-16 后续重构**见 **§35**（付款方列/筛选/必填、三项已付列/排序、默认按添加时间、操作记录合同变更）。
+
+**当轮（§31）列表列**：游戏ID/游戏名称、合同游戏名称、厂商ID、厂商名称、运营状态、操作；**已移除**游戏负责人、版号、合作状态列。
+
+**添加/编辑表单顺序**（§35 后 **付款方必填**）：游戏名称* → 合同游戏名称* → 归属厂商* → **付款方***（4399/纯游/游乐/游戏之家/香港4399/游家时代）→ 游戏负责人（选填）→ 版号 → 运营状态 → 备注。
+
+**校验**（§35 后）：`ADD_GAME_REQUIRED` / `EDIT_GAME_REQUIRED` 含游戏名称、合同游戏名称、**付款方**（添加另含归属厂商）；**不含**游戏负责人。
+
+**字段**：`Game.payer: GamePayer`（必填）；`Game.createdAt` 添加时写入（§35）。
+
+#### F. 合同管理抽屉（`GameListPage`、`Contract` 类型）
+
+> **2026-07-16 二次重构**，见 **§32**。
+
+| 字段 | 规则 |
+|------|------|
+| 游戏ID / 游戏名称 | 只读 |
+| 合同编号 * | 必填文本 |
+| 合同金额 * | 复合型输入；前缀取归属厂商 `Vendor.currency`（￥/$）；≥0 两位小数 |
+| 合作内容 * | 多选：游戏代理金、预付分成款、委托开发费；至少一项 |
+| 已付游戏代理金 * | 勾选游戏代理金时显示；复合型输入 + FieldHint |
+| 已付预付分成款 * | 勾选预付分成款时显示 |
+| 已付委托开发费 * | 勾选委托开发费时显示 |
+| 补充说明 | 选填 |
+| 合作状态 | 单选；保存同步游戏 + 操作日志 |
+
+类型：`cooperationContents`、`paidAgencyFee?`、`paidPrepayment?`、`paidDevelopmentFee?`、`supplementalNote`；**支持币种**见 `Vendor.currency`。
+
+#### G. 改动文件（本轮）
+
+`index.tsx`、`data/types.ts`、`data/mock-data.ts`、`data/store.tsx`、`components/VendorForm.tsx`、`components/SupportChannelsDrawer.tsx`（新增）、`pages/GameListPage.tsx`、`pages/FormulaListPage.tsx`、`pages/ExternalSettlementPage.tsx`、`utils/externalImport.ts`、`ui-spec.md`、`conversation-memory.md`
+
+### 32. 本次对话汇总（2026-07-16 续 — 合同管理重构）
+
+#### A. 合同管理抽屉（`GameListPage`、`FormFields.tsx`）
+
+| 项 | 规则 |
+|----|------|
+| 合同金额 | 必填；`CurrencyInput` 复合型输入；前缀 ￥ 或 $（**初版在合同内选币种，已迁至厂商 §33**） |
+| 合作内容 | 必填多选：游戏代理金、预付分成款、委托开发费 |
+| 条件已付字段 | 勾选后显示对应「已付*」复合型输入 + FieldHint；取消勾选清空 |
+| 补充说明 | 选填（原合同信息说明） |
+| 移除 | 版号费(已支付)、已抵扣预付分成款只读、合同内支持币种 |
+
+组件：`CurrencyInput`（`agf-input-affix__prefix` 灰蓝底）；`agf-checkbox-group` 多选。
+
+#### B. 改动文件
+
+`data/types.ts`、`data/mock-data.ts`、`data/store.tsx`、`components/FormFields.tsx`、`pages/GameListPage.tsx`、`style.css`、`ui-spec.md`、`conversation-memory.md`
+
+### 33. 本次对话汇总（2026-07-16 续 — 支持币种迁至厂商）
+
+| 项 | 规则 |
+|----|------|
+| 支持币种 | 从合同管理迁至**厂商管理**添加/编辑表单；`Vendor.currency: ContractCurrency`；必填；人民币/美金，默认人民币 |
+| 厂商表单布局 | 1175px 宽表第二行：**单位地址** \| **支持币种** \| **发票信息**（5 列栅格：2+1+2） |
+| 厂商必填 | `VENDOR_REQUIRED` 增至 **8 项**（含支持币种） |
+| 合同金额前缀 | 合同抽屉 `CurrencyInput` 通过 `getVendor(game.vendorId).currency` 只读继承；合同内**不可**编辑币种 |
+| Mock | 厂商 **1003**（雷霆网络科技）= 美金；其下游戏（4005/4006）合同金额前缀 **$** |
+
+改动：`data/types.ts`（`Vendor.currency`、移除 `Contract.currency`）、`VendorForm.tsx`、`mock-data.ts`、`GameListPage.tsx`、`ui-spec.md`、`conversation-memory.md`
+
+### 34. 本次对话汇总（2026-07-16 续 — UI 对齐小修）
+
+| 项 | 说明 |
+|----|------|
+| 游戏ID/名称斜杠 | `SupportChannelsDrawer`、`FormulaListPage` 只读/meta 统一为 `4001 / 名称`（斜杠前后空格） |
+| 结算函 mock | 回退产品名移除「H5游戏」，改为「快爆付费」 |
+| 原型评审 | `.spec/prototype-review.md` 复审至 2026-07-16 |
+
+改动：`SupportChannelsDrawer.tsx`、`FormulaListPage.tsx`、`SettlementLetterDrawer.tsx`、`.spec/prototype-review.md`
+
+### 35. 本次对话汇总（2026-07-16 续 — 游戏管理列表 / 金额 / 统计页）
+
+#### A. 游戏管理主列表（`GameListPage.tsx`）
+
+| 列 | 说明 |
+|----|------|
+| 付款方 | 表头筛选（6 选项）；mock 全量有值 |
+| 游戏ID / 游戏名称、合同游戏名称、厂商ID、厂商名称 | |
+| 已付游戏代理金 / 已付预付分成款 / 已付委托开发费 | 表头排序（`ColumnSort`）；有值显示 `formatCurrencyMoney`（厂商币种 + 千分位）；无值 `-` |
+| 运营状态、操作 | 操作含编辑/合同管理/支持渠道/操作记录 |
+
+- **默认排序**：`Game.createdAt` **新→旧**（添加时间）；点击已付列切换该列升/降序
+- **付款方**：添加/编辑表单**必填**（`ADD_GAME_REQUIRED` / `EDIT_GAME_REQUIRED`）
+- **Mock**：16 款游戏均有 `payer`；合同均含三项合作内容且已付金额 > 0
+
+#### B. 操作记录 — 合同变更
+
+- `GameOperationLogAction` 新增 **`合同变更`**；`detail` 多行文本
+- 监听字段：合同金额 + 三项已付；格式 `"字段名"变更为"值"`；清空为 `"-"`
+- 工具：`utils/contractLog.ts` → `buildContractChangeDetail`、`calcContractPaymentTotal`
+
+#### C. 业务类型下拉
+
+- UI 显示 **游戏盒** / 快爆（内部值仍为 `4399` / `快爆`）；`BUSINESS_TYPE_OPTIONS` in `businessScope.ts`
+
+#### D. 收入汇总统计 — 支付金额
+
+- 第三列 **支付金额** = `calcContractPaymentTotal`（与游戏管理合同一致）
+- 游戏维度：单游戏合同合计 + 厂商币种；渠道/厂商维度：关联游戏合计
+- 总收入/结算付款金额：结算口径，**￥** + 千分位（列表已无结算收入/结算退款列）
+
+#### E. 主列表金额展示（全平台）
+
+- `formatMoney`：千分位两位小数（`zh-CN` locale）
+- `formatCurrencyMoney(value, currency)`：符号 + 千分位
+- `SETTLEMENT_CURRENCY = '人民币'`：**外部/内部/内部退款结算**及收入汇总结算列固定 ￥
+- 游戏管理已付列、厂商收入、厂商付款管理：按 `Vendor.currency`
+
+#### F. 移除三统计页
+
+- 删除 `pages/StatisticsPage.tsx`；移除 `stats-vendor` / `stats-channel` / `stats-game` 路由
+- 数据统计仅保留 **收入汇总统计**
+
+#### G. 改动文件
+
+`GameListPage.tsx`、`RevenueSummaryPage.tsx`、`InternalSettlementPage.tsx`、`ExternalSettlementPage.tsx`、`VendorIncomePage.tsx`、`PaymentListPage.tsx`、`utils/settlement.ts`、`utils/contractLog.ts`、`utils/businessScope.ts`、`utils/columnFilters.ts`、`components/ColumnSort.tsx`、`components/DataTable.tsx`、`data/types.ts`、`data/mock-data.ts`、`data/store.tsx`、`index.tsx`、`style.css`、`ui-spec.md`、`conversation-memory.md`
+
+### 36. 本次对话汇总（2026-07-16 续 — 游戏收入 / 游戏付款管理）
+
+#### A. 侧栏新增（`index.tsx`）
+
+| 菜单 | 路由 | 说明 |
+|------|------|------|
+| **游戏收入管理** | `game-income` | 同厂商收入，**按游戏**聚合 |
+| **游戏付款管理** | `game-payment-list` | 同厂商付款管理，**按游戏**聚合 |
+
+置于「厂商收入」「**厂商付款管理**」（原付款管理）**下方**。
+
+#### B. 游戏收入管理（`GameIncomePage.tsx`）
+
+- 列表主键：`gameId`；列：**游戏ID/名称** → **厂商名称** → 账户总收入/余额、预付三列、累计收入/退款
+- 查询：`ListSearchFields`（`gameAndVendor`）；币种取归属厂商
+- 操作：【预付分成管理】（`Game.prepayment` / `historicalDeduction`）、余额>0 时【申请付款】
+- 申请校验：`gamePaymentApply.ts`（银行→游戏预付→未付款）；`applyGamePayment` 仅标记**该游戏**结算记录
+- 面包屑 **?**：`GameIncomeFieldHelp`；字段说明列表圆点无序号（`.agf-field-help-list`）
+
+#### C. 游戏付款管理（`GamePaymentListPage.tsx`）
+
+- 列表主键：`gameId`；列：**游戏ID/名称** → **厂商ID/名称** → 待付/实付金额（**￥**）、付款状态、时间、操作列
+- 结算函：`SettlementLetterDrawer` 支持 `gameId` + `useGamePayments`，⑤ 按游戏预付计算
+- Mock：`INITIAL_GAME_PAYMENTS`（GP001 已付 4005、GP002 未付 4001）；`GAME_PREPAYMENTS`（4009 未填测拦截）
+
+#### D. 数据层
+
+- 类型：`GameBalance`、`GamePaymentRequest`；`Game` 增 `prepayment?`、`historicalDeduction?`
+- 工具：`deriveGameBalances`、`calcGamePrepaymentSummary`、`calcGameLetterPrepaymentDeduction`
+- Store：`gameBalances`、`gamePayments`、`scopedGame*`、`applyGamePayment`、`markGamePaid`、`updateGamePayment`
+
+#### E. Mock 验收要点
+
+| 场景 | 预期 |
+|------|------|
+| 游戏 4008 / 4010 / 4012 | 账户余额 > 0，可【申请付款】 |
+| 游戏 4009 / 5004（快爆） | 未填预付分成款 → 申请付款拦截 |
+| 游戏 4001 / 5001 | GP002/GP301 **未付款** → 申请拦截 |
+| 厂商 1007 | 银行不全 → 「未填写银行信息」 |
+| 厂商 1005 | 厂商预付未填 → 拦截 |
+| 厂商 1001 / 2002 | P002/P302 **未付款** |
+| 4011 | 合作终止 + 公式未配置 |
+
+> 完整矩阵见 **§38**。
+
+### 37. 本次对话汇总（2026-07-16 续 — 厂商付款管理更名 / 口径与 UI）
+
+#### A. 侧栏更名
+
+- **付款管理** → **厂商付款管理**（`payment-list` 路由不变）；与 **游戏付款管理**（`game-payment-list`）区分
+
+#### B. 已抵扣分成款口径（`prepayment.ts`，厂商+游戏共用）
+
+| 项 | 规则 |
+|----|------|
+| 汇总字段 | 状态为**已付款**的付款记录，取 **`pendingAmount`（待付款金额）** 之和（非 `actualAmount`） |
+| 字段说明文案 | `已抵扣分成款 = 已付款待付款金额之和 + 历史已抵扣分成款；若预付分成款 − 上述合计 ≤ 0，则取预付分成款（…均为保存后的数值）` |
+| 组件 | `VendorIncomeFieldHelp.tsx`、`GameIncomeFieldHelp.tsx`；`ui-spec.md` 厂商/游戏收入字段说明 |
+
+#### C. 字段说明弹窗列表样式（`style.css`）
+
+- `.agf-field-help-list`：`list-style-type: disc`；**圆点列表、无序号**
+- 用于厂商收入、游戏收入面包屑 **?** Modal
+
+#### D. 改动文件（本轮）
+
+`index.tsx`、`components/VendorIncomeFieldHelp.tsx`、`components/GameIncomeFieldHelp.tsx`、`utils/prepayment.ts`、`style.css`、`ui-spec.md`、`conversation-memory.md`
+
+### 38. Mock 数据全量状态矩阵（2026-07-16）
+
+**月份对齐**：结算 `incomeTime` 统一为 **2026-06 / 2026-07**；`getSampleMonthRange()` 与结算三页默认 `getRecentTwoMonthsRange()` 一致，打开即可见样例。
+
+#### A. 主数据状态
+
+| 维度 | 样例 | 说明 |
+|------|------|------|
+| 业务类型 | 4399 / 快爆 | 厂商 1001–1008 / 2001–2003；游戏 400x / 500x |
+| 运营状态 | 已上线 / 未上线 | 4006、4011 未上线 |
+| 合作状态 | 合作中 / 合作终止 | **4011** 合作终止 + 操作记录 GL006 |
+| 版号 | 有 / 无 | 多游戏覆盖 |
+| 付款方 | 6 项全有 | 4399/纯游/游乐/游戏之家/香港4399/游家时代 |
+| 支持币种 | 人民币 / 美金 | **1003** 美金，其下 4005/4006 |
+| 结算公式 | 已配置 / 未配置 | **4011** `createEmptyFormula`（导入拦截演示） |
+
+#### B. 预付 / 银行 / 抵扣
+
+| 场景 | 样例 | 验收 |
+|------|------|------|
+| 厂商预付未填 | **1005** | 「像素工坊未补充预付分成款信息」 |
+| 厂商预付 = 0 | **1007** | 0 合法，不拦截预付 |
+| 厂商历史已抵扣 | **1003** 80000 | 配合 P001 看已抵扣/剩余 |
+| 厂商银行不全 | **1007** cardNumber 空 | 「未填写银行信息」（余额 24700） |
+| 游戏预付未填 | **4009**、**5004**（快爆） | 游戏收入申请拦截 |
+| 游戏预付 = 0 | **4012** | 0 合法 |
+| 游戏历史已抵扣 | **4005** 25000 | 配合 GP001 |
+
+#### C. 结算 / 申请付款
+
+| 场景 | 样例 |
+|------|------|
+| 类型 external / internal / refund | S001–S027、S301–S307 |
+| 申请付款状态 未申请 / 已申请 | 各半分布 |
+| 厂商余额 > 0 可申请 | **1002**、**1004**、**1006**、**1008**、**2001**、**2003** |
+| 厂商余额 ≤ 0 | **1003**（均已申请） |
+| 厂商有未付款拦截 | **1001** P002；**2002** P302 |
+| 游戏余额 > 0 可申请 | **4008**、**4010**、**4012** |
+| 游戏有未付款拦截 | **4001** GP002；**5001** GP301 |
+
+#### D. 厂商 / 游戏付款管理
+
+| 状态 | 样例 |
+|------|------|
+| 已付款 + 结算函 + 发票 | P001（含美金）、P301、GP001（含美金） |
+| 已付款缺凭证 | P003（全无）、P004/GP003（缺发票） |
+| 未付款 | P002、P302、GP002、GP301 |
+
+#### E. 改动文件
+
+`data/mock-data.ts`、`utils/monthRange.ts`、`utils/externalImport.ts`、`conversation-memory.md`、`ui-spec.md`
+
+### 39. 本次对话汇总（2026-07-16 续 — 收入/付款 UI 与字段）
+
+#### A. 收入页金额币种（厂商收入 + 游戏收入）
+
+| 列/场景 | 币种 |
+|---------|------|
+| 账户总收入、账户余额、累计收入/退款、已抵扣、剩余 | 固定 **￥**（`SETTLEMENT_CURRENCY`；来自内外部/退款结算） |
+| 预付分成款 | **￥**；`prepayment` **未填**列表显示 `-`（`0` 仍显示金额） |
+
+> 不再按归属厂商 `Vendor.currency` 显示结算口径金额（美金厂商如 1003 下游戏亦显示 ￥）。
+
+#### B. 付款管理金额币种（厂商 + 游戏）
+
+| 列/场景 | 币种 |
+|---------|------|
+| 列表待付款/实际付款金额 | 固定 **￥**（来自账户余额申请） |
+| 【标记付款】待付款金额（只读） | **￥** + 千分位 |
+| 【标记付款】实际付款金额 | `CurrencyInput`（**￥**）；必填 |
+| 【标记付款】实际付款美金 | `CurrencyInput`（**$**）；**选填**；字段 `actualAmountUsd?` |
+| 【详细信息】三金额字段 | 只读 **￥** / **$**；美金未填 `-` |
+
+#### C. 游戏收入 / 游戏付款 — 主列表增列
+
+- 「游戏ID / 游戏名称」右侧仅 **厂商名称**（无厂商ID列）；查询栏隐藏厂商ID输入
+- 查询栏仍为 `ListSearchFields`（`gameAndVendor`）
+
+#### D. 列头筛选下拉（`ColumnFilter.tsx`）
+
+- 菜单 `createPortal` 挂 `document.body`；`position: fixed`；`z-index: 10000`
+- 列表行数少时不被 `agf-table-wrap` `overflow` 裁切
+
+#### E. Mock 补充
+
+- P001 `actualAmountUsd: 51200`；GP001 `actualAmountUsd: 17400`（详细信息验收）
+
+#### F. 改动文件
+
+`pages/GameIncomePage.tsx`、`pages/VendorIncomePage.tsx`、`pages/PaymentListPage.tsx`、`pages/GamePaymentListPage.tsx`、`components/ColumnFilter.tsx`、`components/FormFields.tsx`（`CurrencyInput`）、`data/types.ts`、`utils/payment.ts`、`data/mock-data.ts`、`style.css`、`ui-spec.md`、`conversation-memory.md`
+
+### 40. 本次对话汇总（2026-07-16 续 — 导航/汇总/表单 UI）
+
+#### A. 侧栏隐藏（`index.tsx`）
+
+- **厂商收入**（`vendor-income`）、**厂商付款管理**（`payment-list`）从 `MENU_GROUPS` 与 `ROUTE` **移除**（侧栏不可见）
+- 页面组件与 `#page=vendor-income` / `#page=payment-list` 路由渲染**仍保留**（深链可开）
+- 侧栏「财务分成管理」现见：结算公式、外部/内部/退款结算、**游戏收入管理**、**游戏付款管理**
+
+#### B. 游戏付款管理 — 时间列合并
+
+- 「申请时间」「付款时间」合并为**同一列上下堆叠**（`TimeStackHeader` / `TimeStackCell`）；`DataTable` 列支持 `header` 自定义节点
+- 列名「申请付款时间」已统一为 **申请时间**（厂商付款管理仍为两列分开）
+
+#### C. 合同管理 — 合同金额初始为空
+
+- `Contract.contractAmount?` 可选；`addGame` 不写默认 `0`
+- 打开抽屉：未填或 `0` 且合同编号为空 → 输入框**留空**（不显示 `0.00`）；`contractAmountToField`
+
+#### D. 结算公式 — 扣税点 + 复合百分数输入
+
+- 表单标签「税率」→ **扣税点**（`FormulaListPage` / `TaxRateField`）
+- 渠道费/分成：`PercentAffixInput`（整数 + `%`）；扣税点手输：`DecimalPercentInput`（百分数最多两位小数 + `%`）
+- 抽屉 CSS：`.agf-form-field > .agf-form-input` 全宽规则不作用于 `.agf-input-affix` 内 input，避免 `%` 被裁切
+- 复合输入前缀（￥/$）与后缀（%）背景统一 **`#f5f7fa`**
+
+#### E. 操作记录 — 时间精确到秒
+
+- 格式 `YYYY-MM-DD HH:mm:ss`（`formatDateTime`）；mock `INITIAL_GAME_LOGS` / `INITIAL_FORMULA_LOGS` 同步
+- `store` 写入游戏/公式操作记录改用 `formatDateTime()`（替代 `toLocaleString`）
+
+#### F. 收入汇总统计 — 列调整（`RevenueSummaryPage.tsx`）
+
+| 变更 | 说明 |
+|------|------|
+| 移除 | 结算收入、结算退款列 |
+| 新增 | **结算付款金额** = 游戏付款管理已付款 `actualAmount` 按维度+付款月份累加 |
+| 保留 | 支付金额、总收入（总收入仍=结算收入−结算退款，内部计算） |
+
+验收样例：游戏 `4005`、时间 `2026-07` → 结算付款金额 `￥125,400.00`（GP001）。
+
+#### G. 改动文件
+
+`index.tsx`、`pages/GamePaymentListPage.tsx`、`pages/GameListPage.tsx`、`pages/FormulaListPage.tsx`、`pages/RevenueSummaryPage.tsx`、`components/DataTable.tsx`、`components/FormFields.tsx`、`data/types.ts`、`data/store.tsx`、`data/mock-data.ts`、`utils/contractLog.ts`、`style.css`、`ui-spec.md`、`conversation-memory.md`
+
 ---
 
 ### 19. 本次对话汇总（2026-07-11 ~ 07-12）
@@ -751,21 +1106,21 @@ src/prototypes/agent-game-finance/
 ├── index.tsx, style.css
 ├── components/
 │   ├── DataTable.tsx, Pagination.tsx, ListSearchFields.tsx
-│   ├── FormFields.tsx, VendorForm.tsx, Modal.tsx
-│   ├── FilterBar.tsx, ColumnFilter.tsx, StatusBadge.tsx
-│   ├── MonthRangePicker.tsx, VendorIncomeFieldHelp.tsx, MockFileUpload.tsx
+│   ├── FormFields.tsx, VendorForm.tsx, Modal.tsx   # CurrencyInput、PercentInput
+│   ├── FilterBar.tsx, ColumnFilter.tsx, ColumnSort.tsx, StatusBadge.tsx
+│   ├── MonthRangePicker.tsx, VendorIncomeFieldHelp.tsx, GameIncomeFieldHelp.tsx, MockFileUpload.tsx
 │   ├── BusinessTypeSelect.tsx, FilterBar.tsx（含业务类型选择）
+│   ├── SupportChannelsDrawer.tsx
 │   └── AdminLayout.tsx, Sidebar.tsx, SettlementLetterDrawer.tsx
-├── data/types.ts, mock-data.ts, store.tsx   # businessType / scoped* / internalSettlementButtons 按业务分桶
-├── utils/listKeyword.ts, columnFilters.ts, balance.ts, settlement.ts, monthRange.ts, invoiceTax.ts, externalImport.ts, financeCenter.ts, vendorPaymentApply.ts, payment.ts, settlementLetter.ts, businessScope.ts, prepayment.ts, mockPdf.ts
+├── data/types.ts, mock-data.ts, store.tsx   # businessType / scoped* / gamePayments / internalSettlementButtons 按业务分桶
+├── utils/... prepayment.ts, gamePaymentApply.ts, balance.ts（deriveGameBalances）, settlement.ts, contractLog.ts, businessScope.ts, ...
 └── pages/
-    ├── GameListPage.tsx      # 游戏 CRUD、合同、操作记录
+    ├── GameListPage.tsx      # 游戏 CRUD、合同、支持渠道、操作记录
     ├── VendorListPage.tsx
-    ├── FormulaListPage.tsx, PaymentListPage.tsx
+    ├── FormulaListPage.tsx, PaymentListPage.tsx, GamePaymentListPage.tsx
     ├── InternalSettlementPage.tsx, ExternalSettlementPage.tsx
-    ├── VendorIncomePage.tsx
-    ├── StatisticsPage.tsx    # 厂商/渠道/游戏收入统计
-    └── RevenueSummaryPage.tsx # 收入汇总统计
+    ├── VendorIncomePage.tsx, GameIncomePage.tsx
+    └── RevenueSummaryPage.tsx # 收入汇总统计（数据统计唯一页）
 
 src/resources/agent-game-finance/
 ├── ui-spec.md                # UI/交互规范（改样式必读）
@@ -777,13 +1132,12 @@ src/resources/agent-game-finance/
 ## 数据与 ID 规则
 
 - 厂商 ID：**4399** 从 **1001** 起、**快爆** 从 **2001** 起；游戏 ID：**4399** 从 **4001** 起、**快爆** 从 **5001** 起（`store.tsx` + `utils/businessScope.ts`）。
-- Mock 结算样例 **S001–S025**（4399）+ **S301–S306**（快爆）；收入时间主要为 **2025-05 / 2025-06**；**无 2026 年初始结算数据**。
+- Mock 结算样例 **S001–S027**（4399）+ **S301–S307**（快爆）；收入时间 **2026-06 / 2026-07**。
 - **默认渠道费**（样例公式）：外部 **0%**、内部 **5%**（`makeFormula`）。
-- 数据统计页默认查 `2025-05 - 2025-06`，否则列表可能「暂无数据」。
-- **结算三页**默认查近两个月（如 `2026-06 - 2026-07`），与 mock 月份不一致时会「暂无数据」，需手动改 `2025-05 - 2025-06`。
+- 数据统计与结算三页默认时间范围与 mock 一致，打开即可见样例。
 - **未结算样例**：初始 mock **无**未结算记录（已移除 S008）；内部未结算仅通过【数据拉取】产生。
-- **厂商收入 mock**：1004/1006/1008 余额 > 0 可申请；**1005 像素工坊**未填厂商预付测拦截；1001 有 P002 未付款。
-- **快爆 mock**：2001–2003 厂商、5001–5004 游戏；P301 已付款样例。
+- **厂商收入 mock**：见 §38；1004/1006/1008 可申请；1005 预付拦截；1001/1007 未付款/银行拦截。
+- **快爆 mock**：2001–2003 厂商、5001–5004 游戏；P301/P302、GP301 付款样例。
 
 **游戏名称字段**（勿混用）：
 
@@ -799,7 +1153,6 @@ src/resources/agent-game-finance/
 - 厂商 **1175px** 抽屉：厂商表单（`agf-form-grid`）与**结算函**（`SettlementLetterDrawer`）；结算函不走 730px 横向表单规则。
 - 操作记录抽屉表格无分页。
 - 未在 `AGENTS.md` 添加自动加载 ui-spec / conversation-memory 的规则（用户未确认）。
-- 合同抽屉中付款代理金、委托开发费用**暂未**做必填校验。
 - 结算三页列表「结算公式」列用 `displaySettlementFormula` 去前缀；结算公式管理列表仍保留「内部渠道：/外部渠道：」两行。
 - 历史结算记录 `formulaText` 字段文案可能与列表实时计算略有差异；导入弹窗不再含「总收入」列。
 - **外部收入结算主列表禁止未结算数据**；初始 mock 均为已结算；内部【结算】验收依赖【数据拉取】后的未结算行。
@@ -832,21 +1185,21 @@ src/resources/agent-game-finance/
 4. 合同保存要同步合作状态 + 写操作日志。  
 5. 表单提交必须走校验：字段红字 + Toast，失败不关闭抽屉。  
 6. DualCell / 表头用 `ID / 名称` 格式，斜杠前后有空格；表头加粗。  
-7. 厂商银行信息 11 项全必填（含开户银行所在地）。  
+7. 厂商表单必填 **8 项**：厂商名称、**支持币种**、发票信息、银行 5 项；**联系人/手机/邮箱/单位地址选填**。  
 8. 用户说「推送到 git」时再 commit/push，不要主动提交。  
 9. 产品需求或设计方案有重大分歧时，按 `AGENTS.md` 门禁先对齐再继续实现。  
 10. 重要对话结束前按用户要求更新本文件与 `ui-spec.md`。  
 11. 数据统计无页内 Tab；时间用顶部 `MonthRangePicker`，默认 `getSampleMonthRange()`。  
-12. 收入汇总「总收入」= 结算收入 − 结算退款；三收入统计页「总收入」= grossRevenue 合计，勿混口径。  
+12. 收入汇总「总收入」= 结算收入 − 结算退款（内部计算，列表不展示后两列）；列表新增「结算付款金额」；勿与已删三收入统计页 grossRevenue 口径混用。  
 13. 数据统计已移除「累计流水」列；渠道收入统计含「总收入」。
-14. 结算公式税率：跟随发票按厂商发票映射；勿恢复底部独立「发票设置」或「税点」输入框。  
+14. 结算公式扣税点：跟随发票按厂商发票映射；表单标签「扣税点」；`PercentAffixInput`/`DecimalPercentInput`；勿恢复底部独立「发票设置」或旧「税点」输入框。  
 15. **游戏名称**：「游戏ID / 游戏名称」一律 `onlineName`（`getGameName`）；「合同游戏名称」才用 `name`。  
 16. 游戏添加/编辑：先「游戏名称」后「合同游戏名称」，带 `FieldHint`；编辑时归属厂商只读。  
 17. 结算公式列表：新游戏同步空公式、未配置 `-`、公式列内外两行。  
-18. 支持渠道：内部/外部均为勾选+填 ID（勾选后必填）；小标题「内部渠道」「外部渠道」。  
+18. **支持渠道**：入口在**游戏管理**操作列；抽屉**仅内部渠道**（勾选+填 ID，勾选后必填）；组件 `SupportChannelsDrawer.tsx`；结算公式管理**无**【支持渠道】。  
 19. 结算三页列表无「总收入」；列为「待结算金额」；申请付款状态「未申请/已申请」。  
 20. 列表/抽屉/弹窗表格：`--agf-gutter 24px` + `agf-table-wrap` 灰色实线外框；分页在边框外。
-21. 外部导入：渠道**单选**；无运营游戏禁止上传；上传后切列表态 + `外部渠道：` meta + DataTable 分页。
+21. 外部导入：渠道单选；上传字段**收入时间/游戏名称/厂商名称/待结算金额**；按游戏名+厂商名匹配；**无**勾选游戏拦截；预览列表含厂商名称列。  
 22. 结算三页/导入列表「结算公式」列：用 `displaySettlementFormula`，不显示「外部：/内部：」前缀。
 23. Toast 仅 `success`（绿）/ `error`（红）；主按钮禁用 `#F5F5F5` 底 `#BFBFBF` 字。
 24. 样例渠道费：外部 0%、内部 5%。
@@ -858,33 +1211,61 @@ src/resources/agent-game-finance/
 30. **内部/退款结算**：两页独立；按钮状态 `internalSettlementButtons[businessType]`；**切换业务/页面不重置、浏览器刷新重置**；拉取上月数据；结算仅本页主列表未结算行。
 31. **厂商收入**：账户总收入=累计收入−累计退款；账户余额=未申请结算收入−未申请退款（**不扣**预付）；预付在「预付分成管理」维护；字段说明见面包屑 **?** Modal。
 32. **结算三页时间默认**：`getRecentTwoMonthsRange()` = 上个月 + 当前月。
-33. **支持渠道**：内外部均勾选+填渠道游戏ID（勾选后必填）。
+33. **支持渠道**：见第 18 条；外部渠道清单含**游乐外放**；内部**无 H5游戏**。  
 34. **FieldHint 在上、FieldError 在下**；PercentInput 同理。
 35. **DataTable 无数据也显示分页**（共 0 条）。
-36. **结算 mock 月份**：初始数据仅 2025-05/06；结算三页默认近两个月，查 mock 需手动改时间范围。
+36. **结算 mock 月份**：初始数据 **2026-06/07**；与结算三页、收入汇总默认时间一致。
 37. **厂商收入申请付款**：余额 > 0 才显示按钮；校验银行→**厂商**预付（未填）→未付款；操作列始终有【预付分成管理】。  
 38. **厂商收入样式**：余额列黑色；操作列【申请付款】主题蓝链接。  
 39. **外部结算完成态**：`externalSettlementButtons.settleCompleted` 仍用于外部导入流程，**不再**参与申请付款警告。  
 40. **vendorPaymentApply.ts**：申请付款拦截逻辑集中在此工具。  
-41. **付款管理操作列**：未付款=标记付款+结算函+请款凭证；已付款=详细信息+结算函+请款凭证。  
+41. **厂商付款管理操作列**：未付款=标记付款+结算函+请款凭证；已付款=详细信息+结算函+请款凭证。  
 42. **付款状态**：未付款/已付款（非「待付款」）；`isUnpaidPayment` 兼容历史数据。  
 43. **标记付款**：**待付款金额只读** + **实际付款金额可编辑**（两位小数）；付款银行、收款信息必填；不含结算函/电子发票；提交不关闭；**标记已付款关闭抽屉**；收款信息可编辑。  
 44. **请款凭证**：结算函、电子发票 `MockFileUpload`；标签「结算函」；**已上传文件可删除**。  
-45. **详细信息**：仅已付款；含付款状态；**不含**申请付款时间/付款时间（仅列表列）；仅备注可编辑。  
+45. **详细信息**：仅已付款；含付款状态；**不含**申请时间/付款时间（仅列表列）；仅备注可编辑。  
 46. **MockFileUpload**：选择文件+列表+点击下载+**× 删除**；无虚线分隔；用于请款凭证。  
 47. **列表空状态**：`DataTable` 无数据时表头保留、表体居中空盒插画+「暂无数据」、分页仍显示共 0 条。  
 48. **结算函 1175px**：按 `settlementIds` 过滤；连续月份合并；下载中文/英文；公式①/③；⑤ 基于厂商剩余未抵扣分成款；**remaining>0** 才显示⑤行与函内剩余行，否则总计 **②-④**（无⑤）。  
 49. **updatePayment / settlementIds**：付款记录部分更新；申请付款时绑定结算 ID 列表。  
-50. **平台名称**：侧栏与面包屑用「代理游戏台账」，勿恢复「代理游戏财务」。  
-51. **数据统计侧栏**：仅显示「收入汇总统计」；其余 3 个统计页菜单隐藏、路由保留。  
+50. **平台名称**：侧栏与面包屑用「代理游戏台账」；侧栏分组 **游戏支付管理** / **财务分成管理**（非「游戏管理」「财务管理」）。  
+51. **数据统计侧栏**：仅「收入汇总统计」；厂商/渠道/游戏收入统计三页**已删除**。  
 52. **内部结算拉取后时间**：保持近两个月，存 `internalSettlementButtons[businessType][type].monthRange`；勿改回拉取后切单月。  
 53. **申请付款确认弹窗**：`compact` 样式 `min-width: 420px`。
-54. **业务类型**：列表左上角 `BusinessTypeSelect`（4399/快爆）；`Vendor.businessType`；scoped 列表过滤；ID 段 100x/400x vs 200x/500x；数据互不相干。
+54. **业务类型**：列表左上角显示 **游戏盒**/快爆（值 `4399`/快爆）；scoped 过滤；ID 段 100x/400x vs 200x/500x。
 55. **业务类型选择框宽**：`.agf-select.agf-business-type-select` **100px**。
-56. **厂商预付分成款**：`Vendor.prepayment?`；**0 合法**；未填才拦截申请付款；在厂商收入【预付分成管理】维护；合同管理**无**此字段；**已抵扣=已付款之和+历史**（预付−合计≤0 取预付）；**剩余=预付−已抵扣**；抽屉只读项取**已保存**值。  
+56. **厂商预付分成款**：`Vendor.prepayment?`；**0 合法**；未填才拦截申请付款；在厂商收入【预付分成管理】维护；合同管理**无**此字段；**已抵扣=已付款待付款金额之和+历史**（预付−合计≤0 取预付）；**剩余=预付−已抵扣**；抽屉只读项取**已保存**值。  
 57. **预付分成管理输入**：预付分成款、历史已抵扣分成款**精确至小数点后两位**（如 `800000.00`、`0.00`）。  
 58. **结算函⑤**：`remaining−(②−④)>0` → ⑤=②−④，否则 ⑤=remaining；函内剩余=remaining−⑤；`remaining>0` 才显示⑤相关行。  
-59. **prepayment.ts**：厂商已抵扣/剩余计算、结算函 `calcLetterPrepaymentDeduction` 共用。  
+59. **prepayment.ts**：厂商/游戏已抵扣/剩余计算、结算函 `calcLetterPrepaymentDeduction` / `calcGameLetterPrepaymentDeduction` 共用；已付款记录汇总 **`pendingAmount`**。  
 60. **mockPdf.ts**：结算函【下载】生成可打开 PDF（非纯文本假 PDF）；`SettlementLetterDrawer` 中英文摘要。  
 61. **vendorPaymentApply**：未补充预付 = 厂商 `prepayment` 未填（非 0）。  
-62. **internalSettlementButtons / externalSettlementButtons**：按 `businessType` 分桶存储。
+62. **internalSettlementButtons / externalSettlementButtons**：按 `businessType` 分桶存储。  
+63. **游戏管理列表**：付款方筛选；三项已付列可排序；默认按 `createdAt` 新→旧；金额带币种+千分位。  
+64. **游戏表单**：**付款方必填**；游戏负责人选填；`Game.createdAt` 添加时写入。  
+65. **合同管理**：合同编号/金额/合作内容必填；已付*随勾选；`CurrencyInput` 前缀取 `Vendor.currency`；补充说明选填。  
+66. **合同变更日志**：`action=合同变更`；`detail` 多行；含合同金额+三项已付；格式 `"字段"变更为"值"`。  
+67. **厂商支持币种**：`Vendor.currency`；厂商表单第二行；必填 8 项之一；默认人民币。  
+68. **CurrencyInput**：`agf-input-affix__prefix` / `__suffix` 统一灰底 `#f5f7fa`；人民币=￥、美金=$。  
+69. **合作内容多选**：`agf-checkbox-group`；至少一项；取消勾选清空对应已付金额。  
+70. **只读 meta 斜杠**：抽屉/页内 `游戏ID / 游戏名称` 统一斜杠前后空格（见 §34）。  
+71. **主列表金额**：`formatCurrencyMoney` = 符号+千分位；结算三页固定 ￥（`SETTLEMENT_CURRENCY`）。  
+72. **收入汇总**：支付金额=合同三项已付之和；列表列=总收入+**结算付款金额**（已移除结算收入/退款列）；结算付款金额=游戏付款 `actualAmount` 按付款月累加。  
+73. **ColumnSort**：表头升/降序；用于游戏管理已付三列。  
+74. **厂商付款管理**：侧栏/面包屑名称（原「付款管理」）；路由 `payment-list` 不变。  
+75. **游戏收入管理**：`game-income`；按游戏聚合，逻辑同厂商收入；`Game.prepayment`；面包屑 **?** + `GameIncomeFieldHelp`。  
+76. **游戏付款管理**：`game-payment-list`；按游戏聚合，逻辑同厂商付款管理；`GamePaymentRequest` / `INITIAL_GAME_PAYMENTS`。  
+77. **gamePaymentApply.ts**：游戏收入【申请付款】拦截（银行取归属厂商→游戏预付→未付款）。  
+78. **字段说明列表**：`.agf-field-help-list` 圆点 `disc`、无序号；厂商/游戏收入 Modal 共用。  
+79. **Mock 全量状态**：见 §38；打开结算/统计页默认即可见样例，无需改月份。  
+80. **收入页结算金额**：厂商/游戏收入列表结算口径列固定 **￥**；预付未填 `-`。  
+81. **付款列表金额**：厂商/游戏付款管理待付/实付 **￥**（非厂商支持币种）。  
+82. **实际付款美金**：`actualAmountUsd?`；【标记付款】`CurrencyInput`($) 选填；【详细信息】只读，未填 `-`；mock P001/GP001。  
+83. **ColumnFilter Portal**：下拉挂 `body` + `z-index: 10000`，防表格裁切。  
+84. **游戏收入管理/游戏付款列表**：游戏列右侧增厂商名称；**游戏收入管理无厂商ID列/搜索**。  
+85. **侧栏隐藏**：厂商收入、厂商付款管理不在菜单/ROUTE；页面代码保留。  
+86. **游戏付款时间列**：申请时间+付款时间同一列堆叠（`TimeStackCell`）。  
+87. **合同金额初始**：未填不显示 `0.00`；`contractAmount?`。  
+88. **结算公式扣税点**：标签「扣税点」；`PercentAffixInput`/`DecimalPercentInput` 复合 `%`。  
+89. **操作记录时间**：`YYYY-MM-DD HH:mm:ss`；`formatDateTime()`。  
+90. **复合输入灰底**：币种前缀与 `%` 后缀均为 `#f5f7fa`。

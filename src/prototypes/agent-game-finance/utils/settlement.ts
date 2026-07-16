@@ -1,5 +1,19 @@
-import type { FormulaConfig, SettlementRecord, Vendor } from '../data/types';
+import type { ContractCurrency, FormulaConfig, SettlementRecord, Vendor } from '../data/types';
 import { resolveFollowInvoiceTax } from './invoiceTax';
+
+export const SETTLEMENT_CURRENCY: ContractCurrency = '人民币';
+
+export function currencySymbol(currency: ContractCurrency = '人民币'): string {
+  return currency === '美金' ? '$' : '￥';
+}
+
+export function formatMoney(value: number): string {
+  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function formatCurrencyMoney(value: number, currency: ContractCurrency = '人民币'): string {
+  return `${currencySymbol(currency)}${formatMoney(value)}`;
+}
 
 export function calcSettlement(
   gross: number,
@@ -40,7 +54,7 @@ export function isUnsettledSettlement(s: SettlementRecord): boolean {
 }
 
 export function formatSettlementIncome(s: SettlementRecord): string {
-  return isUnsettledSettlement(s) ? '-' : formatMoney(s.settlementIncome);
+  return isUnsettledSettlement(s) ? '-' : formatCurrencyMoney(s.settlementIncome, SETTLEMENT_CURRENCY);
 }
 
 export function formatSettlementTime(s: SettlementRecord): string {
@@ -63,10 +77,6 @@ export function calcRecordSettlementIncome(
     ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.internalTax)
     : formula.internalTax;
   return calcSettlement(record.settlementAmount, tax, formula.internalChannelFee, formula.internalShare);
-}
-
-export function formatMoney(value: number): string {
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /** 结算时间等：精确到秒，格式 YYYY-MM-DD HH:mm:ss */

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DataTable } from '../components/DataTable';
+import { DataTable, DualCell, TimeStackCell, TimeStackHeader } from '../components/DataTable';
 import { CurrencyInput, ReadonlyField, FieldError } from '../components/FormFields';
 import { FilterBar } from '../components/FilterBar';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
@@ -7,7 +7,7 @@ import { MockFileUpload, mockFileFromName, type MockFileItem } from '../componen
 import { SettlementLetterDrawer } from '../components/SettlementLetterDrawer';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
-import type { PaymentRequest, Vendor } from '../data/types';
+import type { GamePaymentRequest, Vendor } from '../data/types';
 import { PAYMENT_STATUS_FILTER_OPTIONS } from '../utils/columnFilters';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
@@ -52,15 +52,23 @@ function validatePayAmount(value: string): string | undefined {
   return undefined;
 }
 
-export function PaymentListPage() {
-  const { scopedPayments, getVendorName, getVendor, markPaid, updatePayment } = useAppStore();
+export function GamePaymentListPage() {
+  const {
+    scopedGamePayments,
+    getGameName,
+    getGame,
+    getVendor,
+    getVendorName,
+    markGamePaid,
+    updateGamePayment,
+  } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [statusFilter, setStatusFilter] = useState('');
   const [markOpen, setMarkOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [letterOpen, setLetterOpen] = useState(false);
   const [voucherOpen, setVoucherOpen] = useState(false);
-  const [current, setCurrent] = useState<PaymentRequest | null>(null);
+  const [current, setCurrent] = useState<GamePaymentRequest | null>(null);
   const [form, setForm] = useState({ payBank: '', remark: '', receiptInfo: '' });
   const [payAmount, setPayAmount] = useState('');
   const [payAmountUsd, setPayAmountUsd] = useState('');
@@ -77,19 +85,26 @@ export function PaymentListPage() {
 
   const fmtPaymentAmount = (value: number) => formatCurrencyMoney(value, SETTLEMENT_CURRENCY);
 
-  const data = scopedPayments.filter((p) => {
-    if (!matchesListSearch(search, { vendorId: p.vendorId, vendorName: getVendorName(p.vendorId) })) return false;
+  const data = scopedGamePayments.filter((p) => {
+    const game = getGame(p.gameId);
+    if (!matchesListSearch(search, {
+      gameId: p.gameId,
+      gameName: game ? getGameName(p.gameId) : p.gameId,
+      vendorId: game?.vendorId,
+      vendorName: game ? getVendor(game.vendorId)?.name : undefined,
+    })) return false;
     if (statusFilter && p.status !== statusFilter) return false;
     return true;
   });
 
-  const loadPaymentFiles = (p: PaymentRequest) => ({
+  const loadPaymentFiles = (p: GamePaymentRequest) => ({
     settlement: parseSavedFiles(p.settlementLetter),
     invoice: parseSavedFiles(p.invoice),
   });
 
-  const openMark = (p: PaymentRequest) => {
-    const vendor = getVendor(p.vendorId);
+  const openMark = (p: GamePaymentRequest) => {
+    const game = getGame(p.gameId);
+    const vendor = game ? getVendor(game.vendorId) : undefined;
     setCurrent(p);
     setForm({
       payBank: p.payBank ?? '公司招商银行',
@@ -102,15 +117,15 @@ export function PaymentListPage() {
     setMarkOpen(true);
   };
 
-  const openDetail = (p: PaymentRequest) => {
+  const openDetail = (p: GamePaymentRequest) => {
     setCurrent(p);
     setDetailRemark(p.remark ?? '');
     setDetailOpen(true);
   };
 
-  const openLetter = (p: PaymentRequest) => { setCurrent(p); setLetterOpen(true); };
+  const openLetter = (p: GamePaymentRequest) => { setCurrent(p); setLetterOpen(true); };
 
-  const openVoucher = (p: PaymentRequest) => {
+  const openVoucher = (p: GamePaymentRequest) => {
     setCurrent(p);
     setVoucherFiles(loadPaymentFiles(p));
     setVoucherOpen(true);
@@ -167,49 +182,56 @@ export function PaymentListPage() {
 
   const submitMark = () => {
     if (!current || !validateMarkForm()) return;
-    updatePayment(current.id, buildMarkPayload());
+    updateGamePayment(current.id, buildMarkPayload());
     setToast({ message: '提交成功', type: 'success' });
   };
 
   const submitMarkPaid = () => {
     if (!current || !validateMarkForm()) return;
-    markPaid(current.id, buildMarkPayload());
+    markGamePaid(current.id, buildMarkPayload());
     setMarkOpen(false);
     setToast({ message: '已标记付款', type: 'success' });
   };
 
   const submitDetail = () => {
     if (!current) return;
-    updatePayment(current.id, { remark: detailRemark });
+    updateGamePayment(current.id, { remark: detailRemark });
     setToast({ message: '提交成功', type: 'success' });
   };
 
   const submitVoucher = () => {
     if (!current) return;
-    updatePayment(current.id, {
+    updateGamePayment(current.id, {
       settlementLetter: voucherFiles.settlement.map((f) => f.name).join(', ') || undefined,
       invoice: voucherFiles.invoice.map((f) => f.name).join(', ') || undefined,
     });
     setToast({ message: '提交成功', type: 'success' });
   };
 
-  const receiptInfoDisplay = (p: PaymentRequest | null) => {
+  const receiptInfoDisplay = (p: GamePaymentRequest | null) => {
     if (!p) return '';
     if (p.receiptInfo) return p.receiptInfo;
-    return formatVendorReceiptInfo(getVendor(p.vendorId));
+    const game = getGame(p.gameId);
+    return formatVendorReceiptInfo(game ? getVendor(game.vendorId) : undefined);
   };
+
+  const currentVendorId = current ? getGame(current.gameId)?.vendorId ?? '' : '';
 
   return (
     <div className="agf-card">
       <FilterBar>
-        <ListSearchFields mode="vendor" value={search} onChange={setSearch} />
+        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
         data={data}
         columns={[
-          { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
-          { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={getGameName(r.gameId)} sub={r.gameId} /> },
+          { key: 'vendorId', title: '厂商ID', render: (r) => getGame(r.gameId)?.vendorId ?? '' },
+          { key: 'vendorName', title: '厂商名称', render: (r) => {
+            const vendorId = getGame(r.gameId)?.vendorId;
+            return vendorId ? getVendorName(vendorId) : '';
+          } },
           { key: 'pending', title: '待付款金额', render: (r) => fmtPaymentAmount(r.pendingAmount) },
           { key: 'actual', title: '实际付款金额', render: (r) => r.actualAmount ? fmtPaymentAmount(r.actualAmount) : '-' },
           {
@@ -223,8 +245,12 @@ export function PaymentListPage() {
             },
             render: (r) => <StatusBadge text={r.status} />,
           },
-          { key: 'applyTime', title: '申请时间', render: (r) => r.applyTime },
-          { key: 'payTime', title: '付款时间', render: (r) => r.payTime ?? '-' },
+          {
+            key: 'times',
+            title: '申请时间',
+            header: <TimeStackHeader labels={['申请时间', '付款时间']} />,
+            render: (r) => <TimeStackCell lines={[r.applyTime, r.payTime ?? '-']} />,
+          },
           { key: 'ops', title: '操作', render: (r) => (
             <div className="agf-actions">
               {isPaidPayment(r.status) && <button type="button" className="agf-btn agf-btn--link" onClick={() => openDetail(r)}>详细信息</button>}
@@ -243,8 +269,8 @@ export function PaymentListPage() {
             <button type="button" className="agf-btn agf-btn--primary" onClick={submitMarkPaid}>标记已付款</button>
           </>
         }>
-        <ReadonlyField label="厂商ID" value={current?.vendorId ?? ''} />
-        <ReadonlyField label="厂商名称" value={current ? getVendorName(current.vendorId) : ''} />
+        <ReadonlyField label="游戏ID" value={current?.gameId ?? ''} />
+        <ReadonlyField label="游戏名称" value={current ? getGameName(current.gameId) : ''} />
         <ReadonlyField label="待付款金额" value={fmtPaymentAmount(current?.pendingAmount ?? 0)} />
         <div className="agf-form-item">
           <label className="agf-form-label agf-form-label--required">实际付款金额</label>
@@ -313,8 +339,8 @@ export function PaymentListPage() {
             <button type="button" className="agf-btn agf-btn--primary" onClick={submitDetail}>提交</button>
           </>
         }>
-        <ReadonlyField label="厂商ID" value={current?.vendorId ?? ''} />
-        <ReadonlyField label="厂商名称" value={current ? getVendorName(current.vendorId) : ''} />
+        <ReadonlyField label="游戏ID" value={current?.gameId ?? ''} />
+        <ReadonlyField label="游戏名称" value={current ? getGameName(current.gameId) : ''} />
         <ReadonlyField label="付款状态" value={current?.status ?? ''} />
         <ReadonlyField label="待付款金额" value={fmtPaymentAmount(current?.pendingAmount ?? 0)} />
         <ReadonlyField label="实际付款金额" value={formatCnyPaymentDisplay(current?.actualAmount)} />
@@ -330,8 +356,8 @@ export function PaymentListPage() {
             <button type="button" className="agf-btn agf-btn--primary" onClick={submitVoucher}>提交</button>
           </>
         }>
-        <ReadonlyField label="厂商ID" value={current?.vendorId ?? ''} />
-        <ReadonlyField label="厂商名称" value={current ? getVendorName(current.vendorId) : ''} />
+        <ReadonlyField label="游戏ID" value={current?.gameId ?? ''} />
+        <ReadonlyField label="游戏名称" value={current ? getGameName(current.gameId) : ''} />
         <div className="agf-form-item">
           <label className="agf-form-label">结算函</label>
           <MockFileUpload
@@ -349,7 +375,17 @@ export function PaymentListPage() {
           />
         </div>
       </Drawer>
-      {current && <SettlementLetterDrawer open={letterOpen} onClose={() => setLetterOpen(false)} vendorId={current.vendorId} amount={current.pendingAmount} settlementIds={current.settlementIds} />}
+      {current && (
+        <SettlementLetterDrawer
+          open={letterOpen}
+          onClose={() => setLetterOpen(false)}
+          vendorId={currentVendorId}
+          gameId={current.gameId}
+          amount={current.pendingAmount}
+          settlementIds={current.settlementIds}
+          useGamePayments
+        />
+      )}
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { DataTable } from '../components/DataTable';
+import { DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { FieldError, FieldHint, ReadonlyField } from '../components/FormFields';
 import { Drawer, Modal, Toast, type ToastType } from '../components/Modal';
@@ -10,13 +10,13 @@ import { getPreviousMonthKey } from '../utils/monthRange';
 import {
   calcDeductedPrepayment,
   calcRemainingUndeductedPrepayment,
-  sumVendorPaidActualAmount,
+  sumGamePaidActualAmount,
 } from '../utils/prepayment';
 import { formatCurrencyMoney, formatMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
 import {
-  getApplyPaymentBlock,
-  getApplyPaymentBlockMessage,
-} from '../utils/vendorPaymentApply';
+  getApplyGamePaymentBlock,
+  getApplyGamePaymentBlockMessage,
+} from '../utils/gamePaymentApply';
 
 function formatPrepayAmountInput(value: number): string {
   return value.toFixed(2);
@@ -35,21 +35,24 @@ function validatePrepayAmount(value: string, label: string): string | undefined 
   return undefined;
 }
 
-export function VendorIncomePage() {
+export function GameIncomePage() {
   const {
     businessType,
-    scopedBalances,
-    scopedVendors,
-    scopedPayments,
-    applyPayment,
-    updateVendor,
+    scopedGameBalances,
+    scopedGames,
+    scopedGamePayments,
+    applyGamePayment,
+    updateGame,
+    getGame,
     getVendor,
+    getGameName,
+    getVendorName,
     internalSettlementButtons,
   } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [prepayOpen, setPrepayOpen] = useState(false);
-  const [selectedVendor, setSelectedVendor] = useState('');
+  const [selectedGameId, setSelectedGameId] = useState('');
   const [prepayAmount, setPrepayAmount] = useState('');
   const [historicalAmount, setHistoricalAmount] = useState('');
   const [prepayErrors, setPrepayErrors] = useState<Record<string, string>>({});
@@ -57,30 +60,36 @@ export function VendorIncomePage() {
 
   const fmtSettlementAmount = (value: number) => formatCurrencyMoney(value, SETTLEMENT_CURRENCY);
 
-  const rows = scopedBalances.map((b) => {
-    const v = scopedVendors.find((x) => x.id === b.vendorId);
-    const prepaymentUnset = v?.prepayment == null || Number.isNaN(v.prepayment);
+  const rows = scopedGameBalances.map((b) => {
+    const g = scopedGames.find((x) => x.id === b.gameId);
+    const prepaymentUnset = g?.prepayment == null || Number.isNaN(g.prepayment);
     return {
       ...b,
-      vendorName: v?.name ?? b.vendorId,
+      gameName: g ? getGameName(g.id) : b.gameId,
+      vendorId: g?.vendorId ?? '',
+      vendorName: g ? getVendorName(g.vendorId) : '',
       prepaymentUnset,
-      savedPrepayment: v?.prepayment,
+      savedPrepayment: g?.prepayment,
     };
-  }).filter((r) => matchesListSearch(search, { vendorId: r.vendorId, vendorName: r.vendorName }));
+  }).filter((r) => matchesListSearch(search, {
+    gameId: r.gameId,
+    gameName: r.gameName,
+    vendorId: r.vendorId,
+    vendorName: r.vendorName,
+  }));
 
-  const selectedBalance = scopedBalances.find((b) => b.vendorId === selectedVendor);
+  const selectedBalance = scopedGameBalances.find((b) => b.gameId === selectedGameId);
   const confirmAmount = selectedBalance?.balance ?? 0;
-  const prepayVendor = selectedVendor ? getVendor(selectedVendor) : undefined;
+  const prepayGame = selectedGameId ? getGame(selectedGameId) : undefined;
 
-  // 公式中的「预付分成款」「历史已抵扣分成款」均取已保存值，不随未提交的表单输入变化
   const prepayPreview = useMemo(() => {
-    const prepayment = prepayVendor?.prepayment ?? 0;
-    const historical = prepayVendor?.historicalDeduction ?? 0;
-    const paidSum = selectedVendor ? sumVendorPaidActualAmount(selectedVendor, scopedPayments) : 0;
+    const prepayment = prepayGame?.prepayment ?? 0;
+    const historical = prepayGame?.historicalDeduction ?? 0;
+    const paidSum = selectedGameId ? sumGamePaidActualAmount(selectedGameId, scopedGamePayments) : 0;
     const deducted = calcDeductedPrepayment(prepayment, paidSum, historical);
     const remaining = calcRemainingUndeductedPrepayment(prepayment, deducted);
     return { deducted, remaining };
-  }, [prepayVendor, scopedPayments, selectedVendor]);
+  }, [prepayGame, scopedGamePayments, selectedGameId]);
 
   const confirmContent = useMemo(() => {
     const amountText = `申请付款金额：${formatMoney(confirmAmount)}元`;
@@ -94,15 +103,15 @@ export function VendorIncomePage() {
     };
   }, [confirmAmount, businessType, internalSettlementButtons]);
 
-  const openPrepayDrawer = (vendorId: string) => {
-    const vendor = getVendor(vendorId);
-    setSelectedVendor(vendorId);
+  const openPrepayDrawer = (gameId: string) => {
+    const game = getGame(gameId);
+    setSelectedGameId(gameId);
     setPrepayAmount(
-      vendor?.prepayment != null && !Number.isNaN(vendor.prepayment)
-        ? formatPrepayAmountInput(vendor.prepayment)
+      game?.prepayment != null && !Number.isNaN(game.prepayment)
+        ? formatPrepayAmountInput(game.prepayment)
         : '',
     );
-    setHistoricalAmount(formatPrepayAmountInput(vendor?.historicalDeduction ?? 0));
+    setHistoricalAmount(formatPrepayAmountInput(game?.historicalDeduction ?? 0));
     setPrepayErrors({});
     setPrepayOpen(true);
   };
@@ -129,7 +138,7 @@ export function VendorIncomePage() {
   };
 
   const savePrepay = () => {
-    if (!prepayVendor) return;
+    if (!prepayGame) return;
     const nextErrors: Record<string, string> = {};
     const prepaymentError = validatePrepayAmount(prepayAmount, '预付分成款');
     const historicalError = validatePrepayAmount(historicalAmount, '历史已抵扣分成款');
@@ -144,8 +153,8 @@ export function VendorIncomePage() {
     const historicalDeduction = parsePrepayAmount(historicalAmount);
     setPrepayAmount(formatPrepayAmountInput(prepayment));
     setHistoricalAmount(formatPrepayAmountInput(historicalDeduction));
-    updateVendor({
-      ...prepayVendor,
+    updateGame({
+      ...prepayGame,
       prepayment,
       historicalDeduction,
     });
@@ -153,19 +162,20 @@ export function VendorIncomePage() {
     setToast({ message: '保存成功', type: 'success' });
   };
 
-  const handleApply = (vendorId: string) => {
-    const vendor = scopedVendors.find((v) => v.id === vendorId);
-    const block = getApplyPaymentBlock(vendorId, vendor, scopedPayments);
+  const handleApply = (gameId: string) => {
+    const game = getGame(gameId);
+    const vendor = game ? getVendor(game.vendorId) : undefined;
+    const block = getApplyGamePaymentBlock(gameId, game, vendor, scopedGamePayments);
     if (block) {
-      setToast({ message: getApplyPaymentBlockMessage(block), type: 'error' });
+      setToast({ message: getApplyGamePaymentBlockMessage(block), type: 'error' });
       return;
     }
-    setSelectedVendor(vendorId);
+    setSelectedGameId(gameId);
     setConfirmOpen(true);
   };
 
   const confirmApply = () => {
-    const ok = applyPayment(selectedVendor);
+    const ok = applyGamePayment(selectedGameId);
     setConfirmOpen(false);
     setToast({
       message: ok ? '申请付款成功，账户余额已清零' : '账户余额不足，无法申请',
@@ -176,13 +186,13 @@ export function VendorIncomePage() {
   return (
     <div className="agf-card">
       <FilterBar>
-        <ListSearchFields mode="vendor" value={search} onChange={setSearch} />
+        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} hideVendorId />
       </FilterBar>
       <DataTable
-        rowKey={(r) => r.vendorId}
+        rowKey={(r) => r.gameId}
         data={rows}
         columns={[
-          { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
+          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.gameName} sub={r.gameId} /> },
           { key: 'vendorName', title: '厂商名称', render: (r) => r.vendorName },
           { key: 'accountTotal', title: '账户总收入', render: (r) => fmtSettlementAmount(r.accountTotalIncome) },
           { key: 'balance', title: '账户余额', render: (r) => fmtSettlementAmount(r.balance) },
@@ -204,11 +214,11 @@ export function VendorIncomePage() {
             title: '操作',
             render: (r) => (
               <div>
-                <button type="button" className="agf-btn agf-btn--link" onClick={() => openPrepayDrawer(r.vendorId)}>
+                <button type="button" className="agf-btn agf-btn--link" onClick={() => openPrepayDrawer(r.gameId)}>
                   预付分成管理
                 </button>
                 {r.balance > 0 && (
-                  <button type="button" className="agf-btn agf-btn--link" onClick={() => handleApply(r.vendorId)}>
+                  <button type="button" className="agf-btn agf-btn--link" onClick={() => handleApply(r.gameId)}>
                     申请付款
                   </button>
                 )}
@@ -229,10 +239,10 @@ export function VendorIncomePage() {
           </>
         )}
       >
-        {prepayVendor && (
+        {prepayGame && (
           <>
-            <ReadonlyField label="厂商ID" value={prepayVendor.id} />
-            <ReadonlyField label="厂商名称" value={prepayVendor.name} />
+            <ReadonlyField label="游戏ID" value={prepayGame.id} />
+            <ReadonlyField label="游戏名称" value={prepayGame.onlineName} />
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">预付分成款</label>
               <div className="agf-form-field">

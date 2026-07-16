@@ -1,5 +1,5 @@
-import type { PaymentRequest, SettlementRecord, Vendor } from '../data/types';
-import { calcVendorPrepaymentSummary } from './prepayment';
+import type { Game, GamePaymentRequest, PaymentRequest, SettlementRecord, Vendor } from '../data/types';
+import { calcGamePrepaymentSummary, calcVendorPrepaymentSummary } from './prepayment';
 
 function monthToIndex(incomeTime: string): number {
   const [y, m] = incomeTime.split('-').map(Number);
@@ -131,6 +131,24 @@ export function calcLetterPrepaymentDeduction(
     ? net
     : Math.round(vendorRemaining * 100) / 100;
   const remainingUndeducted = Math.round((vendorRemaining - deduction) * 100) / 100;
+  const payAmount = Math.round((net - deduction) * 100) / 100;
+  return { deduction, remainingUndeducted, payAmount };
+}
+
+/** 游戏维度结算函：⑤ 基于游戏「剩余未抵扣分成款」 */
+export function calcGameLetterPrepaymentDeduction(
+  game: Game | undefined,
+  gameId: string,
+  payments: GamePaymentRequest[],
+  incomeTotal: number,
+  refundTotal: number,
+): { deduction: number; remainingUndeducted: number; payAmount: number } {
+  const net = Math.round((incomeTotal - refundTotal) * 100) / 100;
+  const { remainingPrepayment: gameRemaining } = calcGamePrepaymentSummary(game, gameId, payments);
+  const deduction = gameRemaining - net > 0
+    ? net
+    : Math.round(gameRemaining * 100) / 100;
+  const remainingUndeducted = Math.round((gameRemaining - deduction) * 100) / 100;
   const payAmount = Math.round((net - deduction) * 100) / 100;
   return { deduction, remainingUndeducted, payAmount };
 }
