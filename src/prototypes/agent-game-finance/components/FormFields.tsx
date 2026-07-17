@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ContractCurrency } from '../data/types';
-import { currencySymbol } from '../utils/settlement';
+import { currencySymbol, formatMoney } from '../utils/settlement';
 
 export { currencySymbol };
 
@@ -32,6 +32,36 @@ export function FieldHint({ children }: { children: React.ReactNode }) {
 
 export function FormSectionTitle({ children }: { children: React.ReactNode }) {
   return <h4 className="agf-form-section-title">{children}</h4>;
+}
+
+/** 只读金额：左侧币种符号 + 右侧数值（与 CurrencyInput 前缀样式一致） */
+export function ReadonlyCurrencyField({
+  label,
+  amount,
+  currency,
+  unset,
+}: {
+  label: string;
+  amount: number;
+  currency: ContractCurrency;
+  /** 未填预付等场景显示 `-`，不带币种前缀 */
+  unset?: boolean;
+}) {
+  return (
+    <div className="agf-form-item agf-form-item--readonly">
+      <label className="agf-form-label">{label}</label>
+      <div className="agf-form-field">
+        {unset ? (
+          <div className="agf-form-readonly-value">-</div>
+        ) : (
+          <div className="agf-input-affix agf-input-affix--prefix">
+            <span className="agf-input-affix__prefix">{currencySymbol(currency)}</span>
+            <input className="agf-form-input" readOnly value={formatMoney(amount)} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** 复合型金额输入：左侧币种符号 + 右侧数字输入 */

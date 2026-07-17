@@ -4,6 +4,7 @@ export type OperationStatus = '未上线' | '已上线';
 export type CooperationStatus = '合作中' | '合作终止';
 export type LicenseStatus = '有' | '无';
 export type GamePayer = '4399' | '纯游' | '游乐' | '游戏之家' | '香港4399' | '游家时代';
+export type SharePaymentCompany = '4399' | '纯游' | '纯游（美元）' | '香港4399' | '游家时代';
 export type SettlementType = 'external' | 'internal' | 'refund';
 export type ChannelType = 'internal' | 'external';
 export type BusinessType = '4399' | '快爆';
@@ -16,7 +17,7 @@ export interface Vendor {
   phone: string;
   email: string;
   address: string;
-  /** 支持币种，默认人民币 */
+  /** 支付币种，默认人民币 */
   currency: ContractCurrency;
   invoiceInfo: string;
   accountName: string;
@@ -28,6 +29,12 @@ export interface Vendor {
   prepayment?: number;
   /** 历史已抵扣分成款（线下手动处理），默认 0 */
   historicalDeduction?: number;
+  /** 付费设置 — 分成付款公司 */
+  sharePaymentCompany?: SharePaymentCompany;
+  /** 付费设置 — 付款币种 */
+  sharePaymentCurrency?: ContractCurrency;
+  /** 付费设置 — 付款账号 */
+  sharePaymentAccount?: string;
 }
 
 export interface Game {
@@ -51,6 +58,12 @@ export interface Game {
   prepayment?: number;
   /** 历史已抵扣分成款（线下手动处理），默认 0 */
   historicalDeduction?: number;
+  /** 付费设置 — 分成付款公司 */
+  sharePaymentCompany?: SharePaymentCompany;
+  /** 付费设置 — 付款币种 */
+  sharePaymentCurrency?: ContractCurrency;
+  /** 付费设置 — 付款账号 */
+  sharePaymentAccount?: string;
 }
 
 export type ContractCurrency = '人民币' | '美金';
@@ -134,6 +147,36 @@ export interface GameBalance {
   totalRefund: number;
 }
 
+/** 标记已付款时冻结的结算函展示数据，之后不再随汇率/预付等外部数据变化 */
+export interface SettlementLetterSnapshot {
+  incomeRows: Array<{
+    id: string;
+    productName: string;
+    period: string;
+    revenue: number;
+    formula: string;
+    settlementAmount: number;
+  }>;
+  refundRows: Array<{
+    id: string;
+    productName: string;
+    period: string;
+    refundAmount: number;
+    formula: string;
+    settlementRefund: number;
+  }>;
+  incomeTotal: number;
+  refundTotal: number;
+  netTotal: number;
+  paymentCurrency: ContractCurrency;
+  showExchangeRate: boolean;
+  exchangeRate?: number;
+  showPrepaymentDeductionRows: boolean;
+  prepaidDeduction?: number;
+  remainingUndeducted?: number;
+  letterPayAmount: number;
+}
+
 export interface PaymentRequest {
   id: string;
   vendorId: string;
@@ -151,6 +194,8 @@ export interface PaymentRequest {
   remark?: string;
   /** 申请付款时标记为「已申请」的结算记录 ID */
   settlementIds?: string[];
+  /** 标记已付款时写入；打开结算函优先读此快照 */
+  letterSnapshot?: SettlementLetterSnapshot;
 }
 
 export interface GamePaymentRequest {
@@ -169,6 +214,18 @@ export interface GamePaymentRequest {
   invoice?: string;
   remark?: string;
   settlementIds?: string[];
+  /** 标记已付款时写入；打开结算函优先读此快照 */
+  letterSnapshot?: SettlementLetterSnapshot;
+}
+
+/** 月末（最后工作日）从外部接口同步的 USD/CNY 汇率；1 USD = rate 人民币 */
+export interface ExchangeRateRecord {
+  /** 汇率所属月份 YYYY-MM */
+  month: string;
+  /** 汇率值 */
+  rate: number;
+  /** 外部接口实际拉取日（该月最后工作日）YYYY-MM-DD */
+  fetchDate: string;
 }
 
 export type GameOperationLogAction = '添加游戏' | '运营状态' | '合作状态' | '合同变更';

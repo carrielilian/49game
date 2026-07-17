@@ -4,6 +4,7 @@ import {
   INITIAL_GAME_BALANCES,
   INITIAL_GAME_PAYMENTS,
   INITIAL_CONTRACTS,
+  INITIAL_EXCHANGE_RATES,
   INITIAL_FORMULA_LOGS,
   INITIAL_FORMULAS,
   INITIAL_GAME_LOGS,
@@ -28,6 +29,7 @@ import type {
   SettlementType,
   Vendor,
   VendorBalance,
+  ExchangeRateRecord,
 } from './types';
 import { deriveBalances, deriveGameBalances } from '../utils/balance';
 import { buildContractChangeDetail, emptyContract } from '../utils/contractLog';
@@ -91,6 +93,7 @@ interface AppState {
   gamePayments: GamePaymentRequest[];
   gameLogs: GameOperationLog[];
   formulaLogs: FormulaOperationLog[];
+  exchangeRates: ExchangeRateRecord[];
 }
 
 interface AppContextValue extends AppState {
@@ -209,7 +212,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         vendorId: id, balance: 0, accountTotalIncome: 0, prepayment: 0,
         deductedPrepayment: 0, remainingPrepayment: 0, totalIncome: 0, totalRefund: 0,
       }]);
-      return [...prev, { ...v, id, businessType, historicalDeduction: v.historicalDeduction ?? 0 }];
+      return [...prev, { ...v, id, businessType }];
     });
   }, [businessType]);
 
@@ -233,7 +236,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setGameLogs((logs) => [{
         id: genId('GL'), gameId: id, operator: '当前用户', time: formatDateTime(), action: '添加游戏',
       }, ...logs]);
-      return [{ ...g, id, createdAt: new Date().toISOString(), historicalDeduction: g.historicalDeduction ?? 0 }, ...prev];
+      return [{ ...g, id, createdAt: new Date().toISOString() }, ...prev];
     });
   }, [businessType, vendors]);
 
@@ -453,6 +456,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AppContextValue>(() => ({
     vendors, games, contracts, formulas, settlements, balances, gameBalances, payments, gamePayments, gameLogs, formulaLogs,
+    exchangeRates: INITIAL_EXCHANGE_RATES,
     businessType, setBusinessType,
     scopedVendors, scopedGames, scopedSettlements, scopedPayments, scopedBalances, scopedGamePayments, scopedGameBalances,
     getVendor, getGame, getVendorName, getGameName, addVendor, updateVendor, addGame, updateGame,

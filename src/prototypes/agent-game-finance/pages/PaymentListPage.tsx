@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DataTable } from '../components/DataTable';
+import { COL_ALIGN_RIGHT, DataTable } from '../components/DataTable';
 import { CurrencyInput, ReadonlyField, FieldError } from '../components/FormFields';
 import { FilterBar } from '../components/FilterBar';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
@@ -8,10 +8,11 @@ import { SettlementLetterDrawer } from '../components/SettlementLetterDrawer';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
 import type { PaymentRequest, Vendor } from '../data/types';
-import { PAYMENT_STATUS_FILTER_OPTIONS } from '../utils/columnFilters';
+import { GAME_PAYER_OPTIONS, PAYMENT_STATUS_FILTER_OPTIONS } from '../utils/columnFilters';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { formatCurrencyMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
+import { buildSettlementLetterSnapshot } from '../utils/settlementLetterSnapshot';
 import {
   formatOptionalAmountInput,
   formatCnyPaymentDisplay,
@@ -52,8 +53,13 @@ function validatePayAmount(value: string): string | undefined {
   return undefined;
 }
 
+function resolveMarkPayer(saved?: string): string {
+  if (saved && (GAME_PAYER_OPTIONS as readonly string[]).includes(saved)) return saved;
+  return '';
+}
+
 export function PaymentListPage() {
-  const { scopedPayments, getVendorName, getVendor, markPaid, updatePayment } = useAppStore();
+  const { scopedPayments, getVendorName, getVendor, markPaid, updatePayment, settlements, payments, gamePayments, exchangeRates, games, getGameName } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [statusFilter, setStatusFilter] = useState('');
   const [markOpen, setMarkOpen] = useState(false);
@@ -92,7 +98,7 @@ export function PaymentListPage() {
     const vendor = getVendor(p.vendorId);
     setCurrent(p);
     setForm({
-      payBank: p.payBank ?? '公司招商银行',
+      payBank: resolveMarkPayer(p.payBank),
       remark: p.remark ?? '',
       receiptInfo: p.receiptInfo ?? formatVendorReceiptInfo(vendor),
     });
@@ -151,7 +157,7 @@ export function PaymentListPage() {
     if (payErr) errors.payAmount = payErr;
     const usdErr = validateOptionalUsdAmount(payAmountUsd);
     if (usdErr) errors.payAmountUsd = usdErr;
-    if (!form.payBank.trim()) errors.payBank = '付款银行不能为空';
+    if (!form.payBank.trim()) errors.payBank = '付款方不能为空';
     if (!form.receiptInfo.trim()) errors.receiptInfo = '收款信息不能为空';
     setMarkErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -173,7 +179,26 @@ export function PaymentListPage() {
 
   const submitMarkPaid = () => {
     if (!current || !validateMarkForm()) return;
-    markPaid(current.id, buildMarkPayload());
+    const vendor = getVendor(current.vendorId);
+    const paymentCurrency = vendor?.sharePaymentCurrency ?? '人民币';
+    const letterPayAmountOverride = paymentCurrency === '美金'
+      ? (parseOptionalAmount(payAmountUsd) ?? 0)
+      : parsePayAmount(payAmount);
+    const letterSnapshot = buildSettlementLetterSnapshot({
+      vendorId: current.vendorId,
+      amount: current.pendingAmount,
+      settlementIds: current.settlementIds,
+      applyTime: current.applyTime,
+      vendor,
+      settlements,
+      payments,
+      gamePayments,
+      exchangeRates,
+      games,
+      getGameName,
+      letterPayAmountOverride,
+    });
+    markPaid(current.id, { ...buildMarkPayload(), letterSnapshot });
     setMarkOpen(false);
     setToast({ message: '已标记付款', type: 'success' });
   };
@@ -210,8 +235,8 @@ export function PaymentListPage() {
         columns={[
           { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
           { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
-          { key: 'pending', title: '待付款金额', render: (r) => fmtPaymentAmount(r.pendingAmount) },
-          { key: 'actual', title: '实际付款金额', render: (r) => r.actualAmount ? fmtPaymentAmount(r.actualAmount) : '-' },
+          { ...COL_ALIGN_RIGHT, key: 'pending', title: '待付款金额', render: (r) => fmtPaymentAmount(r.pendingAmount) },
+          { ...COL_ALIGN_RIGHT, key: 'actual', title: '实际付款金额', render: (r) => r.actualAmount ? fmtPaymentAmount(r.actualAmount) : '-' },
           {
             key: 'status',
             title: '付款状态',
@@ -277,16 +302,21 @@ export function PaymentListPage() {
           </div>
         </div>
         <div className="agf-form-item">
-          <label className="agf-form-label agf-form-label--required">付款银行</label>
+          <label className="agf-form-label agf-form-label--required">付款方</label>
           <div className="agf-form-field">
-            <input
+            <select
               className="agf-form-input"
               value={form.payBank}
               onChange={(e) => {
                 setForm({ ...form, payBank: e.target.value });
                 clearMarkError('payBank');
               }}
-            />
+            >
+              <option value="">请选择</option>
+              {GAME_PAYER_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
             <FieldError message={markErrors.payBank} />
           </div>
         </div>
@@ -319,7 +349,7 @@ export function PaymentListPage() {
         <ReadonlyField label="待付款金额" value={fmtPaymentAmount(current?.pendingAmount ?? 0)} />
         <ReadonlyField label="实际付款金额" value={formatCnyPaymentDisplay(current?.actualAmount)} />
         <ReadonlyField label="实际付款美金" value={formatUsdAmountDisplay(current?.actualAmountUsd)} />
-        <ReadonlyField label="付款银行" value={current?.payBank ?? '-'} />
+        <ReadonlyField label="付款方" value={current?.payBank ?? '-'} />
         <ReadonlyField label="收款信息" value={receiptInfoDisplay(current)} multiline />
         <div className="agf-form-item"><label className="agf-form-label">备注</label><textarea className="agf-form-textarea" value={detailRemark} onChange={(e) => setDetailRemark(e.target.value)} /></div>
       </Drawer>
@@ -349,7 +379,7 @@ export function PaymentListPage() {
           />
         </div>
       </Drawer>
-      {current && <SettlementLetterDrawer open={letterOpen} onClose={() => setLetterOpen(false)} vendorId={current.vendorId} amount={current.pendingAmount} settlementIds={current.settlementIds} />}
+      {current && <SettlementLetterDrawer open={letterOpen} onClose={() => setLetterOpen(false)} vendorId={current.vendorId} amount={current.pendingAmount} settlementIds={current.settlementIds} applyTime={current.applyTime} letterSnapshot={current.letterSnapshot} />}
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );

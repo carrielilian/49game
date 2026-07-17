@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { DataTable, DualCell } from '../components/DataTable';
+import { COL_ALIGN_RIGHT, DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
 import { StatusBadge } from '../components/StatusBadge';
@@ -186,8 +186,8 @@ export function InternalSettlementPage({ type }: Props) {
             },
             render: (r) => r.channel,
           },
-          { key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
-          { key: 'settleInc', title: incomeLabel, render: (r) => formatSettlementIncome(r) },
+          { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
+          { ...COL_ALIGN_RIGHT, key: 'settleInc', title: incomeLabel, render: (r) => formatSettlementIncome(r) },
           { key: 'formula', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
           { key: 'settleTime', title: '结算时间', render: (r) => formatSettlementTime(r) },
           {

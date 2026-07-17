@@ -16,7 +16,21 @@ export const INVOICE_INFO_FILTER_OPTIONS = selectOptions([
 ]);
 export const SETTLED_STATUS_FILTER_OPTIONS = selectOptions(['已结算', '待结算']);
 
-export const GAME_PAYER_FILTER_OPTIONS = selectOptions(['4399', '纯游', '游乐', '游戏之家', '香港4399', '游家时代']);
+export const GAME_PAYER_OPTIONS = ['4399', '纯游', '游乐', '游戏之家', '香港4399', '游家时代'] as const;
+export const GAME_PAYER_FILTER_OPTIONS = selectOptions(GAME_PAYER_OPTIONS);
+
+/** 付款设置 — 分成付款公司（与游戏管理「付款方」选项独立） */
+export const SHARE_PAYMENT_COMPANY_OPTIONS = [
+  '4399',
+  '纯游',
+  '纯游（美元）',
+  '香港4399',
+  '游家时代',
+] as const;
+
+export function isSharePaymentCompany(value: string): value is (typeof SHARE_PAYMENT_COMPANY_OPTIONS)[number] {
+  return (SHARE_PAYMENT_COMPANY_OPTIONS as readonly string[]).includes(value);
+}
 
 export function uniqueOptions(values: string[]) {
   return selectOptions([...new Set(values)].sort());

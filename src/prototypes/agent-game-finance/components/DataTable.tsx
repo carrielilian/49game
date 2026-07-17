@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import type { ContractCurrency } from '../data/types';
+import { currencySymbol, formatMoney } from '../utils/settlement';
 import { ColumnFilter, type ColumnFilterConfig } from './ColumnFilter';
 import { ColumnSort, type ColumnSortConfig } from './ColumnSort';
 import { DEFAULT_PAGE_SIZE, Pagination } from './Pagination';
@@ -9,8 +11,16 @@ export interface Column<T> {
   header?: React.ReactNode;
   render?: (row: T, index: number) => React.ReactNode;
   width?: string;
+  align?: 'left' | 'right';
   filter?: ColumnFilterConfig;
   sort?: ColumnSortConfig;
+}
+
+/** 列表金额列右对齐 */
+export const COL_ALIGN_RIGHT = { align: 'right' as const };
+
+function columnCellClass(align?: 'left' | 'right'): string | undefined {
+  return align === 'right' ? 'agf-table__cell--right' : undefined;
 }
 
 interface DataTableProps<T> {
@@ -18,6 +28,10 @@ interface DataTableProps<T> {
   data: T[];
   rowKey: (row: T) => string;
   emptyText?: string;
+  /** 固定首行（如查询总计），不参与分页 */
+  leadingRow?: React.ReactNode;
+  /** 固定末行（如查询总计），不参与分页 */
+  trailingRow?: React.ReactNode;
 }
 
 function TableEmptyState({ text }: { text: string }) {
@@ -36,7 +50,7 @@ function TableEmptyState({ text }: { text: string }) {
   );
 }
 
-export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据' }: DataTableProps<T>) {
+export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据', leadingRow, trailingRow }: DataTableProps<T>) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const prevLengthRef = useRef(data.length);
@@ -63,7 +77,11 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
           <thead>
             <tr>
               {columns.map((col) => (
-                <th key={col.key} style={col.width ? { width: col.width } : undefined}>
+                <th
+                  key={col.key}
+                  className={columnCellClass(col.align)}
+                  style={col.width ? { width: col.width } : undefined}
+                >
                   {col.header ?? (col.sort ? <ColumnSort title={col.title} sort={col.sort} />
                     : col.filter ? <ColumnFilter title={col.title} filter={col.filter} /> : col.title)}
                 </th>
@@ -78,15 +96,19 @@ export function DataTable<T>({ columns, data, rowKey, emptyText = '暂无数据'
                 </td>
               </tr>
             ) : (
-              pagedData.map((row, i) => (
-                <tr key={rowKey(row)}>
-                  {columns.map((col) => (
-                    <td key={col.key}>
-                      {col.render ? col.render(row, (safePage - 1) * pageSize + i) : String((row as Record<string, unknown>)[col.key] ?? '')}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              <>
+                {leadingRow}
+                {pagedData.map((row, i) => (
+                  <tr key={rowKey(row)}>
+                    {columns.map((col) => (
+                      <td key={col.key} className={columnCellClass(col.align)}>
+                        {col.render ? col.render(row, (safePage - 1) * pageSize + i) : String((row as Record<string, unknown>)[col.key] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                {trailingRow}
+              </>
             )}
           </tbody>
         </table>
@@ -129,4 +151,40 @@ export function TimeStackCell({ lines }: { lines: React.ReactNode[] }) {
       ))}
     </div>
   );
+}
+
+/** 单行金额：固定宽度币种符号 + 右对齐数字 */
+export function CurrencyAmount({ amount, currency }: { amount: number; currency: ContractCurrency }) {
+  return (
+    <span className="agf-currency-amount">
+      <span className="agf-currency-amount__symbol">{currencySymbol(currency)}</span>
+      <span className="agf-currency-amount__value">{formatMoney(amount)}</span>
+    </span>
+  );
+}
+
+/** 多币种金额上下堆叠：每行独立符号+数字，整体贴右 */
+export function CurrencyStackCell({ items }: { items: { amount: number; currency: ContractCurrency }[] }) {
+  return (
+    <div className="agf-currency-stack">
+      {items.map(({ amount, currency }) => (
+        <CurrencyAmount key={currency} amount={amount} currency={currency} />
+      ))}
+    </div>
+  );
+}
+
+const CURRENCY_TOTAL_ORDER: ContractCurrency[] = ['人民币', '美金'];
+
+/** 按币种汇总金额展示（查询总计行） */
+export function renderCurrencyTotals(
+  totalsByCurrency: Partial<Record<ContractCurrency, number>>,
+  emptyCurrency: ContractCurrency = '人民币',
+): React.ReactNode {
+  const lines = CURRENCY_TOTAL_ORDER
+    .map((currency) => ({ currency, amount: totalsByCurrency[currency] ?? 0 }))
+    .filter(({ amount }) => amount !== 0);
+  if (lines.length === 0) return <CurrencyAmount amount={0} currency={emptyCurrency} />;
+  if (lines.length === 1) return <CurrencyAmount amount={lines[0].amount} currency={lines[0].currency} />;
+  return <CurrencyStackCell items={lines} />;
 }

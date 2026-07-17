@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
-import { DataTable, DualCell, type Column } from '../components/DataTable';
+import { COL_ALIGN_RIGHT, DataTable, DualCell, type Column } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
 import { Modal, Toast, type ToastType } from '../components/Modal';
@@ -32,9 +32,10 @@ const IMPORT_PREVIEW_COLUMNS: Column<ImportPreviewRow>[] = [
     render: (r) => (r.gameId ? <DualCell main={r.gameName} sub={r.gameId} /> : r.gameName || '-'),
   },
   { key: 'vendorName', title: '厂商名称', render: (r) => r.vendorName || '-' },
-  { key: 'pendingAmount', title: '待结算金额', render: (r) => formatCurrencyMoney(r.pendingAmount, SETTLEMENT_CURRENCY) },
+  { ...COL_ALIGN_RIGHT, key: 'pendingAmount', title: '待结算金额', render: (r) => formatCurrencyMoney(r.pendingAmount, SETTLEMENT_CURRENCY) },
   { key: 'formulaText', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
   {
+    ...COL_ALIGN_RIGHT,
     key: 'settlementIncome',
     title: '结算收入',
     render: (r) => (
@@ -193,8 +194,8 @@ export function ExternalSettlementPage() {
             },
             render: (r) => r.channel,
           },
-          { key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
-          { key: 'settleInc', title: '结算收入', render: (r) => formatSettlementIncome(r) },
+          { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
+          { ...COL_ALIGN_RIGHT, key: 'settleInc', title: '结算收入', render: (r) => formatSettlementIncome(r) },
           { key: 'formula', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
           { key: 'settleTime', title: '结算时间', render: (r) => formatSettlementTime(r) },
           {

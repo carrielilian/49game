@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { DataTable, DualCell } from '../components/DataTable';
+import { COL_ALIGN_RIGHT, DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
-import { FieldError, FieldHint, ReadonlyField } from '../components/FormFields';
+import { CurrencyInput, FieldError, FieldHint, FormSectionTitle, ReadonlyCurrencyField, ReadonlyField } from '../components/FormFields';
+import type { ContractCurrency, SharePaymentCompany } from '../data/types';
+import { isSharePaymentCompany, SHARE_PAYMENT_COMPANY_OPTIONS } from '../utils/columnFilters';
 import { Drawer, Modal, Toast, type ToastType } from '../components/Modal';
 import { useAppStore } from '../data/store';
 import { ListSearchFields } from '../components/ListSearchFields';
@@ -26,6 +28,15 @@ function parsePrepayAmount(value: string): number {
   return Math.round(parseFloat(value.trim()) * 100) / 100;
 }
 
+function formatOptionalPrepayAmountInput(value?: number): string {
+  if (value == null || Number.isNaN(value)) return '';
+  return formatPrepayAmountInput(value);
+}
+
+function isPrepaymentUnset(prepayment?: number): boolean {
+  return prepayment == null || Number.isNaN(prepayment);
+}
+
 function validatePrepayAmount(value: string, label: string): string | undefined {
   const trimmed = value.trim();
   if (!trimmed) return `${label}不能为空`;
@@ -34,6 +45,13 @@ function validatePrepayAmount(value: string, label: string): string | undefined 
   if (Number.isNaN(n) || n < 0) return `${label}不能小于0`;
   return undefined;
 }
+
+const PAYMENT_CURRENCY_OPTIONS: ContractCurrency[] = ['人民币', '美金'];
+
+type PaymentSettingsErrors = Partial<Record<
+  'prepayment' | 'historicalDeduction' | 'sharePaymentCompany' | 'sharePaymentCurrency' | 'sharePaymentAccount',
+  string
+>>;
 
 export function GameIncomePage() {
   const {
@@ -55,14 +73,19 @@ export function GameIncomePage() {
   const [selectedGameId, setSelectedGameId] = useState('');
   const [prepayAmount, setPrepayAmount] = useState('');
   const [historicalAmount, setHistoricalAmount] = useState('');
-  const [prepayErrors, setPrepayErrors] = useState<Record<string, string>>({});
+  const [sharePaymentCompany, setSharePaymentCompany] = useState('');
+  const [sharePaymentCurrency, setSharePaymentCurrency] = useState<ContractCurrency | ''>('');
+  const [sharePaymentAccount, setSharePaymentAccount] = useState('');
+  const [prepayErrors, setPrepayErrors] = useState<PaymentSettingsErrors>({});
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const fmtSettlementAmount = (value: number) => formatCurrencyMoney(value, SETTLEMENT_CURRENCY);
+  const fmtPrepayAmount = (value: number, currency: ContractCurrency) => formatCurrencyMoney(value, currency);
 
   const rows = scopedGameBalances.map((b) => {
     const g = scopedGames.find((x) => x.id === b.gameId);
     const prepaymentUnset = g?.prepayment == null || Number.isNaN(g.prepayment);
+    const prepayCurrency = g ? (getVendor(g.vendorId)?.currency ?? '人民币') : '人民币';
     return {
       ...b,
       gameName: g ? getGameName(g.id) : b.gameId,
@@ -70,6 +93,7 @@ export function GameIncomePage() {
       vendorName: g ? getVendorName(g.vendorId) : '',
       prepaymentUnset,
       savedPrepayment: g?.prepayment,
+      prepayCurrency,
     };
   }).filter((r) => matchesListSearch(search, {
     gameId: r.gameId,
@@ -81,6 +105,11 @@ export function GameIncomePage() {
   const selectedBalance = scopedGameBalances.find((b) => b.gameId === selectedGameId);
   const confirmAmount = selectedBalance?.balance ?? 0;
   const prepayGame = selectedGameId ? getGame(selectedGameId) : undefined;
+  const prepayCurrency = prepayGame
+    ? (getVendor(prepayGame.vendorId)?.currency ?? '人民币')
+    : '人民币';
+
+  const prepaymentUnset = isPrepaymentUnset(prepayGame?.prepayment);
 
   const prepayPreview = useMemo(() => {
     const prepayment = prepayGame?.prepayment ?? 0;
@@ -106,12 +135,13 @@ export function GameIncomePage() {
   const openPrepayDrawer = (gameId: string) => {
     const game = getGame(gameId);
     setSelectedGameId(gameId);
-    setPrepayAmount(
-      game?.prepayment != null && !Number.isNaN(game.prepayment)
-        ? formatPrepayAmountInput(game.prepayment)
-        : '',
-    );
-    setHistoricalAmount(formatPrepayAmountInput(game?.historicalDeduction ?? 0));
+    setPrepayAmount(formatOptionalPrepayAmountInput(game?.prepayment));
+    setHistoricalAmount(formatOptionalPrepayAmountInput(game?.historicalDeduction));
+    const payerDefault =
+      game?.payer && isSharePaymentCompany(game.payer) ? game.payer : '';
+    setSharePaymentCompany(game?.sharePaymentCompany ?? payerDefault);
+    setSharePaymentCurrency(game?.sharePaymentCurrency ?? '人民币');
+    setSharePaymentAccount(game?.sharePaymentAccount ?? '');
     setPrepayErrors({});
     setPrepayOpen(true);
   };
@@ -139,11 +169,14 @@ export function GameIncomePage() {
 
   const savePrepay = () => {
     if (!prepayGame) return;
-    const nextErrors: Record<string, string> = {};
+    const nextErrors: PaymentSettingsErrors = {};
     const prepaymentError = validatePrepayAmount(prepayAmount, '预付分成款');
     const historicalError = validatePrepayAmount(historicalAmount, '历史已抵扣分成款');
     if (prepaymentError) nextErrors.prepayment = prepaymentError;
     if (historicalError) nextErrors.historicalDeduction = historicalError;
+    if (!sharePaymentCompany.trim()) nextErrors.sharePaymentCompany = '分成付款公司不能为空';
+    if (!sharePaymentCurrency) nextErrors.sharePaymentCurrency = '付款币种不能为空';
+    if (!sharePaymentAccount.trim()) nextErrors.sharePaymentAccount = '付款账号不能为空';
     if (Object.keys(nextErrors).length) {
       setPrepayErrors(nextErrors);
       setToast({ message: '请完善所有信息', type: 'error' });
@@ -157,6 +190,9 @@ export function GameIncomePage() {
       ...prepayGame,
       prepayment,
       historicalDeduction,
+      sharePaymentCompany: sharePaymentCompany as SharePaymentCompany,
+      sharePaymentCurrency,
+      sharePaymentAccount: sharePaymentAccount.trim(),
     });
     setPrepayOpen(false);
     setToast({ message: '保存成功', type: 'success' });
@@ -194,28 +230,29 @@ export function GameIncomePage() {
         columns={[
           { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.gameName} sub={r.gameId} /> },
           { key: 'vendorName', title: '厂商名称', render: (r) => r.vendorName },
-          { key: 'accountTotal', title: '账户总收入', render: (r) => fmtSettlementAmount(r.accountTotalIncome) },
-          { key: 'balance', title: '账户余额', render: (r) => fmtSettlementAmount(r.balance) },
+          { ...COL_ALIGN_RIGHT, key: 'balance', title: '账户余额', render: (r) => fmtSettlementAmount(r.balance) },
+          { ...COL_ALIGN_RIGHT, key: 'accountTotal', title: '账户总收入', render: (r) => fmtSettlementAmount(r.accountTotalIncome) },
           {
+            ...COL_ALIGN_RIGHT,
             key: 'prepay',
             title: '预付分成款',
             render: (r) => (
               r.prepaymentUnset
                 ? '-'
-                : fmtSettlementAmount(r.savedPrepayment ?? 0)
+                : fmtPrepayAmount(r.savedPrepayment ?? 0, r.prepayCurrency)
             ),
           },
-          { key: 'deducted', title: '已抵扣分成款', render: (r) => fmtSettlementAmount(r.deductedPrepayment) },
-          { key: 'remaining', title: '剩余未抵扣分成款', render: (r) => fmtSettlementAmount(r.remainingPrepayment) },
-          { key: 'income', title: '累计收入', render: (r) => fmtSettlementAmount(r.totalIncome) },
-          { key: 'refund', title: '累计退款', render: (r) => fmtSettlementAmount(r.totalRefund) },
+          { ...COL_ALIGN_RIGHT, key: 'deducted', title: '已抵扣分成款', render: (r) => (r.prepaymentUnset ? '-' : fmtPrepayAmount(r.deductedPrepayment, r.prepayCurrency)) },
+          { ...COL_ALIGN_RIGHT, key: 'remaining', title: '剩余未抵扣分成款', render: (r) => (r.prepaymentUnset ? '-' : fmtPrepayAmount(r.remainingPrepayment, r.prepayCurrency)) },
+          { ...COL_ALIGN_RIGHT, key: 'income', title: '累计收入', render: (r) => fmtSettlementAmount(r.totalIncome) },
+          { ...COL_ALIGN_RIGHT, key: 'refund', title: '累计退款', render: (r) => fmtSettlementAmount(r.totalRefund) },
           {
             key: 'ops',
             title: '操作',
             render: (r) => (
               <div>
                 <button type="button" className="agf-btn agf-btn--link" onClick={() => openPrepayDrawer(r.gameId)}>
-                  预付分成管理
+                  付款设置
                 </button>
                 {r.balance > 0 && (
                   <button type="button" className="agf-btn agf-btn--link" onClick={() => handleApply(r.gameId)}>
@@ -228,7 +265,7 @@ export function GameIncomePage() {
         ]}
       />
       <Drawer
-        title="预付分成管理"
+        title="付款设置"
         open={prepayOpen}
         onClose={() => setPrepayOpen(false)}
         large
@@ -243,18 +280,16 @@ export function GameIncomePage() {
           <>
             <ReadonlyField label="游戏ID" value={prepayGame.id} />
             <ReadonlyField label="游戏名称" value={prepayGame.onlineName} />
+            <FormSectionTitle>预付分成管理</FormSectionTitle>
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">预付分成款</label>
               <div className="agf-form-field">
-                <input
-                  className="agf-form-input"
+                <CurrencyInput
+                  currency={prepayCurrency}
                   value={prepayAmount}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) {
-                      setPrepayAmount(v);
-                      clearPrepayError('prepayment');
-                    }
+                  onChange={(v) => {
+                    setPrepayAmount(v);
+                    clearPrepayError('prepayment');
                   }}
                   onBlur={() => normalizePrepayAmount(prepayAmount, setPrepayAmount, 'prepayment', '预付分成款')}
                 />
@@ -264,15 +299,12 @@ export function GameIncomePage() {
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">历史已抵扣分成款</label>
               <div className="agf-form-field">
-                <input
-                  className="agf-form-input"
+                <CurrencyInput
+                  currency={prepayCurrency}
                   value={historicalAmount}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) {
-                      setHistoricalAmount(v);
-                      clearPrepayError('historicalDeduction');
-                    }
+                  onChange={(v) => {
+                    setHistoricalAmount(v);
+                    clearPrepayError('historicalDeduction');
                   }}
                   onBlur={() => normalizePrepayAmount(
                     historicalAmount,
@@ -285,8 +317,72 @@ export function GameIncomePage() {
                 <FieldError message={prepayErrors.historicalDeduction} />
               </div>
             </div>
-            <ReadonlyField label="已抵扣分成款" value={formatMoney(prepayPreview.deducted)} />
-            <ReadonlyField label="剩余未抵扣分成款" value={formatMoney(prepayPreview.remaining)} />
+            <ReadonlyCurrencyField
+              label="已抵扣分成款"
+              amount={prepayPreview.deducted}
+              currency={prepayCurrency}
+              unset={prepaymentUnset}
+            />
+            <ReadonlyCurrencyField
+              label="剩余未抵扣分成款"
+              amount={prepayPreview.remaining}
+              currency={prepayCurrency}
+              unset={prepaymentUnset}
+            />
+            <FormSectionTitle>付费设置</FormSectionTitle>
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">分成付款公司</label>
+              <div className="agf-form-field">
+                <select
+                  className="agf-form-input"
+                  value={sharePaymentCompany}
+                  onChange={(e) => {
+                    setSharePaymentCompany(e.target.value);
+                    clearPrepayError('sharePaymentCompany');
+                  }}
+                >
+                  <option value="">请选择</option>
+                  {SHARE_PAYMENT_COMPANY_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+                <FieldError message={prepayErrors.sharePaymentCompany} />
+              </div>
+            </div>
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">付款币种</label>
+              <div className="agf-radio-group">
+                {PAYMENT_CURRENCY_OPTIONS.map((currency) => (
+                  <label key={currency} className="agf-radio-item">
+                    <input
+                      type="radio"
+                      name="sharePaymentCurrency"
+                      checked={sharePaymentCurrency === currency}
+                      onChange={() => {
+                        setSharePaymentCurrency(currency);
+                        clearPrepayError('sharePaymentCurrency');
+                      }}
+                    />
+                    {currency}
+                  </label>
+                ))}
+              </div>
+              <FieldError message={prepayErrors.sharePaymentCurrency} />
+            </div>
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">付款账号</label>
+              <div className="agf-form-field">
+                <input
+                  className="agf-form-input"
+                  value={sharePaymentAccount}
+                  onChange={(e) => {
+                    setSharePaymentAccount(e.target.value);
+                    clearPrepayError('sharePaymentAccount');
+                  }}
+                />
+                <FieldError message={prepayErrors.sharePaymentAccount} />
+              </div>
+            </div>
           </>
         )}
       </Drawer>

@@ -1,18 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { DataTable, DualCell } from '../components/DataTable';
+import { COL_ALIGN_RIGHT, DataTable, DualCell, renderCurrencyTotals } from '../components/DataTable';
 import { CurrencyInput, FieldError, FieldHint, ReadonlyField } from '../components/FormFields';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { StatusBadge } from '../components/StatusBadge';
 import { SupportChannelsDrawer } from '../components/SupportChannelsDrawer';
 import { useAppStore } from '../data/store';
-import type { Contract, CooperationContent, Game, GameOperationLog, GamePayer } from '../data/types';
+import type { Contract, ContractCurrency, CooperationContent, Game, GameOperationLog, GamePayer } from '../data/types';
 import {
+  GAME_PAYER_OPTIONS,
   OPERATION_STATUS_FILTER_OPTIONS,
   GAME_PAYER_FILTER_OPTIONS,
 } from '../utils/columnFilters';
 import { formatPaidDisplay, getPaidAmount } from '../utils/contractLog';
-import { formatCurrencyMoney } from '../utils/settlement';
+import { downloadCsv } from '../utils/listExport';
+import { formatCurrencyMoney, formatDateTime } from '../utils/settlement';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 
@@ -72,8 +74,6 @@ const EMPTY_GAME: Omit<Game, 'id' | 'createdAt'> = {
   launchDate: '', operationStatus: '未上线', cooperationStatus: '合作中',
 };
 
-const GAME_PAYER_OPTIONS: GamePayer[] = ['4399', '纯游', '游乐', '游戏之家', '香港4399', '游家时代'];
-
 type GameFormData = Omit<Game, 'id' | 'createdAt'>;
 
 const ADD_GAME_REQUIRED: { key: keyof GameFormData; label: string }[] = [
@@ -81,12 +81,16 @@ const ADD_GAME_REQUIRED: { key: keyof GameFormData; label: string }[] = [
   { key: 'name', label: '合同游戏名称' },
   { key: 'vendorId', label: '归属厂商' },
   { key: 'payer', label: '付款方' },
+  { key: 'license', label: '版号' },
+  { key: 'operationStatus', label: '运营状态' },
 ];
 
 const EDIT_GAME_REQUIRED: { key: keyof GameFormData; label: string }[] = [
   { key: 'onlineName', label: '游戏名称' },
   { key: 'name', label: '合同游戏名称' },
   { key: 'payer', label: '付款方' },
+  { key: 'license', label: '版号' },
+  { key: 'operationStatus', label: '运营状态' },
 ];
 
 type FieldErrors = Record<string, string>;
@@ -119,6 +123,64 @@ const PAID_SORT_META: Record<PaidSortKey, { content: CooperationContent }> = {
   paidPrepayment: { content: '预付分成款' },
   paidDevelopmentFee: { content: '委托开发费' },
 };
+
+const AMOUNT_CELL = 'agf-table__cell--right';
+
+const GAME_LIST_EXPORT_HEADERS = [
+  '付款方',
+  '游戏ID / 游戏名称',
+  '合同游戏名称',
+  '厂商ID',
+  '厂商名称',
+  '已付游戏代理金',
+  '已付预付分成款',
+  '已付委托开发费',
+  '运营状态',
+] as const;
+
+function sumPaidByCurrency(
+  games: Game[],
+  contractByGameId: Map<string, Contract>,
+  key: PaidSortKey,
+  content: CooperationContent,
+  getVendorCurrency: (vendorId: string) => ContractCurrency,
+): Partial<Record<ContractCurrency, number>> {
+  const totals: Partial<Record<ContractCurrency, number>> = {};
+  for (const game of games) {
+    const amount = getPaidAmount(contractByGameId.get(game.id), key, content);
+    if (!amount) continue;
+    const currency = getVendorCurrency(game.vendorId);
+    totals[currency] = (totals[currency] ?? 0) + amount;
+  }
+  return totals;
+}
+
+function buildGameListSummaryRow(
+  games: Game[],
+  contractByGameId: Map<string, Contract>,
+  getVendorCurrency: (vendorId: string) => ContractCurrency,
+): React.ReactNode {
+  return (
+    <tr className="agf-table__summary-row">
+      <td>查询总计</td>
+      <td />
+      <td />
+      <td />
+      <td />
+      <td className={AMOUNT_CELL}>
+        {renderCurrencyTotals(sumPaidByCurrency(games, contractByGameId, 'paidAgencyFee', '游戏代理金', getVendorCurrency))}
+      </td>
+      <td className={AMOUNT_CELL}>
+        {renderCurrencyTotals(sumPaidByCurrency(games, contractByGameId, 'paidPrepayment', '预付分成款', getVendorCurrency))}
+      </td>
+      <td className={AMOUNT_CELL}>
+        {renderCurrencyTotals(sumPaidByCurrency(games, contractByGameId, 'paidDevelopmentFee', '委托开发费', getVendorCurrency))}
+      </td>
+      <td />
+      <td />
+    </tr>
+  );
+}
 
 function GameNameFields({ form, set, errors }: {
   form: GameFormData;
@@ -181,16 +243,26 @@ function ManagerField({ form, set, errors }: {
   );
 }
 
-function LicenseField({ form, setForm, name }: {
+function LicenseField({ form, setForm, name, error, clearError }: {
   form: GameFormData;
   setForm: React.Dispatch<React.SetStateAction<GameFormData>>;
   name: string;
+  error?: string;
+  clearError: () => void;
 }) {
+  const setLicense = (license: GameFormData['license']) => {
+    clearError();
+    setForm({ ...form, license });
+  };
   return (
-    <div className="agf-form-item"><label className="agf-form-label">版号</label>
-      <div className="agf-radio-group">
-        <label className="agf-radio-item"><input type="radio" name={name} checked={form.license === '有'} onChange={() => setForm({ ...form, license: '有' })} />有</label>
-        <label className="agf-radio-item"><input type="radio" name={name} checked={form.license === '无'} onChange={() => setForm({ ...form, license: '无' })} />无</label>
+    <div className="agf-form-item">
+      <label className="agf-form-label agf-form-label--required">版号</label>
+      <div className="agf-form-field">
+        <div className="agf-radio-group">
+          <label className="agf-radio-item"><input type="radio" name={name} checked={form.license === '有'} onChange={() => setLicense('有')} />有</label>
+          <label className="agf-radio-item"><input type="radio" name={name} checked={form.license === '无'} onChange={() => setLicense('无')} />无</label>
+        </div>
+        <FieldError message={error} />
       </div>
     </div>
   );
@@ -228,11 +300,21 @@ function AddGameForm({ form, setForm, vendors, errors, clearError }: {
         }}
       />
       <ManagerField form={form} set={set} errors={errors} />
-      <LicenseField form={form} setForm={setForm} name="license" />
-      <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
-        <div className="agf-radio-group">
-          <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => setForm({ ...form, operationStatus: '未上线' })} />未上线</label>
-          <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '已上线'} onChange={() => setForm({ ...form, operationStatus: '已上线' })} />已上线</label>
+      <LicenseField
+        form={form}
+        setForm={setForm}
+        name="license"
+        error={errors.license}
+        clearError={() => clearError('license')}
+      />
+      <div className="agf-form-item">
+        <label className="agf-form-label agf-form-label--required">运营状态</label>
+        <div className="agf-form-field">
+          <div className="agf-radio-group">
+            <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '未上线' }); }} />未上线</label>
+            <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '已上线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '已上线' }); }} />已上线</label>
+          </div>
+          <FieldError message={errors.operationStatus} />
         </div>
       </div>
       <div className="agf-form-item"><label className="agf-form-label">备注</label><textarea className="agf-form-textarea" value={form.remark ?? ''} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></div>
@@ -266,11 +348,21 @@ function EditGameForm({ form, setForm, editing, getVendorName, errors, clearErro
         }}
       />
       <ManagerField form={form} set={set} errors={errors} />
-      <LicenseField form={form} setForm={setForm} name="edit-license" />
-      <div className="agf-form-item"><label className="agf-form-label">运营状态</label>
-        <div className="agf-radio-group">
-          <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => setForm({ ...form, operationStatus: '未上线' })} />未上线</label>
-          <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '已上线'} onChange={() => setForm({ ...form, operationStatus: '已上线' })} />已上线</label>
+      <LicenseField
+        form={form}
+        setForm={setForm}
+        name="edit-license"
+        error={errors.license}
+        clearError={() => clearError('license')}
+      />
+      <div className="agf-form-item">
+        <label className="agf-form-label agf-form-label--required">运营状态</label>
+        <div className="agf-form-field">
+          <div className="agf-radio-group">
+            <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '未上线' }); }} />未上线</label>
+            <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '已上线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '已上线' }); }} />已上线</label>
+          </div>
+          <FieldError message={errors.operationStatus} />
         </div>
       </div>
       <div className="agf-form-item"><label className="agf-form-label">备注</label><textarea className="agf-form-textarea" value={form.remark ?? ''} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></div>
@@ -355,12 +447,38 @@ export function GameListPage() {
     return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [filtered, sortKey, sortOrder, contractByGameId]);
 
-  const renderPaidCell = (game: Game, key: PaidSortKey, content: CooperationContent) => {
+  const getPaidCellText = (game: Game, key: PaidSortKey, content: CooperationContent): string => {
     const c = contractByGameId.get(game.id);
     const text = c ? formatPaidDisplay(c, key, content) : '-';
     if (text === '-') return '-';
     const currency = getVendor(game.vendorId)?.currency ?? '人民币';
     return formatCurrencyMoney(parseFloat(text), currency);
+  };
+
+  const renderPaidCell = (game: Game, key: PaidSortKey, content: CooperationContent) =>
+    getPaidCellText(game, key, content);
+
+  const getVendorCurrency = (vendorId: string): ContractCurrency =>
+    getVendor(vendorId)?.currency ?? '人民币';
+
+  const trailingRow = tableData.length > 0
+    ? buildGameListSummaryRow(tableData, contractByGameId, getVendorCurrency)
+    : undefined;
+
+  const handleExport = () => {
+    const rows = tableData.map((g) => [
+      g.payer ?? '-',
+      `${g.id} / ${g.onlineName}`,
+      g.name,
+      g.vendorId,
+      getVendorName(g.vendorId),
+      getPaidCellText(g, 'paidAgencyFee', '游戏代理金'),
+      getPaidCellText(g, 'paidPrepayment', '预付分成款'),
+      getPaidCellText(g, 'paidDevelopmentFee', '委托开发费'),
+      g.operationStatus,
+    ]);
+    downloadCsv(`游戏管理-${formatDateTime().slice(0, 10)}.csv`, [...GAME_LIST_EXPORT_HEADERS], rows);
+    setToast({ message: '导出成功', type: 'success' });
   };
 
   const paidSortConfig = (key: PaidSortKey) => ({
@@ -471,6 +589,10 @@ export function GameListPage() {
       if (err) nextErrors[key] = err;
     }
 
+    if (!contractForm.cooperationStatus) {
+      nextErrors.cooperationStatus = '合作状态不能为空';
+    }
+
     if (Object.keys(nextErrors).length) {
       setContractErrors(nextErrors);
       showIncompleteToast();
@@ -520,10 +642,12 @@ export function GameListPage() {
         actions={<button type="button" className="agf-btn agf-btn--primary" onClick={openAdd}>添加游戏</button>}
       >
         <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} showContractName />
+        <button type="button" className="agf-btn agf-btn--primary" onClick={handleExport}>导出</button>
       </FilterBar>
       <DataTable
         rowKey={(r) => r.id}
         data={tableData}
+        trailingRow={trailingRow}
         columns={[
           {
             key: 'payer',
@@ -541,18 +665,21 @@ export function GameListPage() {
           { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
           { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
           {
+            ...COL_ALIGN_RIGHT,
             key: 'paidAgencyFee',
             title: '已付游戏代理金',
             sort: paidSortConfig('paidAgencyFee'),
             render: (r) => renderPaidCell(r, 'paidAgencyFee', '游戏代理金'),
           },
           {
+            ...COL_ALIGN_RIGHT,
             key: 'paidPrepayment',
             title: '已付预付分成款',
             sort: paidSortConfig('paidPrepayment'),
             render: (r) => renderPaidCell(r, 'paidPrepayment', '预付分成款'),
           },
           {
+            ...COL_ALIGN_RIGHT,
             key: 'paidDevelopmentFee',
             title: '已付委托开发费',
             sort: paidSortConfig('paidDevelopmentFee'),
@@ -674,10 +801,14 @@ export function GameListPage() {
                 onChange={(e) => setContractForm({ ...contractForm, supplementalNote: e.target.value })}
               />
             </div>
-            <div className="agf-form-item"><label className="agf-form-label">合作状态</label>
-              <div className="agf-radio-group">
-                <label className="agf-radio-item"><input type="radio" name="contract-cooperationStatus" checked={contractForm.cooperationStatus === '合作中'} onChange={() => setContractForm({ ...contractForm, cooperationStatus: '合作中' })} />合作中</label>
-                <label className="agf-radio-item"><input type="radio" name="contract-cooperationStatus" checked={contractForm.cooperationStatus === '合作终止'} onChange={() => setContractForm({ ...contractForm, cooperationStatus: '合作终止' })} />合作终止</label>
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">合作状态</label>
+              <div className="agf-form-field">
+                <div className="agf-radio-group">
+                  <label className="agf-radio-item"><input type="radio" name="contract-cooperationStatus" checked={contractForm.cooperationStatus === '合作中'} onChange={() => { clearContractError('cooperationStatus'); setContractForm({ ...contractForm, cooperationStatus: '合作中' }); }} />合作中</label>
+                  <label className="agf-radio-item"><input type="radio" name="contract-cooperationStatus" checked={contractForm.cooperationStatus === '合作终止'} onChange={() => { clearContractError('cooperationStatus'); setContractForm({ ...contractForm, cooperationStatus: '合作终止' }); }} />合作终止</label>
+                </div>
+                <FieldError message={contractErrors.cooperationStatus} />
               </div>
             </div>
           </>

@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
-import { DataTable, DualCell } from '../components/DataTable';
+import React, { useEffect, useMemo, useState } from 'react';
+import { COL_ALIGN_RIGHT, CurrencyAmount, DataTable, DualCell, renderCurrencyTotals } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { useAppStore } from '../data/store';
+import { EXTERNAL_CHANNELS, INTERNAL_CHANNELS } from '../data/mock-data';
 import type { Contract, ContractCurrency, Game, GamePaymentRequest, SettlementRecord, Vendor } from '../data/types';
 import { calcContractPaymentTotal } from '../utils/contractLog';
+import { selectOptions } from '../utils/columnFilters';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { getSampleMonthRange, isMonthInRange } from '../utils/monthRange';
 import { isPaidPayment } from '../utils/payment';
@@ -121,13 +123,77 @@ function attachSettlementPaymentAmount(
   });
 }
 
-function formatPaymentAmount(amount: number, currency: ContractCurrency): string {
-  return formatCurrencyMoney(amount, currency);
+function formatPaymentAmount(amount: number, currency: ContractCurrency): React.ReactNode {
+  return <CurrencyAmount amount={amount} currency={currency} />;
 }
 
 const SETTLEMENT_AMOUNT = (value: number) => formatCurrencyMoney(value, SETTLEMENT_CURRENCY);
 
+interface SummaryTotals {
+  paymentByCurrency: Partial<Record<ContractCurrency, number>>;
+  totalRevenue: number;
+  settlementPaymentAmount: number;
+}
+
+function computeSummaryTotals(rows: SummaryRow[]): SummaryTotals {
+  const paymentByCurrency: Partial<Record<ContractCurrency, number>> = {};
+  let totalRevenue = 0;
+  let settlementPaymentAmount = 0;
+  for (const row of rows) {
+    paymentByCurrency[row.paymentCurrency] = (paymentByCurrency[row.paymentCurrency] ?? 0) + row.paymentAmount;
+    totalRevenue += row.totalRevenue;
+    settlementPaymentAmount += row.settlementPaymentAmount;
+  }
+  return { paymentByCurrency, totalRevenue, settlementPaymentAmount };
+}
+
+function renderPaymentTotal(paymentByCurrency: Partial<Record<ContractCurrency, number>>): React.ReactNode {
+  return renderCurrencyTotals(paymentByCurrency);
+}
+
+const AMOUNT_CELL = 'agf-table__cell--right';
+
+function buildSummaryLeadingRow(dimension: QueryDimension, totals: SummaryTotals): React.ReactNode {
+  const paymentCell = renderPaymentTotal(totals.paymentByCurrency);
+  const revenueCell = SETTLEMENT_AMOUNT(totals.totalRevenue);
+  const settlementCell = SETTLEMENT_AMOUNT(totals.settlementPaymentAmount);
+
+  if (dimension === 'game') {
+    return (
+      <tr className="agf-table__summary-row">
+        <td>查询总计</td>
+        <td />
+        <td className={AMOUNT_CELL}>{paymentCell}</td>
+        <td className={AMOUNT_CELL}>{revenueCell}</td>
+        <td className={AMOUNT_CELL}>{settlementCell}</td>
+      </tr>
+    );
+  }
+  if (dimension === 'channel') {
+    return (
+      <tr className="agf-table__summary-row">
+        <td>查询总计</td>
+        <td />
+        <td className={AMOUNT_CELL}>{paymentCell}</td>
+        <td className={AMOUNT_CELL}>{revenueCell}</td>
+        <td className={AMOUNT_CELL}>{settlementCell}</td>
+      </tr>
+    );
+  }
+  return (
+    <tr className="agf-table__summary-row">
+      <td>查询总计</td>
+      <td />
+      <td />
+      <td className={AMOUNT_CELL}>{paymentCell}</td>
+      <td className={AMOUNT_CELL}>{revenueCell}</td>
+      <td className={AMOUNT_CELL}>{settlementCell}</td>
+    </tr>
+  );
+}
+
 const PAYMENT_COLUMN = {
+  ...COL_ALIGN_RIGHT,
   key: 'paymentAmount',
   title: '支付金额',
   render: (r: SummaryRow) => formatPaymentAmount(r.paymentAmount, r.paymentCurrency),
@@ -208,7 +274,10 @@ const DIMENSION_OPTIONS: { value: QueryDimension; label: string }[] = [
   { value: 'vendor', label: '厂商' },
 ];
 
+const REVENUE_CHANNEL_FILTER_OPTIONS = selectOptions([...INTERNAL_CHANNELS, ...EXTERNAL_CHANNELS]);
+
 const SETTLEMENT_PAYMENT_COLUMN = {
+  ...COL_ALIGN_RIGHT,
   key: 'settlementPaymentAmount',
   title: '结算付款金额',
   render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.settlementPaymentAmount),
@@ -219,13 +288,18 @@ export function RevenueSummaryPage() {
   const [dimension, setDimension] = useState<QueryDimension>('game');
   const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
+  const [channelFilter, setChannelFilter] = useState('');
+
+  useEffect(() => {
+    setChannelFilter('');
+  }, [dimension]);
 
   const contractMap = useMemo(
     () => new Map(contracts.map((c) => [c.gameId, c])),
     [contracts],
   );
 
-  const rows = useMemo(() => {
+  const allRows = useMemo(() => {
     const base = buildSummaryRows(
       scopedSettlements,
       dimension,
@@ -247,28 +321,46 @@ export function RevenueSummaryPage() {
     return attachPaymentAmount(withSettlementPayment, dimension, contractMap, getGame, getVendor);
   }, [scopedSettlements, scopedGamePayments, dimension, monthRange, search, getVendorName, getGameName, contractMap, getGame, getVendor]);
 
+  const rows = useMemo(() => {
+    if (dimension !== 'channel' || !channelFilter) return allRows;
+    return allRows.filter((row) => row.channel === channelFilter);
+  }, [allRows, dimension, channelFilter]);
+
+  const summaryTotals = useMemo(() => computeSummaryTotals(rows), [rows]);
+  const leadingRow = rows.length > 0 ? buildSummaryLeadingRow(dimension, summaryTotals) : undefined;
+
   const columns = dimension === 'game'
     ? [
         { key: 'time', title: '时间', render: (r: SummaryRow) => r.time },
         { key: 'game', title: '游戏ID / 游戏名称', render: (r: SummaryRow) => <DualCell main={r.gameName!} sub={r.gameId!} /> },
         PAYMENT_COLUMN,
-        { key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
+        { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
         SETTLEMENT_PAYMENT_COLUMN,
       ]
     : dimension === 'channel'
       ? [
           { key: 'time', title: '时间', render: (r: SummaryRow) => r.time },
-          { key: 'channel', title: '渠道', render: (r: SummaryRow) => r.channel },
+          {
+            key: 'channel',
+            title: '渠道',
+            filter: {
+              type: 'select' as const,
+              value: channelFilter,
+              onChange: setChannelFilter,
+              options: REVENUE_CHANNEL_FILTER_OPTIONS,
+            },
+            render: (r: SummaryRow) => r.channel,
+          },
           PAYMENT_COLUMN,
-          { key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
+          { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
           SETTLEMENT_PAYMENT_COLUMN,
         ]
       : [
           { key: 'time', title: '时间', render: (r: SummaryRow) => r.time },
           { key: 'vendorId', title: '厂商ID', render: (r: SummaryRow) => r.vendorId },
-          PAYMENT_COLUMN,
           { key: 'vendorName', title: '厂商名称', render: (r: SummaryRow) => r.vendorName },
-          { key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
+          PAYMENT_COLUMN,
+          { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
           SETTLEMENT_PAYMENT_COLUMN,
         ];
 
@@ -288,7 +380,7 @@ export function RevenueSummaryPage() {
         <MonthRangePicker value={monthRange} onChange={setMonthRange} />
         <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
       </FilterBar>
-      <DataTable key={dimension} rowKey={(r) => r.id} data={rows} columns={columns} />
+      <DataTable key={dimension} rowKey={(r) => r.id} data={rows} columns={columns} leadingRow={leadingRow} />
     </div>
   );
 }

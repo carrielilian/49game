@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DataTable, DualCell, TimeStackCell, TimeStackHeader } from '../components/DataTable';
+import { COL_ALIGN_RIGHT, DataTable, DualCell, TimeStackCell, TimeStackHeader } from '../components/DataTable';
 import { CurrencyInput, ReadonlyField, FieldError } from '../components/FormFields';
 import { FilterBar } from '../components/FilterBar';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
@@ -7,11 +7,15 @@ import { MockFileUpload, mockFileFromName, type MockFileItem } from '../componen
 import { SettlementLetterDrawer } from '../components/SettlementLetterDrawer';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
-import type { GamePaymentRequest, Vendor } from '../data/types';
+import type { Game, GamePaymentRequest, Vendor } from '../data/types';
 import { PAYMENT_STATUS_FILTER_OPTIONS } from '../utils/columnFilters';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { formatCurrencyMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
+import { calcGamePrepaymentSummary } from '../utils/prepayment';
+import { resolveGameMarkPaymentDefaults } from '../utils/gamePaymentMarkDefaults';
+import { getExchangeRateByApplyTime } from '../utils/exchangeRate';
+import { buildSettlementLetterSnapshot } from '../utils/settlementLetterSnapshot';
 import {
   formatOptionalAmountInput,
   formatCnyPaymentDisplay,
@@ -22,8 +26,11 @@ import {
   validateOptionalUsdAmount,
 } from '../utils/payment';
 
-type MarkFormErrors = Partial<Record<'payAmount' | 'payAmountUsd' | 'payBank' | 'receiptInfo', string>>;
+type MarkFormErrors = Partial<Record<'payAmount' | 'payAmountUsd' | 'sharePaymentCompany' | 'receiptInfo', string>>;
 
+function resolveGameSharePaymentCompany(game?: Game): string {
+  return game?.sharePaymentCompany ?? '';
+}
 function formatVendorReceiptInfo(vendor?: Vendor): string {
   if (!vendor) return '';
   return [
@@ -48,7 +55,7 @@ function validatePayAmount(value: string): string | undefined {
   if (!trimmed) return '实际付款金额不能为空';
   if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return '实际付款金额精确至小数点后两位';
   const n = parseFloat(trimmed);
-  if (Number.isNaN(n) || n <= 0) return '实际付款金额必须大于0';
+  if (Number.isNaN(n) || n < 0) return '实际付款金额不能小于0';
   return undefined;
 }
 
@@ -61,6 +68,11 @@ export function GamePaymentListPage() {
     getVendorName,
     markGamePaid,
     updateGamePayment,
+    gamePayments,
+    exchangeRates,
+    settlements,
+    games,
+    payments,
   } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [statusFilter, setStatusFilter] = useState('');
@@ -69,7 +81,7 @@ export function GamePaymentListPage() {
   const [letterOpen, setLetterOpen] = useState(false);
   const [voucherOpen, setVoucherOpen] = useState(false);
   const [current, setCurrent] = useState<GamePaymentRequest | null>(null);
-  const [form, setForm] = useState({ payBank: '', remark: '', receiptInfo: '' });
+  const [form, setForm] = useState({ remark: '', receiptInfo: '' });
   const [payAmount, setPayAmount] = useState('');
   const [payAmountUsd, setPayAmountUsd] = useState('');
   const [markErrors, setMarkErrors] = useState<MarkFormErrors>({});
@@ -105,14 +117,22 @@ export function GamePaymentListPage() {
   const openMark = (p: GamePaymentRequest) => {
     const game = getGame(p.gameId);
     const vendor = game ? getVendor(game.vendorId) : undefined;
+    const { remainingPrepayment } = calcGamePrepaymentSummary(game, p.gameId, gamePayments);
+    const exchangeRate = getExchangeRateByApplyTime(p.applyTime, exchangeRates) ?? 7.21;
+    const defaults = resolveGameMarkPaymentDefaults(
+      p.pendingAmount,
+      game,
+      vendor,
+      remainingPrepayment,
+      exchangeRate,
+    );
     setCurrent(p);
     setForm({
-      payBank: p.payBank ?? '公司招商银行',
       remark: p.remark ?? '',
       receiptInfo: p.receiptInfo ?? formatVendorReceiptInfo(vendor),
     });
-    setPayAmount(formatPayAmountInput(p.actualAmount ?? p.pendingAmount));
-    setPayAmountUsd(formatOptionalAmountInput(p.actualAmountUsd));
+    setPayAmount(formatPayAmountInput(defaults.actualAmount));
+    setPayAmountUsd(formatOptionalAmountInput(defaults.actualAmountUsd));
     setMarkErrors({});
     setMarkOpen(true);
   };
@@ -131,13 +151,16 @@ export function GamePaymentListPage() {
     setVoucherOpen(true);
   };
 
-  const buildMarkPayload = () => ({
-    payBank: form.payBank,
-    receiptInfo: form.receiptInfo.trim(),
-    remark: form.remark,
-    actualAmount: parsePayAmount(payAmount),
-    actualAmountUsd: parseOptionalAmount(payAmountUsd),
-  });
+  const buildMarkPayload = () => {
+    const game = current ? getGame(current.gameId) : undefined;
+    return {
+      payBank: resolveGameSharePaymentCompany(game),
+      receiptInfo: form.receiptInfo.trim(),
+      remark: form.remark,
+      actualAmount: parsePayAmount(payAmount),
+      actualAmountUsd: parseOptionalAmount(payAmountUsd),
+    };
+  };
 
   const normalizePayAmount = () => {
     const trimmed = payAmount.trim();
@@ -166,7 +189,9 @@ export function GamePaymentListPage() {
     if (payErr) errors.payAmount = payErr;
     const usdErr = validateOptionalUsdAmount(payAmountUsd);
     if (usdErr) errors.payAmountUsd = usdErr;
-    if (!form.payBank.trim()) errors.payBank = '付款银行不能为空';
+    if (!resolveGameSharePaymentCompany(current ? getGame(current.gameId) : undefined).trim()) {
+      errors.sharePaymentCompany = '分成付款公司未配置，请先在游戏收入管理【付款设置】中维护';
+    }
     if (!form.receiptInfo.trim()) errors.receiptInfo = '收款信息不能为空';
     setMarkErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -188,7 +213,29 @@ export function GamePaymentListPage() {
 
   const submitMarkPaid = () => {
     if (!current || !validateMarkForm()) return;
-    markGamePaid(current.id, buildMarkPayload());
+    const game = getGame(current.gameId);
+    const vendor = game ? getVendor(game.vendorId) : undefined;
+    const paymentCurrency = game?.sharePaymentCurrency ?? '人民币';
+    const letterPayAmountOverride = paymentCurrency === '美金'
+      ? (parseOptionalAmount(payAmountUsd) ?? 0)
+      : parsePayAmount(payAmount);
+    const letterSnapshot = buildSettlementLetterSnapshot({
+      vendorId: game?.vendorId ?? '',
+      gameId: current.gameId,
+      amount: current.pendingAmount,
+      settlementIds: current.settlementIds,
+      applyTime: current.applyTime,
+      vendor,
+      game,
+      settlements,
+      payments,
+      gamePayments,
+      exchangeRates,
+      games,
+      getGameName,
+      letterPayAmountOverride,
+    });
+    markGamePaid(current.id, { ...buildMarkPayload(), letterSnapshot });
     setMarkOpen(false);
     setToast({ message: '已标记付款', type: 'success' });
   };
@@ -216,6 +263,8 @@ export function GamePaymentListPage() {
   };
 
   const currentVendorId = current ? getGame(current.gameId)?.vendorId ?? '' : '';
+  const currentGame = current ? getGame(current.gameId) : undefined;
+  const sharePaymentCompany = current?.payBank || resolveGameSharePaymentCompany(currentGame);
 
   return (
     <div className="agf-card">
@@ -232,8 +281,8 @@ export function GamePaymentListPage() {
             const vendorId = getGame(r.gameId)?.vendorId;
             return vendorId ? getVendorName(vendorId) : '';
           } },
-          { key: 'pending', title: '待付款金额', render: (r) => fmtPaymentAmount(r.pendingAmount) },
-          { key: 'actual', title: '实际付款金额', render: (r) => r.actualAmount ? fmtPaymentAmount(r.actualAmount) : '-' },
+          { ...COL_ALIGN_RIGHT, key: 'pending', title: '待付款金额', render: (r) => fmtPaymentAmount(r.pendingAmount) },
+          { ...COL_ALIGN_RIGHT, key: 'actual', title: '实际付款金额', render: (r) => r.actualAmount ? fmtPaymentAmount(r.actualAmount) : '-' },
           {
             key: 'status',
             title: '付款状态',
@@ -302,20 +351,15 @@ export function GamePaymentListPage() {
             <FieldError message={markErrors.payAmountUsd} />
           </div>
         </div>
-        <div className="agf-form-item">
-          <label className="agf-form-label agf-form-label--required">付款银行</label>
-          <div className="agf-form-field">
-            <input
-              className="agf-form-input"
-              value={form.payBank}
-              onChange={(e) => {
-                setForm({ ...form, payBank: e.target.value });
-                clearMarkError('payBank');
-              }}
-            />
-            <FieldError message={markErrors.payBank} />
+        <ReadonlyField label="分成付款公司" value={sharePaymentCompany || '-'} />
+        {markErrors.sharePaymentCompany && (
+          <div className="agf-form-item">
+            <div className="agf-form-label" />
+            <div className="agf-form-field">
+              <FieldError message={markErrors.sharePaymentCompany} />
+            </div>
           </div>
-        </div>
+        )}
         <div className="agf-form-item">
           <label className="agf-form-label agf-form-label--required">收款信息</label>
           <div className="agf-form-field">
@@ -345,7 +389,7 @@ export function GamePaymentListPage() {
         <ReadonlyField label="待付款金额" value={fmtPaymentAmount(current?.pendingAmount ?? 0)} />
         <ReadonlyField label="实际付款金额" value={formatCnyPaymentDisplay(current?.actualAmount)} />
         <ReadonlyField label="实际付款美金" value={formatUsdAmountDisplay(current?.actualAmountUsd)} />
-        <ReadonlyField label="付款银行" value={current?.payBank ?? '-'} />
+        <ReadonlyField label="分成付款公司" value={sharePaymentCompany || '-'} />
         <ReadonlyField label="收款信息" value={receiptInfoDisplay(current)} multiline />
         <div className="agf-form-item"><label className="agf-form-label">备注</label><textarea className="agf-form-textarea" value={detailRemark} onChange={(e) => setDetailRemark(e.target.value)} /></div>
       </Drawer>
@@ -383,7 +427,8 @@ export function GamePaymentListPage() {
           gameId={current.gameId}
           amount={current.pendingAmount}
           settlementIds={current.settlementIds}
-          useGamePayments
+          applyTime={current.applyTime}
+          letterSnapshot={current.letterSnapshot}
         />
       )}
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

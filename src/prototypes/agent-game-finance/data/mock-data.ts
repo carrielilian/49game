@@ -12,9 +12,11 @@ import type {
   SettlementRecord,
   Vendor,
   VendorBalance,
+  ExchangeRateRecord,
 } from './types';
 import { deriveBalances, deriveGameBalances } from '../utils/balance';
 import { resolveFollowInvoiceTax } from '../utils/invoiceTax';
+import { buildSettlementLetterSnapshot } from '../utils/settlementLetterSnapshot';
 
 const BT4399 = '4399' as const satisfies BusinessType;
 const BTKB = '快爆' as const satisfies BusinessType;
@@ -44,12 +46,12 @@ const VENDOR_INCOMPLETE_BANK = new Set(['1007']);
 
 function vendorWithPrepayment(v: Omit<Vendor, 'prepayment' | 'historicalDeduction'> & { prepayment?: number }): Vendor {
   const prepayment = VENDOR_PREPAYMENTS[v.id];
-  const historicalDeduction = VENDOR_HISTORICAL_DEDUCTIONS[v.id] ?? 0;
+  const historicalDeduction = VENDOR_HISTORICAL_DEDUCTIONS[v.id];
   const bankIncomplete = VENDOR_INCOMPLETE_BANK.has(v.id);
   return {
     ...v,
     ...(prepayment != null ? { prepayment } : {}),
-    historicalDeduction,
+    ...(historicalDeduction != null ? { historicalDeduction } : {}),
     ...(bankIncomplete ? { cardNumber: '' } : {}),
   };
 }
@@ -60,6 +62,7 @@ const GAME_PREPAYMENTS: Partial<Record<string, number>> = {
   '4002': 280000,
   '4003': 150000,
   '4005': 380000,
+  '4006': 100000, // GP015 验收结果⑤
   '4008': 200000,
   // 4009 未填，验收游戏预付拦截
   '4010': 180000,
@@ -72,15 +75,31 @@ const GAME_PREPAYMENTS: Partial<Record<string, number>> = {
 /** 游戏历史已抵扣分成款 mock */
 const GAME_HISTORICAL_DEDUCTIONS: Partial<Record<string, number>> = {
   '4005': 25000, // 配合 GP001 验收已抵扣/剩余
+  '4006': 95000, // GP015：剩余未抵扣 5000（配合结果⑤）
+};
+
+/** 游戏付费设置 mock（付款设置 — 分成付款公司等） */
+const GAME_SHARE_PAYMENT: Partial<Record<string, Pick<Game, 'sharePaymentCompany' | 'sharePaymentCurrency' | 'sharePaymentAccount'>>> = {
+  '4001': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6222123412341234' },
+  '4003': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6214567856785678' },
+  '4005': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金', sharePaymentAccount: '6227901290129012' },
+  '4006': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金', sharePaymentAccount: '6227901290129012' },
+  '4007': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金', sharePaymentAccount: '6228345634563456' },
+  '4008': { sharePaymentCompany: '香港4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6228345634563456' },
+  '4009': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6216789078907890' },
+  '4010': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金', sharePaymentAccount: '6222234523452345' },
+  '5001': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6229098765432109' },
 };
 
 function gameWithPrepayment(g: Game): Game {
   const prepayment = GAME_PREPAYMENTS[g.id];
-  const historicalDeduction = GAME_HISTORICAL_DEDUCTIONS[g.id] ?? g.historicalDeduction ?? 0;
+  const historicalDeduction = GAME_HISTORICAL_DEDUCTIONS[g.id] ?? g.historicalDeduction;
+  const sharePayment = GAME_SHARE_PAYMENT[g.id];
   return {
     ...g,
     ...(prepayment != null ? { prepayment } : {}),
-    historicalDeduction,
+    ...(historicalDeduction != null ? { historicalDeduction } : {}),
+    ...(sharePayment ?? {}),
   };
 }
 
@@ -225,6 +244,7 @@ export const INITIAL_SETTLEMENTS: SettlementRecord[] = [
   // 补充覆盖：塔防英雄收入、合作终止游戏历史余额、银行不全厂商
   { id: 'S026', type: 'internal', incomeTime: '2026-07', gameId: '4004', channel: '快爆付费', grossRevenue: 142000, settlementAmount: 134900, settlementIncome: 67450, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-06 11:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1002' },
   { id: 'S027', type: 'internal', incomeTime: '2026-07', gameId: '4011', channel: '游戏盒付费', grossRevenue: 52000, settlementAmount: 49400, settlementIncome: 24700, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-06 11:30:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1007' },
+  { id: 'S028', type: 'external', incomeTime: '2026-07', gameId: '4006', channel: '游乐IOS', grossRevenue: 196000, settlementAmount: 196000, settlementIncome: 88200, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-06 12:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1003' },
   // 快爆业务结算样例
   { id: 'S301', type: 'internal', incomeTime: '2026-06', gameId: '5001', channel: '快爆付费', grossRevenue: 198000, settlementAmount: 188100, settlementIncome: 94050, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-07-02 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2001' },
   { id: 'S302', type: 'external', incomeTime: '2026-06', gameId: '5001', channel: '快爆游IOS', grossRevenue: 220000, settlementAmount: 220000, settlementIncome: 99000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-03 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2001' },
@@ -235,31 +255,119 @@ export const INITIAL_SETTLEMENTS: SettlementRecord[] = [
   { id: 'S307', type: 'internal', incomeTime: '2026-07', gameId: '5001', channel: '快爆内购', grossRevenue: 178000, settlementAmount: 163016, settlementIncome: 81508, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-08-06 12:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '2001' },
 ];
 
-export const INITIAL_PAYMENTS: PaymentRequest[] = [
+/** 汇率表：每月末（最后工作日）从外部接口同步；标记付款按申请时间的「上个月」取 rate */
+export const INITIAL_EXCHANGE_RATES: ExchangeRateRecord[] = [
+  { month: '2026-04', rate: 7.162, fetchDate: '2026-04-30' },
+  { month: '2026-05', rate: 7.185, fetchDate: '2026-05-29' },
+  { month: '2026-06', rate: 7.21, fetchDate: '2026-06-30' },
+];
+
+const RAW_PAYMENTS: PaymentRequest[] = [
   // 1003 已付款+完整凭证+历史已抵扣（结算函⑤验收）
-  { id: 'P001', vendorId: '1003', pendingAmount: 367800, actualAmount: 367800, actualAmountUsd: 51200, status: '已付款', applyTime: '2026-07-10 14:30:25', payTime: '2026-07-20 16:45:08', payBank: '公司招商银行', receiptInfo: '雷霆网络科技有限公司 6227901290129012', settlementLetter: '结算函_雷霆网络科技.pdf', invoice: '电子发票_367800.pdf', settlementIds: ['S004', 'S016', 'S007'] },
+  { id: 'P001', vendorId: '1003', pendingAmount: 367800, actualAmount: 367800, actualAmountUsd: 51200, status: '已付款', applyTime: '2026-07-10 14:30:25', payTime: '2026-07-20 16:45:08', payBank: '4399', receiptInfo: '雷霆网络科技有限公司 6227901290129012', settlementLetter: '结算函_雷霆网络科技.pdf', invoice: '电子发票_367800.pdf', settlementIds: ['S004', 'S016', 'S007'] },
   // 1001 未付款（验收「存在未付款记录」拦截）
   { id: 'P002', vendorId: '1001', pendingAmount: 255200, status: '未付款', applyTime: '2026-07-05 09:15:42', settlementIds: ['S001', 'S002', 'S010', 'S020'] },
   // 1006 已付款缺凭证（请款凭证空态）
-  { id: 'P003', vendorId: '1006', pendingAmount: 144000, actualAmount: 144000, status: '已付款', applyTime: '2026-06-28 10:00:00', payTime: '2026-07-08 15:30:00', payBank: '公司招商银行', receiptInfo: '云端游创科技有限公司 6222234523452345', settlementIds: ['S011'] },
+  { id: 'P003', vendorId: '1006', pendingAmount: 144000, actualAmount: 144000, status: '已付款', applyTime: '2026-06-28 10:00:00', payTime: '2026-07-08 15:30:00', payBank: '4399', receiptInfo: '云端游创科技有限公司 6222234523452345', settlementIds: ['S011'] },
   // 1008 已付款仅结算函（缺电子发票）
-  { id: 'P004', vendorId: '1008', pendingAmount: 43200, actualAmount: 43000, status: '已付款', applyTime: '2026-06-25 11:20:00', payTime: '2026-07-05 09:45:00', payBank: '公司招商银行', receiptInfo: '极客游戏有限公司 6226012301230123', settlementLetter: '结算函_极客游戏.pdf', settlementIds: ['S014'] },
+  { id: 'P004', vendorId: '1008', pendingAmount: 43200, actualAmount: 43000, status: '已付款', applyTime: '2026-06-25 11:20:00', payTime: '2026-07-05 09:45:00', payBank: '游家时代', receiptInfo: '极客游戏有限公司 6226012301230123', settlementLetter: '结算函_极客游戏.pdf', settlementIds: ['S014'] },
   // 快爆 2001 已付款
-  { id: 'P301', vendorId: '2001', pendingAmount: 99000, actualAmount: 99000, status: '已付款', applyTime: '2026-07-12 11:20:30', payTime: '2026-07-22 15:10:18', payBank: '公司招商银行', receiptInfo: '快爆星辰科技有限公司 6229098765432109', settlementLetter: '结算函_快爆星辰科技.pdf', invoice: '电子发票_99000.pdf', settlementIds: ['S302'] },
+  { id: 'P301', vendorId: '2001', pendingAmount: 99000, actualAmount: 99000, status: '已付款', applyTime: '2026-07-12 11:20:30', payTime: '2026-07-22 15:10:18', payBank: '4399', receiptInfo: '快爆星辰科技有限公司 6229098765432109', settlementLetter: '结算函_快爆星辰科技.pdf', invoice: '电子发票_99000.pdf', settlementIds: ['S302'] },
   // 快爆 2002 未付款
   { id: 'P302', vendorId: '2002', pendingAmount: 39389.6, status: '未付款', applyTime: '2026-07-15 14:00:00', settlementIds: ['S303'] },
 ];
 
-export const INITIAL_GAME_PAYMENTS: GamePaymentRequest[] = [
-  // 4005 已付款+历史已抵扣
-  { id: 'GP001', gameId: '4005', pendingAmount: 125400, actualAmount: 125400, actualAmountUsd: 17400, status: '已付款', applyTime: '2026-07-11 10:20:15', payTime: '2026-07-21 14:30:00', payBank: '公司招商银行', receiptInfo: '雷霆网络科技有限公司 6227901290129012', settlementLetter: '结算函_消消乐大师.pdf', invoice: '电子发票_125400.pdf', settlementIds: ['S004'] },
-  // 4001 未付款（验收游戏付款拦截 + 未付款列表）
-  { id: 'GP002', gameId: '4001', pendingAmount: 88200, status: '未付款', applyTime: '2026-07-06 11:05:30', settlementIds: ['S001', 'S010'] },
+const RAW_GAME_PAYMENTS: GamePaymentRequest[] = [
+  // 4005 已付款+历史已抵扣（厂商支付币种美金 · 结果⑤ 参考）
+  { id: 'GP001', gameId: '4005', pendingAmount: 125400, actualAmount: 125400, actualAmountUsd: 17400, status: '已付款', applyTime: '2026-07-11 10:20:15', payTime: '2026-07-21 14:30:00', payBank: '纯游（美元）', receiptInfo: '雷霆网络科技有限公司 6227901290129012', settlementLetter: '结算函_消消乐大师.pdf', invoice: '电子发票_125400.pdf', settlementIds: ['S004'] },
+  // 4001 未付款 · 结果③（预付>0，厂商/付款币种均人民币，net=0）
+  { id: 'GP002', gameId: '4001', pendingAmount: 88200, status: '未付款', applyTime: '2026-07-06 11:05:30', remark: '【结果③-net=0】预付320000，剩余≥待付', settlementIds: ['S001', 'S010'] },
   // 4008 已付款仅结算函
-  { id: 'GP003', gameId: '4008', pendingAmount: 34200, actualAmount: 34200, status: '已付款', applyTime: '2026-06-30 09:00:00', payTime: '2026-07-10 11:00:00', payBank: '公司招商银行', receiptInfo: '梦想互娱有限公司 6228345634563456', settlementLetter: '结算函_策略争霸.pdf', settlementIds: ['S012'] },
+  { id: 'GP003', gameId: '4008', pendingAmount: 34200, actualAmount: 34200, status: '已付款', applyTime: '2026-06-30 09:00:00', payTime: '2026-07-10 11:00:00', payBank: '香港4399', receiptInfo: '梦想互娱有限公司 6228345634563456', settlementLetter: '结算函_策略争霸.pdf', settlementIds: ['S012'] },
   // 快爆 5001 未付款
   { id: 'GP301', gameId: '5001', pendingAmount: 94050, status: '未付款', applyTime: '2026-07-14 16:30:00', settlementIds: ['S301'] },
+  // —— 标记付款初始填充 · 五分支验收（均为未付款，打开【标记付款】自动重算）——
+  // 4009 未填预付 · 结果①（预付≤0，付款币种人民币）
+  { id: 'GP011', gameId: '4009', pendingAmount: 46736.4, status: '未付款', applyTime: '2026-07-08 09:20:00', remark: '【结果①】预付≤0·付款币种人民币', settlementIds: ['S013', 'S018'] },
+  // 4007 未填预付 · 结果②（预付≤0，付款币种美金）
+  { id: 'GP012', gameId: '4007', pendingAmount: 30875, status: '未付款', applyTime: '2026-07-09 10:15:00', remark: '【结果②】预付≤0·付款币种美金', settlementIds: ['S006'] },
+  // 4003 预付150000 · 结果③（预付>0，厂商/付款币种均人民币，net=30000）
+  { id: 'GP013', gameId: '4003', pendingAmount: 180000, status: '未付款', applyTime: '2026-07-10 11:30:00', remark: '【结果③-net>0】待付180000−剩余150000=30000', settlementIds: ['S003', 'S017'] },
+  // 4010 预付180000 · 结果④（预付>0，厂商人民币，付款币种美金，net=20000）
+  { id: 'GP014', gameId: '4010', pendingAmount: 200000, status: '未付款', applyTime: '2026-07-11 14:00:00', remark: '【结果④】待付200000−剩余180000=20000，美金=net÷汇率', settlementIds: ['S009'] },
+  // 4006 预付100000/历史95000 · 结果⑤（预付>0，厂商支付币种美金）
+  { id: 'GP015', gameId: '4006', pendingAmount: 88200, status: '未付款', applyTime: '2026-07-12 15:45:00', remark: '【结果⑤】厂商支付币种美金，usdNet=待付÷汇率−剩余5000', settlementIds: ['S028'] },
 ];
+
+function mockGetGameName(id: string): string {
+  const g = INITIAL_GAMES.find((x) => x.id === id);
+  return g?.onlineName ?? g?.name ?? id;
+}
+
+function enrichPaidLetterSnapshots<T extends PaymentRequest | GamePaymentRequest>(
+  items: T[],
+  kind: 'vendor' | 'game',
+): T[] {
+  return items.map((p) => {
+    if (p.status !== '已付款') return p;
+    if (kind === 'game' && 'gameId' in p) {
+      const game = INITIAL_GAMES.find((g) => g.id === p.gameId);
+      if (!game) return p;
+      const vendor = INITIAL_VENDORS.find((v) => v.id === game.vendorId);
+      const paymentCurrency = game.sharePaymentCurrency ?? '人民币';
+      const letterPayAmountOverride = paymentCurrency === '美金'
+        ? (p.actualAmountUsd ?? 0)
+        : (p.actualAmount ?? p.pendingAmount);
+      return {
+        ...p,
+        letterSnapshot: buildSettlementLetterSnapshot({
+          vendorId: game.vendorId,
+          gameId: p.gameId,
+          amount: p.pendingAmount,
+          settlementIds: p.settlementIds,
+          applyTime: p.applyTime,
+          vendor,
+          game,
+          settlements: INITIAL_SETTLEMENTS,
+          payments: RAW_PAYMENTS,
+          gamePayments: RAW_GAME_PAYMENTS,
+          exchangeRates: INITIAL_EXCHANGE_RATES,
+          games: INITIAL_GAMES,
+          getGameName: mockGetGameName,
+          letterPayAmountOverride,
+        }),
+      };
+    }
+    if (kind === 'vendor' && 'vendorId' in p) {
+      const vendor = INITIAL_VENDORS.find((v) => v.id === p.vendorId);
+      const paymentCurrency = vendor?.sharePaymentCurrency ?? '人民币';
+      const letterPayAmountOverride = paymentCurrency === '美金'
+        ? (p.actualAmountUsd ?? 0)
+        : (p.actualAmount ?? p.pendingAmount);
+      return {
+        ...p,
+        letterSnapshot: buildSettlementLetterSnapshot({
+          vendorId: p.vendorId,
+          amount: p.pendingAmount,
+          settlementIds: p.settlementIds,
+          applyTime: p.applyTime,
+          vendor,
+          settlements: INITIAL_SETTLEMENTS,
+          payments: RAW_PAYMENTS,
+          gamePayments: RAW_GAME_PAYMENTS,
+          exchangeRates: INITIAL_EXCHANGE_RATES,
+          games: INITIAL_GAMES,
+          getGameName: mockGetGameName,
+          letterPayAmountOverride,
+        }),
+      };
+    }
+    return p;
+  });
+}
+
+export const INITIAL_PAYMENTS = enrichPaidLetterSnapshots(RAW_PAYMENTS, 'vendor');
+export const INITIAL_GAME_PAYMENTS = enrichPaidLetterSnapshots(RAW_GAME_PAYMENTS, 'game');
 
 export const INITIAL_BALANCES: VendorBalance[] = deriveBalances(
   INITIAL_SETTLEMENTS, INITIAL_VENDORS, INITIAL_PAYMENTS,

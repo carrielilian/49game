@@ -21,7 +21,7 @@ const CURRENCY_OPTIONS: ContractCurrency[] = ['人民币', '美金'];
 
 export const VENDOR_REQUIRED: { key: keyof VendorFormData; label: string }[] = [
   { key: 'name', label: '厂商名称（公司名称）' },
-  { key: 'currency', label: '支持币种' },
+  { key: 'currency', label: '支付币种' },
   { key: 'invoiceInfo', label: '发票信息' },
   { key: 'accountName', label: '开户名称' },
   { key: 'bank', label: '开户银行' },
@@ -126,7 +126,7 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
             </tr>
             <tr>
               <th colSpan={2}><GridLabel>单位地址</GridLabel></th>
-              <th><GridLabel required>支持币种</GridLabel></th>
+              <th><GridLabel required>支付币种</GridLabel></th>
               <th colSpan={2}><GridLabel required>发票信息</GridLabel></th>
             </tr>
             <tr>

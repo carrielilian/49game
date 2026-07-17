@@ -32,6 +32,8 @@ const ROUTE = defineHashPageRoute([
   { id: 'external-settlement', title: '外部收入结算' },
   { id: 'internal-settlement', title: '内部收入结算' },
   { id: 'internal-refund', title: '内部退款结算' },
+  { id: 'vendor-income', title: '厂商收入' },
+  { id: 'payment-list', title: '厂商付款管理' },
   { id: 'game-income', title: '游戏收入管理' },
   { id: 'game-payment-list', title: '游戏付款管理' },
   { id: 'stats-summary', title: '收入汇总统计' },
