@@ -401,11 +401,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       (s) => s.gameId === gameId && s.settled && s.paymentApplyStatus === '未申请',
     );
     const settlementIds = toApply.map((s) => s.id);
-    setGamePayments((prev) => [...prev, {
+    setGamePayments((prev) => [{
       id: genId('GP'), gameId, pendingAmount: bal.balance, status: '未付款',
       applyTime: formatDateTime(),
       settlementIds,
-    }]);
+    }, ...prev]);
     setSettlements((prev) => prev.map((s) =>
       settlementIds.includes(s.id)
         ? { ...s, paymentApplyStatus: '已申请' as const }

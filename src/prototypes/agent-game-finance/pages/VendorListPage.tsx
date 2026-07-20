@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ColumnFilter } from '../components/ColumnFilter';
 import { DataTable } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
@@ -54,6 +55,7 @@ export function VendorListPage() {
     if (Object.keys(next).length) { setErrors(next); showIncompleteToast(); return; }
     addVendor(form);
     setAddOpen(false);
+    setToast({ message: '提交成功', type: 'success' });
   };
   const handleEdit = () => {
     if (!editing) return;
@@ -61,46 +63,82 @@ export function VendorListPage() {
     if (Object.keys(next).length) { setErrors(next); showIncompleteToast(); return; }
     updateVendor({ ...editing, ...form });
     setEditOpen(false);
+    setToast({ message: '提交成功', type: 'success' });
   };
 
   return (
     <div className="agf-card">
-      <FilterBar
-        actions={<button type="button" className="agf-btn agf-btn--primary" onClick={openAdd}>添加厂商</button>}
-      >
-        <ListSearchFields mode="vendor" value={search} onChange={setSearch} />
-      </FilterBar>
-      <DataTable
-        rowKey={(r) => r.id}
-        data={filtered}
-        columns={[
-          { key: 'id', title: '厂商ID', render: (r) => r.id },
-          { key: 'name', title: '厂商名称（公司名称）', render: (r) => r.name },
-          {
-            key: 'invoice',
-            title: '发票信息',
-            filter: {
-              type: 'select',
-              value: invoiceFilter,
-              onChange: setInvoiceFilter,
-              options: INVOICE_INFO_FILTER_OPTIONS,
+      <div data-annotation-id="vendor-list-query">
+        <FilterBar
+          actions={(
+            <button
+              type="button"
+              className="agf-btn agf-btn--primary"
+              data-annotation-id="vendor-list-add"
+              onClick={openAdd}
+            >
+              添加厂商
+            </button>
+          )}
+        >
+          <ListSearchFields mode="vendor" value={search} onChange={setSearch} />
+        </FilterBar>
+      </div>
+      <div data-annotation-id="vendor-list-table">
+        <DataTable
+          rowKey={(r) => r.id}
+          data={filtered}
+          columns={[
+            { key: 'id', title: '厂商ID', render: (r) => r.id },
+            { key: 'name', title: '厂商名称', render: (r) => r.name },
+            {
+              key: 'invoice',
+              title: '发票信息',
+              header: (
+                <span data-annotation-id="vendor-list-invoice-col">
+                  <ColumnFilter
+                    title="发票信息"
+                    filter={{
+                      type: 'select',
+                      value: invoiceFilter,
+                      onChange: setInvoiceFilter,
+                      options: INVOICE_INFO_FILTER_OPTIONS,
+                    }}
+                  />
+                </span>
+              ),
+              render: (r) => r.invoiceInfo,
             },
-            render: (r) => r.invoiceInfo,
-          },
-          { key: 'ops', title: '操作', render: (r) => (
-            <div className="agf-actions">
-              <button type="button" className="agf-btn agf-btn--link" onClick={() => openEdit(r)}>编辑</button>
-            </div>
-          ) },
-        ]}
-      />
+            {
+              key: 'ops',
+              title: '操作',
+              render: (r) => (
+                <div className="agf-actions">
+                  <button
+                    type="button"
+                    className="agf-btn agf-btn--link"
+                    data-annotation-id="vendor-list-edit"
+                    onClick={() => openEdit(r)}
+                  >
+                    编辑
+                  </button>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </div>
       <Drawer title="添加厂商" open={addOpen} onClose={() => setAddOpen(false)} width={1175}
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setAddOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleAdd}>确定</button></>}>
-        <VendorForm form={form} setForm={setForm} errors={errors} clearError={clearError} />
+        <div data-annotation-id="vendor-list-add-form">
+          <VendorForm form={form} setForm={setForm} errors={errors} clearError={clearError} />
+        </div>
       </Drawer>
       <Drawer title="编辑厂商" open={editOpen} onClose={() => setEditOpen(false)} width={1175}
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>保存</button></>}>
-        <VendorForm form={form} setForm={setForm} vendorId={editing?.id} errors={errors} clearError={clearError} />
+        <div data-annotation-id="vendor-list-edit-form">
+          <VendorForm form={form} setForm={setForm} vendorId={editing?.id} errors={errors} clearError={clearError} />
+        </div>
       </Drawer>
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>

@@ -3,7 +3,8 @@ import { resolveFollowInvoiceTax } from './invoiceTax';
 
 export const SETTLEMENT_CURRENCY: ContractCurrency = '人民币';
 
-export function currencySymbol(currency: ContractCurrency = '人民币'): string {
+export function currencySymbol(currency?: ContractCurrency): string {
+  if (!currency) return '';
   return currency === '美金' ? '$' : '￥';
 }
 
@@ -13,6 +14,11 @@ export function formatMoney(value: number): string {
 
 export function formatCurrencyMoney(value: number, currency: ContractCurrency = '人民币'): string {
   return `${currencySymbol(currency)}${formatMoney(value)}`;
+}
+
+export function formatOptionalCurrencyMoney(value: number, currency?: ContractCurrency): string {
+  if (!currency) return formatMoney(value);
+  return formatCurrencyMoney(value, currency);
 }
 
 export function calcSettlement(

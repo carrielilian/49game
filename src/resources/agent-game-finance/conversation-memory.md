@@ -2,7 +2,7 @@
 
 > **用途**：在新 Cursor 对话中快速恢复本项目背景、已做决策和待办，避免重复对齐。  
 > **UI 细节**：改样式、表单、抽屉、分页等请优先读 [`ui-spec.md`](./ui-spec.md)。  
-> **最后更新**：2026-07-17（结算函快照/汇率条件、预付币种对齐、ReadonlyCurrencyField）  
+> **最后更新**：2026-07-20（Batch 7 批注验收；收入汇总导出；申请/标记付款行为对齐）  
 > **对应 Git**：见文末「Git 状态」；远程 https://github.com/carrielilian/49game.git `main`（本地可能有未推送改动）
 
 ---
@@ -53,6 +53,53 @@
 
 ## 本次对话完成的主要工作
 
+### 2026-07-20 最新（Batch 7 批注 + 体验 + 功能对齐）
+
+#### 批注接入（Batch 0–7，用户已确认）
+
+| 批次 | 页面 | 节点数（约） |
+|------|------|-------------|
+| 0 | 基础设施（`AnnotationViewer`、顶栏开关、`annotation-source`） | — |
+| 1–6 | 厂商/游戏/公式/外部·内部·退款结算 | 已验收 |
+| 7 | 游戏收入(7)、游戏付款(11)、收入汇总(5，含导出) | 已验收 |
+
+- **批注约定**：自然语言；蓝逻辑 / 绿状态 / 橙表单；操作列 marker 在按钮上；抽屉内锚点仅抽屉打开时可见。
+- **侧栏隐藏页**（厂商收入、厂商付款）** intentionally 未批注**。
+- **关键文件**：`docs/annotations/**`、`utils/buildAnnotationSource.ts`、`annotation-source.json`、`index.tsx`、`utils/resolveAnnotationElement.ts`、`components/OverlayScope.tsx`、`utils/annotationPanelWidth.ts`。
+
+#### 批注体验
+
+| 项 | 规则 |
+|----|------|
+| 序号默认显示 | `index.tsx` → `defaultMarkerIndexVisible: true` |
+| 气泡宽度 560px | `utils/annotationPanelWidth.ts` 向 Shadow DOM 注入；**普通 `style.css` 无效** |
+
+#### 本轮功能 / UI 调整
+
+| 主题 | 要点 |
+|------|------|
+| **收入汇总【导出】** | 当前筛选 CSV；字段同列表；文件名 `收入汇总统计-{维度}-{YYYY-MM-DD}.csv`；按钮在「厂商名称」**右侧 inline**（非 `aside` 右对齐）；`RevenueSummaryPage.tsx` |
+| **请款凭证上传说明** | 结算函/电子发票按钮下灰色 hint：「支持的上传格式为：png、jpg、pdf」；`MockFileUpload.hint` |
+| **游戏收入【申请付款】成功** | 绿 Toast「申请付款成功，账户余额已清零」；`store.applyGamePayment` 在 `gamePayments` **数组最前**插入「未付款」记录 |
+| **游戏【标记付款】** | 仅「取消 + 标记已付款」；**无【提交】**；成功 Toast「提交成功」 |
+| **【付款设置】** | 分成付款公司未保存时**为空**（不从付款方回填）；已抵扣/剩余只读、不随输入实时算 |
+
+#### 与旧规范对齐的决策（以批注 + 代码为准）
+
+| 主题 | 现行 |
+|------|------|
+| 分成付款公司初始值 | 未保存 → 空（「请选择」），**不**默认 `Game.payer` |
+| 标记付款未配置分成付款公司 | **不拦截**；申请付款前须在【付款设置】维护 |
+| 游戏标记付款按钮 | 取消 + 标记已付款（厂商隐藏页仍三按钮） |
+| 标记已付款 Toast | 「提交成功」（厂商/游戏一致） |
+
+### 2026-07-20（支付币种 + 操作记录）
+
+| 主题 | 要点 |
+|------|------|
+| **支付币种迁至合同管理** | 厂商表单移除支付币种；合同管理新增单选必填；各模块读 `Contract.currency`；未设置时 `CurrencyInput` 无前缀；详见 **§49** |
+| **操作记录金额格式化** | 合同变更日志金额带币种符号与千分位（`buildContractChangeDetail`）；详见 **§50** |
+
 ### 1. 列表查询（8 个列表页 + 数据统计）
 
 - 规则：**仅对列表存在的字段展示查询框**；多框为 **AND** 逻辑。
@@ -88,29 +135,30 @@
 
 ### 4. 合同管理抽屉
 
-> **2026-07-16 现行规范**见 **§32**（合作内容/复合型金额）、**§33**（支持币种迁至厂商）。
+> **2026-07-20 现行规范**见 **§49**（支付币种在合同管理维护）；**§32**（合作内容/复合型金额）。
 
 **字段顺序**：
 
 1. 游戏 ID / 游戏名称 — 只读  
 2. 合同编号 *  
-3. 合同金额 * — `CurrencyInput`；前缀取归属厂商 `Vendor.currency`（￥/$）  
-4. 合作内容 * — 多选：游戏代理金、预付分成款、委托开发费  
-5. 已付* 字段 — 随合作内容勾选显示（复合型输入 + FieldHint）  
-6. 补充说明 — 选填  
-7. 合作状态 — 保存同步游戏 + 操作日志  
+3. **支付币种** * — 单选「人民币」/「美金」；保存必填；选中后下方金额输入显示 ￥/$ 前缀  
+4. 合同金额 * — `CurrencyInput`；前缀取 `Contract.currency`；**未选币种时前缀为空**  
+5. 合作内容 * — 多选：游戏代理金、预付分成款、委托开发费  
+6. 已付* 字段 — 随合作内容勾选显示（复合型输入 + FieldHint）  
+7. 补充说明 — 选填  
+8. 合作状态 — 保存同步游戏 + 操作日志  
 
-**已移除**：版号费(已支付)、已抵扣预付分成款、合同内支持币种编辑、原「合同信息说明」（改「补充说明」）。
+**已移除**：版号费(已支付)、已抵扣预付分成款、原「合同信息说明」（改「补充说明」）；**厂商管理「支付币种」**（`Vendor.currency` 已删除）。
 
-**类型**（`data/types.ts`）：`contractNumber, contractAmount, cooperationContents, paidAgencyFee?, paidPrepayment?, paidDevelopmentFee?, supplementalNote, cooperationStatus`。
+**类型**（`data/types.ts`）：`contractNumber, currency?, contractAmount, cooperationContents, paidAgencyFee?, paidPrepayment?, paidDevelopmentFee?, supplementalNote, cooperationStatus`。
 
 ### 5. 操作记录
 
 - 类型：**添加游戏 | 运营状态 | 合作状态 | 合同变更**。
 - 「操作」列：添加游戏 →「添加游戏」；运营/合作状态 → `StatusBadge`；**合同变更** → 多行纯文本（`agf-log-detail`，`white-space: pre-line`）。
-- **合同变更**（`updateContract` → `buildContractChangeDetail`）：当合同**合同金额**、**已付游戏代理金**、**已付预付分成款**、**已付委托开发费**任一变更时写入；格式 `"字段名"变更为"值"`，多字段换行；未填写显示 `"-"`（不含币种符号）。
+- **合同变更**（`updateContract` → `buildContractChangeDetail`）：当合同**合同金额**、**已付游戏代理金**、**已付预付分成款**、**已付委托开发费**任一变更时写入；格式 `"字段名"变更为"值"`，多字段换行；未填写显示 `"-"`；**金额**取保存后 `Contract.currency`，展示**币种符号 + 千分位**（`formatOptionalCurrencyMoney`，如 `"￥9,894.00"`）。
 - 排序：**时间新→旧**。类型 `GameOperationLog` 使用 `action` + 可选 `status` / `detail`。
-- 游戏 4001 示例 mock：含合同变更示例（`GL005`）。
+- 游戏 4001 示例 mock：含合同变更示例（`GL005`，`"已付游戏代理金"变更为"￥546.00"`）。
 - 写入点：`addGame`、`updateGame`（运营状态）、`updateContract`（合作状态 + 合同变更）。
 - 抽屉顶部：只读游戏信息 `游戏ID / 游戏名称：4001 / 星际探险OL`（`onlineName`，`agf-drawer-meta`，与表头「操作人」左对齐）。
 - 操作记录抽屉内表格**暂无分页**；表格用 `agf-table-wrap` 灰色边框（与主列表一致）。
@@ -529,7 +577,7 @@
 
 | 项 | 规则 |
 |----|------|
-| 【标记已付款】 | 校验通过后**关闭抽屉**；绿 Toast「已标记付款」 |
+| 【标记已付款】 | 校验通过后**关闭抽屉**；绿 Toast「提交成功」 |
 | 【提交】 | 仍**不关闭**抽屉 |
 | 收款信息 | 由只读改为**可编辑**多行；默认取自厂商银行五字段；必填 |
 
@@ -835,7 +883,7 @@
 |----|------|
 | 付款方 | 表头筛选（6 选项）；mock 全量有值 |
 | 游戏ID / 游戏名称、合同游戏名称、厂商ID、厂商名称 | |
-| 已付游戏代理金 / 已付预付分成款 / 已付委托开发费 | 表头排序（`ColumnSort`）；有值显示 `formatCurrencyMoney`（厂商币种 + 千分位）；无值 `-` |
+| 已付游戏代理金 / 已付预付分成款 / 已付委托开发费 | 表头排序（`ColumnSort`）；有值 `formatOptionalCurrencyMoney`（`Contract.currency` + 千分位）；无值 `-` |
 | 运营状态、操作 | 操作含编辑/合同管理/支持渠道/操作记录 |
 
 - **默认排序**：`Game.createdAt` **新→旧**（添加时间）；点击已付列切换该列升/降序
@@ -845,8 +893,8 @@
 #### B. 操作记录 — 合同变更
 
 - `GameOperationLogAction` 新增 **`合同变更`**；`detail` 多行文本
-- 监听字段：合同金额 + 三项已付；格式 `"字段名"变更为"值"`；清空为 `"-"`
-- 工具：`utils/contractLog.ts` → `buildContractChangeDetail`、`calcContractPaymentTotal`
+- 监听字段：合同金额 + 三项已付；格式 `"字段名"变更为"值"`；清空为 `"-"`；金额带币种符号与千分位
+- 工具：`utils/contractLog.ts` → `buildContractChangeDetail`、`calcContractPaymentTotal`、`formatOptionalCurrencyMoney`（via `settlement.ts`）
 
 #### C. 业务类型下拉
 
@@ -855,7 +903,7 @@
 #### D. 收入汇总统计 — 支付金额
 
 - 第三列 **支付金额** = `calcContractPaymentTotal`（与游戏管理合同一致）
-- 游戏维度：单游戏合同合计 + 厂商币种；渠道/厂商维度：关联游戏合计
+- 游戏维度：单游戏合同合计 + **`Contract.currency`**；渠道/厂商维度：关联游戏合计
 - 总收入/结算付款金额：结算口径，**￥** + 千分位（列表已无结算收入/结算退款列）
 
 #### E. 主列表金额展示（全平台）
@@ -863,7 +911,8 @@
 - `formatMoney`：千分位两位小数（`zh-CN` locale）
 - `formatCurrencyMoney(value, currency)`：符号 + 千分位
 - `SETTLEMENT_CURRENCY = '人民币'`：**外部/内部/内部退款结算**及收入汇总结算列固定 ￥
-- 游戏管理已付列、厂商收入、厂商付款管理：按 `Vendor.currency`
+- 游戏管理已付列、收入汇总支付金额：按 **`Contract.currency`**（`resolveContractCurrency`）
+- 厂商/游戏收入预付列、【付款设置】输入前缀：`prepaymentCurrency` 快照 ?? `Contract.currency`
 
 #### F. 移除三统计页
 
@@ -1186,7 +1235,7 @@
 | 区块一 | **预付分成管理**：预付分成款、历史已抵扣（`CurrencyInput`，前缀取归属厂商 `Vendor.currency`）；已抵扣/剩余只读 |
 | 区块二 | **付费设置**：分成付款公司（下拉，4399 / 纯游 / 纯游（美元） / 香港4399 / 游家时代）、付款币种（人民币/美金 单选）、付款账号（必填） |
 | 数据字段 | `Game` / `Vendor`：`sharePaymentCompany`（`SharePaymentCompany`）、`sharePaymentCurrency`、`sharePaymentAccount` |
-| 默认 | 游戏：分成付款公司未保存时取 `Game.payer`（仅当 payer 在分成付款公司五项内）；付款币种默认人民币 |
+| 默认 | 游戏：分成付款公司未保存时**为空**（「请选择」）；付款币种默认人民币 |
 | 未填展示 | 预付/历史未保存时输入框**空**（不显示 `0.00`）；预付未填时列表与抽屉只读「已抵扣/剩余」为 `-` |
 
 #### B. 游戏收入列表
@@ -1200,7 +1249,8 @@
 | 项 | 规则 |
 |----|------|
 | 厂商付款 | 「付款方」下拉；选项同游戏管理付款方六项 |
-| 游戏付款 | **移除「付款方」下拉**；改为只读 **「分成付款公司」**；取值 `Game.sharePaymentCompany`（游戏收入管理【付款设置】）；未配置拦截 |
+| 游戏付款 | **移除「付款方」下拉**；改为只读 **「分成付款公司」**；取值 `Game.sharePaymentCompany`（游戏收入【付款设置】）；**不**在标记付款拦截未配置（申请付款前须在付款设置维护） |
+| 游戏付款按钮 | **取消 + 标记已付款**（无【提交】）；成功 Toast「提交成功」 |
 | 保存 | 游戏付款 `payBank` 写入当时分成付款公司快照 |
 
 #### D. 结算函（`SettlementLetterDrawer`）
@@ -1373,6 +1423,84 @@ flowchart TB
 
 ---
 
+### 48. 本次对话汇总（2026-07-20 — 支付币种快照冻结）
+
+#### A. 问题
+
+编辑厂商「支付币种」时，历史合同已付金额、预付分成等若仍读 `Vendor.currency`，符号会随厂商改币种而变，不符合「已入库数据不应被改」。
+
+#### B. 数据模型
+
+| 字段 | 实体 | 写入时机 | 更新规则 |
+|------|------|----------|----------|
+| `currency` | `Contract` | 合同**首次保存** | 仅当为空时写入当时 `Vendor.currency` |
+| `prepaymentCurrency` | `Vendor` / `Game` | 【付款设置】**首次保存**预付 | 仅当为空时写入当时 `Vendor.currency` |
+
+#### C. 展示与计算
+
+- 游戏管理三项已付、收入汇总「支付金额」、合同抽屉前缀 → `resolveContractCurrency(contract, vendor)`
+- 厂商/游戏收入预付三列、【付款设置】抽屉 → `resolvePrepaymentCurrency(entity, vendor)`
+- 游戏【标记付款】五分支 `vendorCurrency` → `Game.prepaymentCurrency ?? Vendor.currency`
+- `updateVendor` **不 cascade** 更新 contracts / prepaymentCurrency
+
+#### D. 工具与文件
+
+`utils/currencySnapshot.ts`；`data/types.ts`、`mock-data.ts`（backfill）；`GameListPage`、`RevenueSummaryPage`、`GameIncomePage`、`VendorIncomePage`、`gamePaymentMarkDefaults.ts`
+
+#### E. 验收
+
+> **已被 §49 取代**：支付币种现仅在合同管理维护，不再从厂商读取。
+
+编辑厂商支付币种场景**已移除**；历史数据通过 `Contract.currency` / `prepaymentCurrency` 快照冻结。
+
+---
+
+### 49. 本次对话汇总（2026-07-20 — 支付币种迁至合同管理）
+
+#### A. 需求
+
+- **移除**【厂商管理】「支付币种」字段（`Vendor.currency` 删除）
+- **新增**【游戏管理 → 合同管理】「支付币种」单选（人民币 / 美金），位于合同编号与合同金额之间，保存必填
+- **各模块**金额前缀与列表展示改读 `Contract.currency`
+- **未设置**支付币种时，`CurrencyInput` 前缀为空（不显示 ￥/$）
+
+#### B. 实现要点
+
+| 区域 | 变更 |
+|------|------|
+| `VendorForm` | 移除支付币种；`VENDOR_REQUIRED` 改为 **7 项** |
+| `GameListPage` 合同抽屉 | 新增支付币种 radio；校验必填；金额输入前缀随选中币种 |
+| `currencySnapshot.ts` | `resolveContractCurrency(contract)`；预付读 `prepaymentCurrency ?? contract.currency` |
+| `FormFields` | `CurrencyInput` / `ReadonlyCurrencyField` 支持 `currency?`；undefined 无前缀 |
+| `mock-data` | 合同带 `currency`；厂商 1003 下游戏为美金；backfill `prepaymentCurrency` |
+
+#### C. 验收
+
+1. 厂商添加/编辑表单**无**支付币种
+2. 合同管理有支付币种，保存后列表已付列与抽屉金额带 ￥/$
+3. 未选币种时合同金额等输入框**无前缀**
+4. 收入汇总/游戏收入/标记付款等读合同币种（预付仍用 `prepaymentCurrency` 快照）
+
+---
+
+### 50. 本次对话汇总（2026-07-20 — 操作记录金额格式化）
+
+#### A. 需求
+
+游戏管理【操作记录】中**合同变更**日志的金额值需显示**币种符号 + 千分位**（如 `￥9,894.00`），不再显示裸数字 `9894.00`。
+
+#### B. 实现
+
+- `utils/contractLog.ts` → `buildContractChangeDetail`：写入日志时对合同金额与三项已付调用 `formatOptionalCurrencyMoney(value, newC.currency)`
+- 变更检测仍用裸数值比较（`formatContractAmountDisplay` / `formatPaidDisplay`）；仅展示文案格式化
+- mock `GL005` 更新为 `"已付游戏代理金"变更为"￥546.00"`
+
+#### C. 验收
+
+保存合同后打开操作记录，新「合同变更」行金额应为 `￥x,xxx.xx` 或 `$x,xxx.xx`（随 `Contract.currency`）。
+
+---
+
 ### 19. 本次对话汇总（2026-07-11 ~ 07-12）
 
 **业务定稿：内外部结算路径不同**
@@ -1416,7 +1544,7 @@ src/prototypes/agent-game-finance/
     ├── VendorListPage.tsx    # VendorForm（支付币种）
     ├── FormulaListPage.tsx, PaymentListPage.tsx, GamePaymentListPage.tsx  # 标记付款；游戏只读分成付款公司
     ├── InternalSettlementPage.tsx, ExternalSettlementPage.tsx
-    ├── GameIncomePage.tsx, VendorIncomePage.tsx  # 付款设置；预付币种 Vendor.currency
+    ├── GameIncomePage.tsx, VendorIncomePage.tsx  # 付款设置；预付币种 Contract.currency / prepaymentCurrency
     └── RevenueSummaryPage.tsx
 
 src/resources/agent-game-finance/
@@ -1470,7 +1598,7 @@ src/resources/agent-game-finance/
 | 远程 | https://github.com/carrielilian/49game.git |
 | 分支 | `main` |
 | 远程最新 | `707ce1f`（2026-07-13 厂商收入等） |
-| **本地** | 2026-07-14 厂商预付分成管理、账户余额口径、结算函⑤条件显示等改动**尚未推送**（用户说「推送到 git」时再 commit/push） |
+| **本地** | 2026-07-20 Batch 7 批注、收入汇总导出、申请付款置顶、标记付款去提交等改动**尚未推送**（本环境未检测到 git CLI；用户说「推送到 git」时再 commit/push） |
 
 ---
 
@@ -1486,22 +1614,24 @@ src/resources/agent-game-finance/
 8. 用户说「推送到 git」时再 commit/push，不要主动提交。  
 9. 产品需求或设计方案有重大分歧时，按 `AGENTS.md` 门禁先对齐再继续实现。  
 10. 重要对话结束前按用户要求更新本文件与 `ui-spec.md`。  
-11. 数据统计无页内 Tab；时间用顶部 `MonthRangePicker`，默认 `getSampleMonthRange()`。  
-12. 收入汇总「总收入」= 结算收入 − 结算退款（内部计算，列表不展示后两列）；列表新增「结算付款金额」；勿与已删三收入统计页 grossRevenue 口径混用。  
-13. 数据统计已移除「累计流水」列；渠道收入统计含「总收入」。
-14. 结算公式扣税点：跟随发票按厂商发票映射；表单标签「扣税点」；`PercentAffixInput`/`DecimalPercentInput`；勿恢复底部独立「发票设置」或旧「税点」输入框。  
-15. **游戏名称**：「游戏ID / 游戏名称」一律 `onlineName`（`getGameName`）；「合同游戏名称」才用 `name`。  
-16. 游戏添加/编辑：先「游戏名称」后「合同游戏名称」，带 `FieldHint`；编辑时归属厂商只读。  
-17. 结算公式列表：新游戏同步空公式、未配置 `-`、公式列内外两行。  
-18. **支持渠道**：入口在**游戏管理**操作列；抽屉**仅内部渠道**（勾选+填 ID，勾选后必填）；组件 `SupportChannelsDrawer.tsx`；结算公式管理**无**【支持渠道】。  
-19. 结算三页列表无「总收入」；列为「待结算金额」；申请付款状态「未申请/已申请」。  
-20. 列表/抽屉/弹窗表格：`--agf-gutter 24px` + `agf-table-wrap` 灰色实线外框；分页在边框外。
-21. 外部导入：渠道单选；上传字段**收入时间/游戏名称/厂商名称/待结算金额**；按游戏名+厂商名匹配；**无**勾选游戏拦截；预览列表含厂商名称列。  
-22. 结算三页/导入列表「结算公式」列：用 `displaySettlementFormula`，不显示「外部：/内部：」前缀。
-23. Toast 仅 `success`（绿）/ `error`（红）；主按钮禁用 `#F5F5F5` 底 `#BFBFBF` 字。
-24. 样例渠道费：外部 0%、内部 5%。
-25. 结算公式列表展示：`待结算金额*（1-渠道费-税率）*分成`；`displaySettlementFormula` 去前缀。
-26. **内部/退款**主列表有【结算】；**外部**主列表无【结算】；结算时间无漏斗；内部未结算时收入/时间 `-`。
+11. **改批注**先读 `docs/annotations/` + `buildAnnotationSource.ts`；改气泡宽度用 `annotationPanelWidth.ts`（勿只靠 `style.css`）。  
+12. **游戏申请付款**看 `store.applyGamePayment`（首行插入未付款）；**收入汇总导出**在 `RevenueSummaryPage.tsx`。  
+13. 数据统计无页内 Tab；时间用顶部 `MonthRangePicker`，默认 `getSampleMonthRange()`。  
+14. 收入汇总「总收入」= 结算收入 − 结算退款（内部计算，列表不展示后两列）；列表新增「结算付款金额」；勿与已删三收入统计页 grossRevenue 口径混用。  
+15. 数据统计已移除「累计流水」列；渠道收入统计含「总收入」。
+16. 结算公式扣税点：跟随发票按厂商发票映射；表单标签「扣税点」；`PercentAffixInput`/`DecimalPercentInput`；勿恢复底部独立「发票设置」或旧「税点」输入框。  
+17. **游戏名称**：「游戏ID / 游戏名称」一律 `onlineName`（`getGameName`）；「合同游戏名称」才用 `name`。  
+18. 游戏添加/编辑：先「游戏名称」后「合同游戏名称」，带 `FieldHint`；编辑时归属厂商只读。  
+19. 结算公式列表：新游戏同步空公式、未配置 `-`、公式列内外两行。  
+20. **支持渠道**：入口在**游戏管理**操作列；抽屉**仅内部渠道**（勾选+填 ID，勾选后必填）；组件 `SupportChannelsDrawer.tsx`；结算公式管理**无**【支持渠道】。  
+21. 结算三页列表无「总收入」；列为「待结算金额」；申请付款状态「未申请/已申请」。  
+22. 列表/抽屉/弹窗表格：`--agf-gutter 24px` + `agf-table-wrap` 灰色实线外框；分页在边框外。
+23. 外部导入：渠道单选；上传字段**收入时间/游戏名称/厂商名称/待结算金额**；按游戏名+厂商名匹配；**无**勾选游戏拦截；预览列表含厂商名称列。  
+24. 结算三页/导入列表「结算公式」列：用 `displaySettlementFormula`，不显示「外部：/内部：」前缀。
+25. Toast 仅 `success`（绿）/ `error`（红）；主按钮禁用 `#F5F5F5` 底 `#BFBFBF` 字。
+26. 样例渠道费：外部 0%、内部 5%。
+27. 结算公式列表展示：`待结算金额*（1-渠道费-税率）*分成`；`displaySettlementFormula` 去前缀。
+28. **内部/退款**主列表有【结算】；**外部**主列表无【结算】；结算时间无漏斗；内部未结算时收入/时间 `-`。
 27. 结算三页查询 `gameAndVendor`；列含厂商ID、厂商名称（分两列，在游戏列右侧）。
 28. 外部确认导入写**已结算**记录；结算时间=确认导入时间；弹窗内【结算】必需；分页下方留白 16+24px。
 29. **外部收入结算主列表禁止未结算数据**；初始 mock 均为已结算；内部未结算仅来自【数据拉取】，勿再加静态未结算 mock。
@@ -1518,7 +1648,7 @@ src/resources/agent-game-finance/
 40. **vendorPaymentApply.ts**：申请付款拦截逻辑集中在此工具。  
 41. **厂商付款管理操作列**：未付款=标记付款+结算函+请款凭证；已付款=详细信息+结算函+请款凭证。  
 42. **付款状态**：未付款/已付款（非「待付款」）；`isUnpaidPayment` 兼容历史数据。  
-43. **标记付款**：**待付款金额只读** + **实际付款金额可编辑**（两位小数）；付款银行、收款信息必填；不含结算函/电子发票；提交不关闭；**标记已付款关闭抽屉**；收款信息可编辑。  
+43. **标记付款**：**待付款金额只读** + **实际付款金额可编辑**（两位小数）；收款信息必填；不含结算函/电子发票；**游戏付款**仅「取消 + 标记已付款」（无提交）；**厂商隐藏页**仍三按钮；标记已付款关闭抽屉 + Toast「提交成功」；收款信息可编辑。  
 44. **请款凭证**：结算函、电子发票 `MockFileUpload`；标签「结算函」；**已上传文件可删除**。  
 45. **详细信息**：仅已付款；含付款状态；**不含**申请时间/付款时间（仅列表列）；仅备注可编辑。  
 46. **MockFileUpload**：选择文件+列表+点击下载+**× 删除**；无虚线分隔；用于请款凭证。  
@@ -1543,9 +1673,9 @@ src/resources/agent-game-finance/
 65. **internalSettlementButtons / externalSettlementButtons**：按 `businessType` 分桶存储。  
 66. **游戏管理列表**：付款方筛选；三项已付列可排序；默认按 `createdAt` 新→旧；金额带币种+千分位。  
 67. **游戏表单**：**付款方必填**；游戏负责人选填；`Game.createdAt` 添加时写入。  
-68. **合同管理**：合同编号/金额/合作内容/**合作状态**必填；已付*随勾选；`CurrencyInput` 前缀取 `Vendor.currency`；补充说明选填。  
-69. **合同变更日志**：`action=合同变更`；`detail` 多行；含合同金额+三项已付；格式 `"字段"变更为"值"`。  
-70. **厂商支付币种**：`Vendor.currency`；厂商表单标签「**支付币种**」；第二行必填；默认人民币。  
+68. **合同管理**：合同编号/**支付币种**/金额/合作内容/**合作状态**必填；已付*随勾选；`CurrencyInput` 前缀取 `Contract.currency`；未设置币种时前缀为空；补充说明选填。  
+69. **合同变更日志**：`action=合同变更`；`detail` 多行；含合同金额+三项已付；格式 `"字段"变更为"值"`；金额带币种符号与千分位。  
+70. **合同支付币种**：`Contract.currency`；合同管理单选必填；各模块金额展示与输入前缀均读合同。  
 71. **CurrencyInput**：`agf-input-affix__prefix` / `__suffix` 统一灰底 `#f5f7fa`；人民币=￥、美金=$。  
 72. **合作内容多选**：`agf-checkbox-group`；至少一项；取消勾选清空对应已付金额。  
 73. **只读 meta 斜杠**：抽屉/页内 `游戏ID / 游戏名称` 统一斜杠前后空格（见 §34）。  
@@ -1578,17 +1708,24 @@ src/resources/agent-game-finance/
 100. **游戏管理查询总计**：列表**最后一行**「查询总计」；`DataTable.trailingRow`；三项已付按币种求和。  
 101. **游戏管理导出**：第一行「厂商名称」右侧【导出】primary；第二行【添加游戏】；CSV `游戏管理-{YYYY-MM-DD}.csv`；`utils/listExport.ts`。
 102. **付款设置**：原「预付分成管理」；抽屉两区块「预付分成管理」+「付费设置」；`sharePaymentCompany/Currency/Account`。  
-103. **付费设置默认值**：游戏分成付款公司未保存时取 `Game.payer`（仅当 payer 在分成付款公司五项内）；付款币种默认人民币。  
+103. **付费设置默认值**：游戏分成付款公司未保存时**为空**；付款币种默认人民币。  
 104. **预付未填展示**：列表与抽屉「已抵扣/剩余」为 `-`；历史已抵扣/预付输入未保存时不显示 `0.00`。  
 105. **游戏收入列序**：账户余额在账户总收入前。  
-106. **标记付款付款方**：厂商付款管理仍为下拉；**游戏付款管理**改只读「分成付款公司」，取 `Game.sharePaymentCompany`。  
+106. **标记付款付款方**：厂商付款管理仍为下拉 + 三按钮；**游戏付款管理**只读「分成付款公司」+ **两按钮**（无提交）；不在标记付款拦截未配置。  
 107. **游戏表单必填**：添加/编辑含版号、运营状态；合同管理含合作状态。  
-108. **厂商支付币种**：表单标签「支付币种」（非「支持币种」）；合同/预付 `CurrencyInput` 前缀仍取 `Vendor.currency`。  
+108. **厂商表单**：必填 **7 项**（无支付币种）；联系人/手机/邮箱/地址选填。  
 109. **分成付款公司选项**：`SHARE_PAYMENT_COMPANY_OPTIONS` = 4399 / 纯游 / 纯游（美元） / 香港4399 / 游家时代；与游戏管理「付款方」六项独立。  
 110. **游戏标记付款初始填充**：`gamePaymentMarkDefaults.ts`；每次打开重算；五分支见 §46-F 流程图；实付金额允许 ≥ 0。  
 111. **汇率表 mock**：`INITIAL_EXCHANGE_RATES`（2026-04~06）；申请 2026-07 取 2026-06 汇率 **7.21**。  
 112. **游戏付款 mock 验收**：GP011–GP015 覆盖五分支 + GP002（③ net=0）；详见 §46-F。  
 113. **结算函快照**：`letterSnapshot`；标记已付款时写入；已付款打开结算函只读快照。  
 114. **结算函⑤两行**：`remaining−(②−④)>0` → ⑤=②−④ 否则 ⑤=remaining；函内剩余=remaining−⑤；见 §47-C。  
-115. **游戏收入预付列币种**：列表预付/已抵扣/剩余三列取 `Vendor.currency`。  
-116. **ReadonlyCurrencyField**：【付款设置】已抵扣/剩余只读；前缀同 `CurrencyInput`。
+115. **游戏收入预付列币种**：列表预付/已抵扣/剩余取 `prepaymentCurrency` 快照（§48）。  
+116. **ReadonlyCurrencyField**：【付款设置】已抵扣/剩余只读；前缀同 `CurrencyInput`。  
+117. **支付币种**：`Contract.currency` 在合同管理维护；`prepaymentCurrency` 首次保存写入；`utils/currencySnapshot.ts`。  
+118. **操作记录金额**：合同变更日志金额 `formatOptionalCurrencyMoney`；见 §50。  
+119. **批注系统**：`@axhub/annotation`；正文在 `docs/annotations/`；`buildAnnotationSource.ts` 合并 markdown；侧栏隐藏页未批注。  
+120. **批注体验**：序号默认开；气泡宽 560px 需 Shadow DOM 注入（`annotationPanelWidth.ts`）。  
+121. **收入汇总导出**：inline 在厂商名称右侧；`收入汇总统计-{维度}-{日期}.csv`；不含查询总计行。  
+122. **游戏申请付款成功**：`applyGamePayment` 写入 `gamePayments` **首行**；Toast「申请付款成功，账户余额已清零」。  
+123. **请款凭证格式说明**：`MockFileUpload.hint` — png、jpg、pdf。

@@ -8,10 +8,11 @@ interface AdminLayoutProps {
   onNavigate: (pageId: string) => void;
   breadcrumbs: string[];
   breadcrumbExtra?: React.ReactNode;
+  headerExtra?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function AdminLayout({ menuGroups, activePage, onNavigate, breadcrumbs, breadcrumbExtra, children }: AdminLayoutProps) {
+export function AdminLayout({ menuGroups, activePage, onNavigate, breadcrumbs, breadcrumbExtra, headerExtra, children }: AdminLayoutProps) {
   return (
     <div className="agf-app">
       <Sidebar groups={menuGroups} activePage={activePage} onNavigate={onNavigate} />
@@ -27,6 +28,7 @@ export function AdminLayout({ menuGroups, activePage, onNavigate, breadcrumbs, b
             {breadcrumbExtra}
           </nav>
           <div className="agf-header__actions">
+            {headerExtra}
             <Download size={18} aria-hidden />
             <User size={18} aria-hidden />
             <span>管理员</span>

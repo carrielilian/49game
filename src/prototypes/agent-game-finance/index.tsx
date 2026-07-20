@@ -6,9 +6,16 @@
  * - /rules/axure-export-workflow.md
  * - /rules/prototype-development-guide.md
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import {
+  AnnotationViewer,
+  type AnnotationDirectoryRouteNode,
+  type AnnotationViewerOptions,
+} from '@axhub/annotation';
 import { defineHashPageRoute, useHashPage } from '../../common/useHashPage';
 import { AdminLayout } from './components/AdminLayout';
+import { AnnotationToggle } from './components/AnnotationToggle';
+import { OverlayScopeProvider, useOverlayScope } from './components/OverlayScope';
 import { GameIncomeFieldHelp } from './components/GameIncomeFieldHelp';
 import { VendorIncomeFieldHelp } from './components/VendorIncomeFieldHelp';
 import type { MenuGroup } from './components/Sidebar';
@@ -23,6 +30,9 @@ import { PaymentListPage } from './pages/PaymentListPage';
 import { RevenueSummaryPage } from './pages/RevenueSummaryPage';
 import { VendorIncomePage } from './pages/VendorIncomePage';
 import { VendorListPage } from './pages/VendorListPage';
+import { buildAnnotationSource } from './utils/buildAnnotationSource';
+import { useAnnotationPanelWidth } from './utils/annotationPanelWidth';
+import { createAnnotationElementResolver } from './utils/resolveAnnotationElement';
 import './style.css';
 
 const ROUTE = defineHashPageRoute([
@@ -99,8 +109,27 @@ function PageContent({ pageId }: { pageId: string }) {
 
 function AppShell() {
   const { page, setPage } = useHashPage(ROUTE);
+  const { overlayOpenRef } = useOverlayScope();
+  const [showAnnotation, setShowAnnotation] = useState(true);
+  const resolveElement = useMemo(
+    () => createAnnotationElementResolver(overlayOpenRef),
+    [overlayOpenRef],
+  );
   const meta = PAGE_META[page] ?? PAGE_META['vendor-list'];
   const breadcrumbs = useMemo(() => ['业务中台', '代理游戏台账', meta.group, meta.title], [meta]);
+  const annotationSource = useMemo(() => buildAnnotationSource(), []);
+  const viewerOptions = useMemo<AnnotationViewerOptions>(() => ({
+    currentPageId: page,
+    showToolbar: true,
+    showColorFilter: true,
+    defaultMarkerIndexVisible: true,
+    emptyWhenNoData: false,
+    onDirectoryRoute: (node: AnnotationDirectoryRouteNode) => {
+      if (typeof node.route === 'string') setPage(node.route);
+    },
+  }), [page, setPage]);
+
+  useAnnotationPanelWidth(showAnnotation);
 
   return (
     <AdminLayout
@@ -108,6 +137,7 @@ function AppShell() {
       activePage={page}
       onNavigate={setPage}
       breadcrumbs={breadcrumbs}
+      headerExtra={<AnnotationToggle checked={showAnnotation} onChange={setShowAnnotation} />}
       breadcrumbExtra={
         page === 'vendor-income' ? <VendorIncomeFieldHelp />
           : page === 'game-income' ? <GameIncomeFieldHelp />
@@ -115,6 +145,13 @@ function AppShell() {
       }
     >
       <PageContent pageId={page} />
+      {showAnnotation && (
+        <AnnotationViewer
+          source={annotationSource}
+          options={viewerOptions}
+          resolveElement={resolveElement}
+        />
+      )}
     </AdminLayout>
   );
 }
@@ -122,7 +159,9 @@ function AppShell() {
 const Component = function Component() {
   return (
     <AppProvider>
-      <AppShell />
+      <OverlayScopeProvider>
+        <AppShell />
+      </OverlayScopeProvider>
     </AppProvider>
   );
 };

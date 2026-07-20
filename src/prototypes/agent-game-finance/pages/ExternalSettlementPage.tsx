@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { COL_ALIGN_RIGHT, DataTable, DualCell, type Column } from '../components/DataTable';
+import { ColumnFilter } from '../components/ColumnFilter';
 import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
 import { Modal, Toast, type ToastType } from '../components/Modal';
@@ -164,17 +165,20 @@ export function ExternalSettlementPage() {
 
   return (
     <div className="agf-card">
-      <FilterBar
-        actions={
-          <button type="button" className="agf-btn agf-btn--primary" onClick={openImport}>
-            <Upload size={16} />
-            导入并结算
-          </button>
-        }
-      >
-        <MonthRangePicker value={monthRange} onChange={setMonthRange} />
-        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
-      </FilterBar>
+      <div data-annotation-id="external-settlement-query">
+        <FilterBar
+          actions={
+            <button type="button" className="agf-btn agf-btn--primary" data-annotation-id="external-settlement-import" onClick={openImport}>
+              <Upload size={16} />
+              导入并结算
+            </button>
+          }
+        >
+          <MonthRangePicker value={monthRange} onChange={setMonthRange} />
+          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
+        </FilterBar>
+      </div>
+      <div data-annotation-id="external-settlement-table">
       <DataTable
         rowKey={(r) => r.id}
         data={data}
@@ -186,12 +190,19 @@ export function ExternalSettlementPage() {
           {
             key: 'channel',
             title: '渠道',
-            filter: {
-              type: 'select',
-              value: channelFilter,
-              onChange: setChannelFilter,
-              options: selectOptions(EXTERNAL_CHANNELS),
-            },
+            header: (
+              <span data-annotation-id="external-settlement-channel-col">
+                <ColumnFilter
+                  title="渠道"
+                  filter={{
+                    type: 'select',
+                    value: channelFilter,
+                    onChange: setChannelFilter,
+                    options: selectOptions(EXTERNAL_CHANNELS),
+                  }}
+                />
+              </span>
+            ),
             render: (r) => r.channel,
           },
           { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
@@ -201,16 +212,24 @@ export function ExternalSettlementPage() {
           {
             key: 'status',
             title: '申请付款状态',
-            filter: {
-              type: 'select',
-              value: paymentStatusFilter,
-              onChange: setPaymentStatusFilter,
-              options: PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
-            },
+            header: (
+              <span data-annotation-id="external-settlement-payment-col">
+                <ColumnFilter
+                  title="申请付款状态"
+                  filter={{
+                    type: 'select',
+                    value: paymentStatusFilter,
+                    onChange: setPaymentStatusFilter,
+                    options: PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
+                  }}
+                />
+              </span>
+            ),
             render: (r) => <StatusBadge text={r.paymentApplyStatus} />,
           },
         ]}
       />
+      </div>
       <Modal
         title="导入并结算"
         open={importOpen}
@@ -241,6 +260,7 @@ export function ExternalSettlementPage() {
           </>
         }
       >
+        <div data-annotation-id="external-settlement-import-modal">
         {!importUploaded ? (
           <>
             <div className="agf-import-section">
@@ -294,6 +314,7 @@ export function ExternalSettlementPage() {
             />
           </>
         )}
+        </div>
       </Modal>
       {toast && (
         <Toast

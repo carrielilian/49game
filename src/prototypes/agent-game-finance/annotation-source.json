@@ -1,0 +1,1544 @@
+{
+  "documentVersion": 1,
+  "format": "axhub-annotation-source",
+  "data": {
+    "version": 2,
+    "prototypeName": "agent-game-finance",
+    "pageId": "vendor-list",
+    "updatedAt": 1784515200000,
+    "nodes": [
+      {
+        "id": "vendor-list-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "vendor-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"vendor-list-query\"]"
+          ],
+          "fingerprint": "div|data-annotation-id=vendor-list-query",
+          "path": []
+        },
+        "aiPrompt": "说明厂商管理查询栏的业务类型切换与厂商搜索逻辑。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "vendor-list-add",
+        "index": 2,
+        "title": "添加厂商",
+        "pageId": "vendor-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"vendor-list-add\"]"
+          ],
+          "fingerprint": "button|data-annotation-id=vendor-list-add",
+          "path": []
+        },
+        "aiPrompt": "说明添加厂商入口与抽屉行为。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "vendor-list-table",
+        "index": 3,
+        "title": "厂商列表",
+        "pageId": "vendor-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"vendor-list-table\"]"
+          ],
+          "fingerprint": "div|data-annotation-id=vendor-list-table",
+          "path": []
+        },
+        "aiPrompt": "说明厂商列表各列含义与过滤关系。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "vendor-list-invoice-col",
+        "index": 4,
+        "title": "发票信息列",
+        "pageId": "vendor-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"vendor-list-invoice-col\"]"
+          ],
+          "fingerprint": "th|data-annotation-id=vendor-list-invoice-col",
+          "path": []
+        },
+        "aiPrompt": "说明发票信息列筛选选项与结算公式联动。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "vendor-list-edit",
+        "index": 5,
+        "title": "编辑",
+        "pageId": "vendor-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"vendor-list-edit\"]"
+          ],
+          "fingerprint": "button|data-annotation-id=vendor-list-edit",
+          "path": []
+        },
+        "aiPrompt": "说明列表操作列编辑入口与编辑抽屉行为。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "vendor-list-add-form",
+        "index": 6,
+        "title": "添加表单",
+        "pageId": "vendor-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"vendor-list-add-form\"]"
+          ],
+          "fingerprint": "div|data-annotation-id=vendor-list-add-form",
+          "path": []
+        },
+        "aiPrompt": "说明添加厂商抽屉表单字段与校验。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "vendor-list-edit-form",
+        "index": 7,
+        "title": "编辑表单",
+        "pageId": "vendor-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"vendor-list-edit-form\"]"
+          ],
+          "fingerprint": "div|data-annotation-id=vendor-list-edit-form",
+          "path": []
+        },
+        "aiPrompt": "说明编辑厂商抽屉表单字段、只读规则与保存逻辑。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-query\"]"
+          ],
+          "fingerprint": "div|game-list-query",
+          "path": []
+        },
+        "aiPrompt": "说明游戏管理查询栏。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-export",
+        "index": 2,
+        "title": "导出",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-export\"]"
+          ],
+          "fingerprint": "button|game-list-export",
+          "path": []
+        },
+        "aiPrompt": "说明游戏管理导出。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-add",
+        "index": 3,
+        "title": "添加游戏",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-add\"]"
+          ],
+          "fingerprint": "button|game-list-add",
+          "path": []
+        },
+        "aiPrompt": "说明添加游戏入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-table",
+        "index": 4,
+        "title": "游戏列表",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-table\"]"
+          ],
+          "fingerprint": "div|game-list-table",
+          "path": []
+        },
+        "aiPrompt": "说明游戏列表各列。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-payer-col",
+        "index": 5,
+        "title": "付款方列",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-payer-col\"]"
+          ],
+          "fingerprint": "span|game-list-payer-col",
+          "path": []
+        },
+        "aiPrompt": "说明付款方列筛选。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-paid-cols",
+        "index": 6,
+        "title": "已付金额列",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-paid-cols\"]"
+          ],
+          "fingerprint": "span|game-list-paid-cols",
+          "path": []
+        },
+        "aiPrompt": "说明三项已付金额列。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-op-status",
+        "index": 7,
+        "title": "运营状态列",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-op-status\"]"
+          ],
+          "fingerprint": "span|game-list-op-status",
+          "path": []
+        },
+        "aiPrompt": "说明运营状态列。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-summary",
+        "index": 8,
+        "title": "查询总计行",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-summary\"]"
+          ],
+          "fingerprint": "tr|game-list-summary",
+          "path": []
+        },
+        "aiPrompt": "说明查询总计行。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-edit",
+        "index": 9,
+        "title": "编辑",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-edit\"]"
+          ],
+          "fingerprint": "button|game-list-edit",
+          "path": []
+        },
+        "aiPrompt": "说明编辑入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-contract",
+        "index": 10,
+        "title": "合同管理",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-contract\"]"
+          ],
+          "fingerprint": "button|game-list-contract",
+          "path": []
+        },
+        "aiPrompt": "说明合同管理入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-channels",
+        "index": 11,
+        "title": "支持渠道",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-channels\"]"
+          ],
+          "fingerprint": "button|game-list-channels",
+          "path": []
+        },
+        "aiPrompt": "说明支持渠道入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-logs",
+        "index": 12,
+        "title": "操作记录",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-logs\"]"
+          ],
+          "fingerprint": "button|game-list-logs",
+          "path": []
+        },
+        "aiPrompt": "说明操作记录入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-add-form",
+        "index": 13,
+        "title": "添加表单",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-add-form\"]"
+          ],
+          "fingerprint": "div|game-list-add-form",
+          "path": []
+        },
+        "aiPrompt": "说明添加游戏表单。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-edit-form",
+        "index": 14,
+        "title": "编辑表单",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-edit-form\"]"
+          ],
+          "fingerprint": "div|game-list-edit-form",
+          "path": []
+        },
+        "aiPrompt": "说明编辑游戏表单。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-contract-form",
+        "index": 15,
+        "title": "合同表单",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-contract-form\"]"
+          ],
+          "fingerprint": "div|game-list-contract-form",
+          "path": []
+        },
+        "aiPrompt": "说明合同管理表单。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-channels-form",
+        "index": 16,
+        "title": "支持渠道表单",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-channels-form\"]"
+          ],
+          "fingerprint": "div|game-list-channels-form",
+          "path": []
+        },
+        "aiPrompt": "说明支持渠道表单。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-list-logs-drawer",
+        "index": 17,
+        "title": "操作记录抽屉",
+        "pageId": "game-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-list-logs-drawer\"]"
+          ],
+          "fingerprint": "div|game-list-logs-drawer",
+          "path": []
+        },
+        "aiPrompt": "说明操作记录抽屉。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-query\"]"
+          ],
+          "fingerprint": "div|formula-list-query",
+          "path": []
+        },
+        "aiPrompt": "说明结算公式管理查询栏。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-table",
+        "index": 2,
+        "title": "结算公式列表",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-table\"]"
+          ],
+          "fingerprint": "div|formula-list-table",
+          "path": []
+        },
+        "aiPrompt": "说明结算公式列表各列。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-formula-col",
+        "index": 3,
+        "title": "结算公式列",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-formula-col\"]"
+          ],
+          "fingerprint": "span|formula-list-formula-col",
+          "path": []
+        },
+        "aiPrompt": "说明结算公式列展示规则。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-formula",
+        "index": 4,
+        "title": "结算公式",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-formula\"]"
+          ],
+          "fingerprint": "button|formula-list-formula",
+          "path": []
+        },
+        "aiPrompt": "说明结算公式入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-logs",
+        "index": 5,
+        "title": "操作记录",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-logs\"]"
+          ],
+          "fingerprint": "button|formula-list-logs",
+          "path": []
+        },
+        "aiPrompt": "说明操作记录入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-formula-form",
+        "index": 6,
+        "title": "结算公式表单",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-formula-form\"]"
+          ],
+          "fingerprint": "div|formula-list-formula-form",
+          "path": []
+        },
+        "aiPrompt": "说明结算公式设置表单。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-logs-drawer",
+        "index": 7,
+        "title": "操作记录抽屉",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-logs-drawer\"]"
+          ],
+          "fingerprint": "div|formula-list-logs-drawer",
+          "path": []
+        },
+        "aiPrompt": "说明操作记录抽屉。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "external-settlement-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "external-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"external-settlement-query\"]"
+          ],
+          "fingerprint": "div|external-settlement-query",
+          "path": []
+        },
+        "aiPrompt": "说明外部收入结算查询栏。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "external-settlement-import",
+        "index": 2,
+        "title": "导入并结算",
+        "pageId": "external-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"external-settlement-import\"]"
+          ],
+          "fingerprint": "button|external-settlement-import",
+          "path": []
+        },
+        "aiPrompt": "说明导入并结算入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "external-settlement-table",
+        "index": 3,
+        "title": "外部收入列表",
+        "pageId": "external-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"external-settlement-table\"]"
+          ],
+          "fingerprint": "div|external-settlement-table",
+          "path": []
+        },
+        "aiPrompt": "说明外部收入结算列表。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "external-settlement-channel-col",
+        "index": 4,
+        "title": "渠道列",
+        "pageId": "external-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"external-settlement-channel-col\"]"
+          ],
+          "fingerprint": "span|external-settlement-channel-col",
+          "path": []
+        },
+        "aiPrompt": "说明渠道列筛选。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "external-settlement-payment-col",
+        "index": 5,
+        "title": "申请付款状态列",
+        "pageId": "external-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"external-settlement-payment-col\"]"
+          ],
+          "fingerprint": "span|external-settlement-payment-col",
+          "path": []
+        },
+        "aiPrompt": "说明申请付款状态列筛选。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "external-settlement-import-modal",
+        "index": 6,
+        "title": "导入并结算弹窗",
+        "pageId": "external-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"external-settlement-import-modal\"]"
+          ],
+          "fingerprint": "div|external-settlement-import-modal",
+          "path": []
+        },
+        "aiPrompt": "说明导入并结算弹窗流程。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-settlement-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "internal-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-settlement-query\"]"
+          ],
+          "fingerprint": "div|internal-settlement-query",
+          "path": []
+        },
+        "aiPrompt": "说明内部收入结算查询栏。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-settlement-pull",
+        "index": 2,
+        "title": "数据拉取",
+        "pageId": "internal-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-settlement-pull\"]"
+          ],
+          "fingerprint": "button|internal-settlement-pull",
+          "path": []
+        },
+        "aiPrompt": "说明内部收入数据拉取。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-settlement-settle",
+        "index": 3,
+        "title": "结算",
+        "pageId": "internal-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-settlement-settle\"]"
+          ],
+          "fingerprint": "button|internal-settlement-settle",
+          "path": []
+        },
+        "aiPrompt": "说明内部收入结算按钮。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-settlement-table",
+        "index": 4,
+        "title": "内部收入列表",
+        "pageId": "internal-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-settlement-table\"]"
+          ],
+          "fingerprint": "div|internal-settlement-table",
+          "path": []
+        },
+        "aiPrompt": "说明内部收入结算列表。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-settlement-channel-col",
+        "index": 5,
+        "title": "渠道列",
+        "pageId": "internal-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-settlement-channel-col\"]"
+          ],
+          "fingerprint": "span|internal-settlement-channel-col",
+          "path": []
+        },
+        "aiPrompt": "说明内部收入渠道列筛选。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-settlement-payment-col",
+        "index": 6,
+        "title": "申请付款状态列",
+        "pageId": "internal-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-settlement-payment-col\"]"
+          ],
+          "fingerprint": "span|internal-settlement-payment-col",
+          "path": []
+        },
+        "aiPrompt": "说明内部收入申请付款状态列。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-refund-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "internal-refund",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-refund-query\"]"
+          ],
+          "fingerprint": "div|internal-refund-query",
+          "path": []
+        },
+        "aiPrompt": "说明内部退款结算查询栏。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-refund-pull",
+        "index": 2,
+        "title": "数据拉取",
+        "pageId": "internal-refund",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-refund-pull\"]"
+          ],
+          "fingerprint": "button|internal-refund-pull",
+          "path": []
+        },
+        "aiPrompt": "说明内部退款数据拉取。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-refund-settle",
+        "index": 3,
+        "title": "结算",
+        "pageId": "internal-refund",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-refund-settle\"]"
+          ],
+          "fingerprint": "button|internal-refund-settle",
+          "path": []
+        },
+        "aiPrompt": "说明内部退款结算按钮。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-refund-table",
+        "index": 4,
+        "title": "内部退款列表",
+        "pageId": "internal-refund",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-refund-table\"]"
+          ],
+          "fingerprint": "div|internal-refund-table",
+          "path": []
+        },
+        "aiPrompt": "说明内部退款结算列表。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-refund-channel-col",
+        "index": 5,
+        "title": "渠道列",
+        "pageId": "internal-refund",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-refund-channel-col\"]"
+          ],
+          "fingerprint": "span|internal-refund-channel-col",
+          "path": []
+        },
+        "aiPrompt": "说明内部退款渠道列筛选。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "internal-refund-payment-col",
+        "index": 6,
+        "title": "申请付款状态列",
+        "pageId": "internal-refund",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"internal-refund-payment-col\"]"
+          ],
+          "fingerprint": "span|internal-refund-payment-col",
+          "path": []
+        },
+        "aiPrompt": "说明内部退款申请付款状态列。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-income-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "game-income",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-income-query\"]"
+          ],
+          "fingerprint": "div|game-income-query",
+          "path": []
+        },
+        "aiPrompt": "说明游戏收入管理查询栏。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-income-table",
+        "index": 2,
+        "title": "游戏收入列表",
+        "pageId": "game-income",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-income-table\"]"
+          ],
+          "fingerprint": "div|game-income-table",
+          "path": []
+        },
+        "aiPrompt": "说明游戏收入列表各列。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-income-field-help",
+        "index": 3,
+        "title": "字段说明",
+        "pageId": "game-income",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-income-field-help\"]"
+          ],
+          "fingerprint": "button|game-income-field-help",
+          "path": []
+        },
+        "aiPrompt": "说明面包屑字段帮助。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-income-payment-settings",
+        "index": 4,
+        "title": "付款设置",
+        "pageId": "game-income",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-income-payment-settings\"]"
+          ],
+          "fingerprint": "button|game-income-payment-settings",
+          "path": []
+        },
+        "aiPrompt": "说明付款设置入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-income-apply-payment",
+        "index": 5,
+        "title": "申请付款",
+        "pageId": "game-income",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-income-apply-payment\"]"
+          ],
+          "fingerprint": "button|game-income-apply-payment",
+          "path": []
+        },
+        "aiPrompt": "说明申请付款入口与校验。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-income-payment-form",
+        "index": 6,
+        "title": "付款设置抽屉",
+        "pageId": "game-income",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-income-payment-form\"]"
+          ],
+          "fingerprint": "div|game-income-payment-form",
+          "path": []
+        },
+        "aiPrompt": "说明付款设置抽屉表单。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-income-apply-modal",
+        "index": 7,
+        "title": "申请付款确认",
+        "pageId": "game-income",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-income-apply-modal\"]"
+          ],
+          "fingerprint": "div|game-income-apply-modal",
+          "path": []
+        },
+        "aiPrompt": "说明申请付款确认弹窗。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-query\"]"
+          ],
+          "fingerprint": "div|game-payment-list-query",
+          "path": []
+        },
+        "aiPrompt": "说明游戏付款管理查询栏。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-table",
+        "index": 2,
+        "title": "游戏付款列表",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-table\"]"
+          ],
+          "fingerprint": "div|game-payment-list-table",
+          "path": []
+        },
+        "aiPrompt": "说明游戏付款列表。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-payment-col",
+        "index": 3,
+        "title": "付款状态列",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-payment-col\"]"
+          ],
+          "fingerprint": "span|game-payment-list-payment-col",
+          "path": []
+        },
+        "aiPrompt": "说明付款状态列筛选。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-mark",
+        "index": 4,
+        "title": "标记付款",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-mark\"]"
+          ],
+          "fingerprint": "button|game-payment-list-mark",
+          "path": []
+        },
+        "aiPrompt": "说明标记付款入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-detail",
+        "index": 5,
+        "title": "详细信息",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-detail\"]"
+          ],
+          "fingerprint": "button|game-payment-list-detail",
+          "path": []
+        },
+        "aiPrompt": "说明详细信息入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-letter",
+        "index": 6,
+        "title": "结算函",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-letter\"]"
+          ],
+          "fingerprint": "button|game-payment-list-letter",
+          "path": []
+        },
+        "aiPrompt": "说明结算函入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-voucher",
+        "index": 7,
+        "title": "请款凭证",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-voucher\"]"
+          ],
+          "fingerprint": "button|game-payment-list-voucher",
+          "path": []
+        },
+        "aiPrompt": "说明请款凭证入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-mark-drawer",
+        "index": 8,
+        "title": "标记付款抽屉",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-mark-drawer\"]"
+          ],
+          "fingerprint": "div|game-payment-list-mark-drawer",
+          "path": []
+        },
+        "aiPrompt": "说明标记付款抽屉。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-detail-drawer",
+        "index": 9,
+        "title": "详细信息抽屉",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-detail-drawer\"]"
+          ],
+          "fingerprint": "div|game-payment-list-detail-drawer",
+          "path": []
+        },
+        "aiPrompt": "说明详细信息抽屉。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-voucher-drawer",
+        "index": 10,
+        "title": "请款凭证抽屉",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-voucher-drawer\"]"
+          ],
+          "fingerprint": "div|game-payment-list-voucher-drawer",
+          "path": []
+        },
+        "aiPrompt": "说明请款凭证抽屉。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "game-payment-list-letter-drawer",
+        "index": 11,
+        "title": "结算函抽屉",
+        "pageId": "game-payment-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"game-payment-list-letter-drawer\"]"
+          ],
+          "fingerprint": "div|game-payment-list-letter-drawer",
+          "path": []
+        },
+        "aiPrompt": "说明游戏付款结算函抽屉内容与计算口径。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "stats-summary-query",
+        "index": 1,
+        "title": "查询栏",
+        "pageId": "stats-summary",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"stats-summary-query\"]"
+          ],
+          "fingerprint": "div|stats-summary-query",
+          "path": []
+        },
+        "aiPrompt": "说明收入汇总统计查询栏。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "stats-summary-table",
+        "index": 2,
+        "title": "收入汇总列表",
+        "pageId": "stats-summary",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"stats-summary-table\"]"
+          ],
+          "fingerprint": "div|stats-summary-table",
+          "path": []
+        },
+        "aiPrompt": "说明收入汇总列表。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "stats-summary-summary-row",
+        "index": 3,
+        "title": "查询总计行",
+        "pageId": "stats-summary",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"stats-summary-summary-row\"]"
+          ],
+          "fingerprint": "tr|stats-summary-summary-row",
+          "path": []
+        },
+        "aiPrompt": "说明查询总计行。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "stats-summary-export",
+        "index": 5,
+        "title": "导出",
+        "pageId": "stats-summary",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"stats-summary-export\"]"
+          ],
+          "fingerprint": "button|stats-summary-export",
+          "path": []
+        },
+        "aiPrompt": "说明收入汇总统计导出。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "stats-summary-channel-col",
+        "index": 4,
+        "title": "渠道列",
+        "pageId": "stats-summary",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"stats-summary-channel-col\"]"
+          ],
+          "fingerprint": "span|stats-summary-channel-col",
+          "path": []
+        },
+        "aiPrompt": "说明渠道维度筛选。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#059669",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      }
+    ]
+  },
+  "markdownMap": {},
+  "assetMap": {},
+  "directory": {
+    "nodes": [
+      {
+        "type": "folder",
+        "id": "agf-directory",
+        "title": "代理游戏台账",
+        "defaultExpanded": true,
+        "children": [
+          {
+            "type": "folder",
+            "id": "agf-game-payment",
+            "title": "游戏支付管理",
+            "defaultExpanded": true,
+            "children": [
+              {
+                "type": "route",
+                "id": "route-vendor-list",
+                "title": "厂商管理",
+                "route": "vendor-list"
+              },
+              {
+                "type": "route",
+                "id": "route-game-list",
+                "title": "游戏管理",
+                "route": "game-list"
+              }
+            ]
+          },
+          {
+            "type": "folder",
+            "id": "agf-finance",
+            "title": "财务分成管理",
+            "defaultExpanded": true,
+            "children": [
+              {
+                "type": "route",
+                "id": "route-formula-list",
+                "title": "结算公式管理",
+                "route": "formula-list"
+              },
+              {
+                "type": "route",
+                "id": "route-external-settlement",
+                "title": "外部收入结算",
+                "route": "external-settlement"
+              },
+              {
+                "type": "route",
+                "id": "route-internal-settlement",
+                "title": "内部收入结算",
+                "route": "internal-settlement"
+              },
+              {
+                "type": "route",
+                "id": "route-internal-refund",
+                "title": "内部退款结算",
+                "route": "internal-refund"
+              },
+              {
+                "type": "route",
+                "id": "route-game-income",
+                "title": "游戏收入管理",
+                "route": "game-income"
+              },
+              {
+                "type": "route",
+                "id": "route-game-payment-list",
+                "title": "游戏付款管理",
+                "route": "game-payment-list"
+              }
+            ]
+          },
+          {
+            "type": "folder",
+            "id": "agf-stats",
+            "title": "数据统计",
+            "defaultExpanded": true,
+            "children": [
+              {
+                "type": "route",
+                "id": "route-stats-summary",
+                "title": "收入汇总统计",
+                "route": "stats-summary"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

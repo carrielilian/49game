@@ -20,6 +20,7 @@ export function GameIncomeFieldHelp() {
       <button
         type="button"
         className="agf-help-btn"
+        data-annotation-id="game-income-field-help"
         onClick={() => setOpen(true)}
         aria-label="游戏收入管理字段说明"
         title="字段说明"

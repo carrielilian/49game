@@ -2,6 +2,7 @@ import type {
   BusinessType,
   Contract,
   CooperationContent,
+  ContractCurrency,
   FormulaConfig,
   Game,
   GameBalance,
@@ -44,7 +45,7 @@ const VENDOR_HISTORICAL_DEDUCTIONS: Partial<Record<string, number>> = {
 /** 银行五字段不全（验收「未填写银行信息」拦截） */
 const VENDOR_INCOMPLETE_BANK = new Set(['1007']);
 
-function vendorWithPrepayment(v: Omit<Vendor, 'prepayment' | 'historicalDeduction'> & { prepayment?: number }): Vendor {
+function vendorWithPrepayment(v: Omit<Vendor, 'prepayment' | 'historicalDeduction' | 'prepaymentCurrency'> & { prepayment?: number }): Vendor {
   const prepayment = VENDOR_PREPAYMENTS[v.id];
   const historicalDeduction = VENDOR_HISTORICAL_DEDUCTIONS[v.id];
   const bankIncomplete = VENDOR_INCOMPLETE_BANK.has(v.id);
@@ -104,17 +105,17 @@ function gameWithPrepayment(g: Game): Game {
 }
 
 export const INITIAL_VENDORS: Vendor[] = [
-  vendorWithPrepayment({ id: '1001', businessType: BT4399, name: '星辉互动科技有限公司', contact: '张伟', phone: '13800138001', email: 'zhangwei@xinghui.com', address: '北京市朝阳区望京SOHO T3', currency: '人民币', invoiceInfo: '增值税专用发票（6%）', accountName: '星辉互动科技有限公司', bank: '中国工商银行', bankLocation: '北京市', branch: '朝阳支行', cardNumber: '6222123412341234' }),
-  vendorWithPrepayment({ id: '1002', businessType: BT4399, name: '幻境游戏工作室', contact: '李娜', phone: '13900139002', email: 'lina@huanjing.com', address: '上海市浦东新区张江高科技园区', currency: '人民币', invoiceInfo: '增值税专用发票（3%）', accountName: '幻境游戏工作室', bank: '招商银行', bankLocation: '上海市', branch: '张江支行', cardNumber: '6214567856785678' }),
-  vendorWithPrepayment({ id: '1003', businessType: BT4399, name: '雷霆网络科技', contact: '王强', phone: '13700137003', email: 'wangqiang@leiting.com', address: '深圳市南山区科技园南区', currency: '美金', invoiceInfo: '增值税专用发票（6%）', accountName: '雷霆网络科技有限公司', bank: '建设银行', bankLocation: '广东省', branch: '科技园支行', cardNumber: '6227901290129012' }),
-  vendorWithPrepayment({ id: '1004', businessType: BT4399, name: '梦想互娱', contact: '陈静', phone: '13600136004', email: 'chenjing@mengxiang.com', address: '广州市天河区珠江新城', currency: '人民币', invoiceInfo: '增值税专用发票（6%）', accountName: '梦想互娱有限公司', bank: '农业银行', bankLocation: '广东省', branch: '天河支行', cardNumber: '6228345634563456' }),
-  vendorWithPrepayment({ id: '1005', businessType: BT4399, name: '像素工坊', contact: '刘洋', phone: '13500135005', email: 'liuyang@pixel.com', address: '杭州市西湖区文三路', currency: '人民币', invoiceInfo: '增值税专用发票（3%）', accountName: '像素工坊', bank: '中国银行', bankLocation: '浙江省', branch: '文三路支行', cardNumber: '6216789078907890' }),
-  vendorWithPrepayment({ id: '1006', businessType: BT4399, name: '云端游创', contact: '赵敏', phone: '13400134006', email: 'zhaomin@cloudgame.com', address: '成都市高新区天府大道', currency: '人民币', invoiceInfo: '增值税专用发票（6%）', accountName: '云端游创科技有限公司', bank: '交通银行', bankLocation: '四川省', branch: '天府支行', cardNumber: '6222234523452345' }),
-  vendorWithPrepayment({ id: '1007', businessType: BT4399, name: '灵动科技', contact: '孙涛', phone: '13300133007', email: 'suntao@lingdong.com', address: '武汉市洪山区光谷软件园', currency: '人民币', invoiceInfo: '增值税专用发票（3%）', accountName: '灵动科技有限公司', bank: '浦发银行', bankLocation: '湖北省', branch: '光谷支行', cardNumber: '6225678967896789' }),
-  vendorWithPrepayment({ id: '1008', businessType: BT4399, name: '极客游戏', contact: '周雪', phone: '13200132008', email: 'zhouxue@geekgame.com', address: '南京市鼓楼区新街口', currency: '人民币', invoiceInfo: '增值税专用发票（6%）', accountName: '极客游戏有限公司', bank: '民生银行', bankLocation: '江苏省', branch: '新街口支行', cardNumber: '6226012301230123' }),
-  vendorWithPrepayment({ id: '2001', businessType: BTKB, name: '快爆星辰科技', contact: '林峰', phone: '13100131001', email: 'linfeng@kbstar.com', address: '厦门市思明区软件园二期', currency: '人民币', invoiceInfo: '增值税专用发票（6%）', accountName: '快爆星辰科技有限公司', bank: '兴业银行', bankLocation: '福建省', branch: '软件园支行', cardNumber: '6229098765432109' }),
-  vendorWithPrepayment({ id: '2002', businessType: BTKB, name: '极速互娱', contact: '黄悦', phone: '13100131002', email: 'huangyue@jisu.com', address: '长沙市岳麓区麓谷企业广场', currency: '人民币', invoiceInfo: '增值税专用发票（3%）', accountName: '极速互娱工作室', bank: '长沙银行', bankLocation: '湖南省', branch: '麓谷支行', cardNumber: '6214567890123456' }),
-  vendorWithPrepayment({ id: '2003', businessType: BTKB, name: '爆趣游戏', contact: '何亮', phone: '13100131003', email: 'heliang@baoqu.com', address: '西安市高新区锦业路', currency: '人民币', invoiceInfo: '增值税专用发票（6%）', accountName: '爆趣游戏有限公司', bank: '西安银行', bankLocation: '陕西省', branch: '高新支行', cardNumber: '6225887654321098' }),
+  vendorWithPrepayment({ id: '1001', businessType: BT4399, name: '星辉互动科技有限公司', contact: '张伟', phone: '13800138001', email: 'zhangwei@xinghui.com', address: '北京市朝阳区望京SOHO T3', invoiceInfo: '增值税专用发票（6%）', accountName: '星辉互动科技有限公司', bank: '中国工商银行', bankLocation: '北京市', branch: '朝阳支行', cardNumber: '6222123412341234' }),
+  vendorWithPrepayment({ id: '1002', businessType: BT4399, name: '幻境游戏工作室', contact: '李娜', phone: '13900139002', email: 'lina@huanjing.com', address: '上海市浦东新区张江高科技园区', invoiceInfo: '增值税专用发票（3%）', accountName: '幻境游戏工作室', bank: '招商银行', bankLocation: '上海市', branch: '张江支行', cardNumber: '6214567856785678' }),
+  vendorWithPrepayment({ id: '1003', businessType: BT4399, name: '雷霆网络科技', contact: '王强', phone: '13700137003', email: 'wangqiang@leiting.com', address: '深圳市南山区科技园南区', invoiceInfo: '增值税专用发票（6%）', accountName: '雷霆网络科技有限公司', bank: '建设银行', bankLocation: '广东省', branch: '科技园支行', cardNumber: '6227901290129012' }),
+  vendorWithPrepayment({ id: '1004', businessType: BT4399, name: '梦想互娱', contact: '陈静', phone: '13600136004', email: 'chenjing@mengxiang.com', address: '广州市天河区珠江新城', invoiceInfo: '增值税专用发票（6%）', accountName: '梦想互娱有限公司', bank: '农业银行', bankLocation: '广东省', branch: '天河支行', cardNumber: '6228345634563456' }),
+  vendorWithPrepayment({ id: '1005', businessType: BT4399, name: '像素工坊', contact: '刘洋', phone: '13500135005', email: 'liuyang@pixel.com', address: '杭州市西湖区文三路', invoiceInfo: '增值税专用发票（3%）', accountName: '像素工坊', bank: '中国银行', bankLocation: '浙江省', branch: '文三路支行', cardNumber: '6216789078907890' }),
+  vendorWithPrepayment({ id: '1006', businessType: BT4399, name: '云端游创', contact: '赵敏', phone: '13400134006', email: 'zhaomin@cloudgame.com', address: '成都市高新区天府大道', invoiceInfo: '增值税专用发票（6%）', accountName: '云端游创科技有限公司', bank: '交通银行', bankLocation: '四川省', branch: '天府支行', cardNumber: '6222234523452345' }),
+  vendorWithPrepayment({ id: '1007', businessType: BT4399, name: '灵动科技', contact: '孙涛', phone: '13300133007', email: 'suntao@lingdong.com', address: '武汉市洪山区光谷软件园', invoiceInfo: '增值税专用发票（3%）', accountName: '灵动科技有限公司', bank: '浦发银行', bankLocation: '湖北省', branch: '光谷支行', cardNumber: '6225678967896789' }),
+  vendorWithPrepayment({ id: '1008', businessType: BT4399, name: '极客游戏', contact: '周雪', phone: '13200132008', email: 'zhouxue@geekgame.com', address: '南京市鼓楼区新街口', invoiceInfo: '增值税专用发票（6%）', accountName: '极客游戏有限公司', bank: '民生银行', bankLocation: '江苏省', branch: '新街口支行', cardNumber: '6226012301230123' }),
+  vendorWithPrepayment({ id: '2001', businessType: BTKB, name: '快爆星辰科技', contact: '林峰', phone: '13100131001', email: 'linfeng@kbstar.com', address: '厦门市思明区软件园二期', invoiceInfo: '增值税专用发票（6%）', accountName: '快爆星辰科技有限公司', bank: '兴业银行', bankLocation: '福建省', branch: '软件园支行', cardNumber: '6229098765432109' }),
+  vendorWithPrepayment({ id: '2002', businessType: BTKB, name: '极速互娱', contact: '黄悦', phone: '13100131002', email: 'huangyue@jisu.com', address: '长沙市岳麓区麓谷企业广场', invoiceInfo: '增值税专用发票（3%）', accountName: '极速互娱工作室', bank: '长沙银行', bankLocation: '湖南省', branch: '麓谷支行', cardNumber: '6214567890123456' }),
+  vendorWithPrepayment({ id: '2003', businessType: BTKB, name: '爆趣游戏', contact: '何亮', phone: '13100131003', email: 'heliang@baoqu.com', address: '西安市高新区锦业路', invoiceInfo: '增值税专用发票（6%）', accountName: '爆趣游戏有限公司', bank: '西安银行', bankLocation: '陕西省', branch: '高新支行', cardNumber: '6225887654321098' }),
 ];
 
 export const INITIAL_GAMES: Game[] = [
@@ -136,6 +137,11 @@ export const INITIAL_GAMES: Game[] = [
   gameWithPrepayment({ id: '5004', name: '农场大亨', onlineName: '农场大亨OL', vendorId: '2003', launchDate: '2024-08-01', manager: '何亮', payer: '游家时代', license: '无', operationStatus: '已上线', cooperationStatus: '合作中', createdAt: '2024-07-25T16:00:00' }),
 ];
 
+/** 合同支付币种 mock：厂商 1003 下游戏为美金 */
+const CONTRACT_CURRENCY_BY_VENDOR: Partial<Record<string, ContractCurrency>> = {
+  '1003': '美金',
+};
+
 export const INITIAL_CONTRACTS: Contract[] = INITIAL_GAMES.map((g, i) => {
   const paidAgencyFee = [80000, 50000, 30000, 60000, 90000, 45000, 20000, 70000, 35000, 55000, 15000, 40000, 48000, 32000, 55000, 38000][i];
   const paidPrepayment = [120000, 200000, 80000, 50000, 150000, 60000, 80000, 90000, 45000, 120000, 35000, 65000, 95000, 28000, 42000, 60000][i];
@@ -143,6 +149,7 @@ export const INITIAL_CONTRACTS: Contract[] = INITIAL_GAMES.map((g, i) => {
   const cooperationContents: CooperationContent[] = ['游戏代理金', '预付分成款', '委托开发费'];
   return {
     gameId: g.id,
+    currency: CONTRACT_CURRENCY_BY_VENDOR[g.vendorId] ?? '人民币',
     contractNumber: `HT-${g.id}`,
     contractAmount: [580000, 430000, 230000, 460000, 690000, 345000, 250000, 550000, 285000, 485000, 135000, 360000, 428000, 272000, 495000, 318000][i],
     cooperationContents,
@@ -153,6 +160,35 @@ export const INITIAL_CONTRACTS: Contract[] = INITIAL_GAMES.map((g, i) => {
     cooperationStatus: g.cooperationStatus,
   };
 });
+
+function enrichMockPrepaymentCurrency() {
+  const contractMap = new Map(INITIAL_CONTRACTS.map((c) => [c.gameId, c]));
+  for (const game of INITIAL_GAMES) {
+    if (game.prepayment != null && !game.prepaymentCurrency) {
+      const currency = contractMap.get(game.id)?.currency;
+      if (currency) Object.assign(game, { prepaymentCurrency: currency });
+    }
+  }
+  for (const vendor of INITIAL_VENDORS) {
+    if (vendor.prepayment != null && !vendor.prepaymentCurrency) {
+      const firstGame = INITIAL_GAMES.find((g) => g.vendorId === vendor.id);
+      const currency = firstGame ? contractMap.get(firstGame.id)?.currency : undefined;
+      if (currency) Object.assign(vendor, { prepaymentCurrency: currency });
+    }
+  }
+}
+
+enrichMockPrepaymentCurrency();
+
+/** 游戏管理批注验收：4012 合同未勾选预付分成款，列表「已付预付分成款」列展示「-」 */
+function enrichGameListAnnotationDemo() {
+  const contract4012 = INITIAL_CONTRACTS.find((c) => c.gameId === '4012');
+  if (contract4012) {
+    contract4012.cooperationContents = ['游戏代理金', '委托开发费'];
+    contract4012.paidPrepayment = undefined;
+  }
+}
+enrichGameListAnnotationDemo();
 
 const INTERNAL_CHANNELS = [
   '快爆付费',
@@ -314,6 +350,7 @@ function enrichPaidLetterSnapshots<T extends PaymentRequest | GamePaymentRequest
       const game = INITIAL_GAMES.find((g) => g.id === p.gameId);
       if (!game) return p;
       const vendor = INITIAL_VENDORS.find((v) => v.id === game.vendorId);
+      const contract = INITIAL_CONTRACTS.find((c) => c.gameId === p.gameId);
       const paymentCurrency = game.sharePaymentCurrency ?? '人民币';
       const letterPayAmountOverride = paymentCurrency === '美金'
         ? (p.actualAmountUsd ?? 0)
@@ -328,6 +365,7 @@ function enrichPaidLetterSnapshots<T extends PaymentRequest | GamePaymentRequest
           applyTime: p.applyTime,
           vendor,
           game,
+          contract,
           settlements: INITIAL_SETTLEMENTS,
           payments: RAW_PAYMENTS,
           gamePayments: RAW_GAME_PAYMENTS,
@@ -381,10 +419,16 @@ export const INITIAL_GAME_LOGS: GameOperationLog[] = [
   { id: 'GL000', gameId: '4001', operator: '张明', time: '2024-03-01 09:00:00', action: '添加游戏' },
   { id: 'GL001', gameId: '4001', operator: '张明', time: '2024-03-15 10:30:00', action: '运营状态', status: '已上线' },
   { id: 'GL004', gameId: '4001', operator: '张明', time: '2024-06-01 14:20:00', action: '合作状态', status: '合作中' },
-  { id: 'GL005', gameId: '4001', operator: '张明', time: '2024-06-02 09:15:00', action: '合同变更', detail: '"已付游戏代理金"变更为"546.00"\n"已付预付分成款"变更为"-"' },
+  { id: 'GL005', gameId: '4001', operator: '张明', time: '2024-06-02 09:15:00', action: '合同变更', detail: '"已付游戏代理金"变更为"￥546.00"\n"已付预付分成款"变更为"-"' },
   { id: 'GL003', gameId: '4006', operator: '刘洋', time: '2024-09-01 11:00:00', action: '合作状态', status: '合作中' },
+  { id: 'GL002', gameId: '4006', operator: '刘洋', time: '2024-09-05 11:00:00', action: '运营状态', status: '未上线' },
   { id: 'GL006', gameId: '4011', operator: '钱伟', time: '2025-11-01 10:00:00', action: '合作状态', status: '合作终止' },
   { id: 'GL007', gameId: '4011', operator: '钱伟', time: '2025-11-02 14:30:00', action: '运营状态', status: '未上线' },
+  // 4012 农场物语：游戏管理批注验收样例（列表默认首行）
+  { id: 'GL011', gameId: '4012', operator: '冯丽', time: '2024-09-01 13:00:00', action: '添加游戏' },
+  { id: 'GL010', gameId: '4012', operator: '冯丽', time: '2024-09-06 10:30:00', action: '运营状态', status: '已上线' },
+  { id: 'GL009', gameId: '4012', operator: '冯丽', time: '2024-09-12 14:00:00', action: '合作状态', status: '合作中' },
+  { id: 'GL008', gameId: '4012', operator: '冯丽', time: '2024-10-15 09:20:00', action: '合同变更', detail: '"已付游戏代理金"变更为"￥40,000.00"\n"已付委托开发费"变更为"￥85,000.00"' },
 ];
 
 export const INITIAL_FORMULA_LOGS: FormulaOperationLog[] = [

@@ -3,7 +3,7 @@ import { COL_ALIGN_RIGHT, DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { CurrencyInput, FieldError, FieldHint, FormSectionTitle, ReadonlyCurrencyField, ReadonlyField } from '../components/FormFields';
 import type { ContractCurrency, SharePaymentCompany } from '../data/types';
-import { isSharePaymentCompany, SHARE_PAYMENT_COMPANY_OPTIONS } from '../utils/columnFilters';
+import { SHARE_PAYMENT_COMPANY_OPTIONS } from '../utils/columnFilters';
 import { Drawer, Modal, Toast, type ToastType } from '../components/Modal';
 import { useAppStore } from '../data/store';
 import { ListSearchFields } from '../components/ListSearchFields';
@@ -14,11 +14,12 @@ import {
   calcRemainingUndeductedPrepayment,
   sumGamePaidActualAmount,
 } from '../utils/prepayment';
-import { formatCurrencyMoney, formatMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
+import { formatCurrencyMoney, formatMoney, formatOptionalCurrencyMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
 import {
   getApplyGamePaymentBlock,
   getApplyGamePaymentBlockMessage,
 } from '../utils/gamePaymentApply';
+import { resolvePrepaymentCurrency, withCurrencyOnFirstSave } from '../utils/currencySnapshot';
 
 function formatPrepayAmountInput(value: number): string {
   return value.toFixed(2);
@@ -59,6 +60,7 @@ export function GameIncomePage() {
     scopedGameBalances,
     scopedGames,
     scopedGamePayments,
+    contracts,
     applyGamePayment,
     updateGame,
     getGame,
@@ -80,12 +82,19 @@ export function GameIncomePage() {
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const fmtSettlementAmount = (value: number) => formatCurrencyMoney(value, SETTLEMENT_CURRENCY);
-  const fmtPrepayAmount = (value: number, currency: ContractCurrency) => formatCurrencyMoney(value, currency);
+  const fmtPrepayAmount = (value: number, currency?: ContractCurrency) =>
+    formatOptionalCurrencyMoney(value, currency);
+
+  const contractByGameId = useMemo(
+    () => new Map(contracts.map((c) => [c.gameId, c])),
+    [contracts],
+  );
 
   const rows = scopedGameBalances.map((b) => {
     const g = scopedGames.find((x) => x.id === b.gameId);
     const prepaymentUnset = g?.prepayment == null || Number.isNaN(g.prepayment);
-    const prepayCurrency = g ? (getVendor(g.vendorId)?.currency ?? '人民币') : '人民币';
+    const contract = g ? contractByGameId.get(g.id) : undefined;
+    const prepayCurrency = resolvePrepaymentCurrency(g, contract);
     return {
       ...b,
       gameName: g ? getGameName(g.id) : b.gameId,
@@ -105,9 +114,8 @@ export function GameIncomePage() {
   const selectedBalance = scopedGameBalances.find((b) => b.gameId === selectedGameId);
   const confirmAmount = selectedBalance?.balance ?? 0;
   const prepayGame = selectedGameId ? getGame(selectedGameId) : undefined;
-  const prepayCurrency = prepayGame
-    ? (getVendor(prepayGame.vendorId)?.currency ?? '人民币')
-    : '人民币';
+  const prepayContract = prepayGame ? contractByGameId.get(prepayGame.id) : undefined;
+  const prepayCurrency = resolvePrepaymentCurrency(prepayGame, prepayContract);
 
   const prepaymentUnset = isPrepaymentUnset(prepayGame?.prepayment);
 
@@ -137,9 +145,7 @@ export function GameIncomePage() {
     setSelectedGameId(gameId);
     setPrepayAmount(formatOptionalPrepayAmountInput(game?.prepayment));
     setHistoricalAmount(formatOptionalPrepayAmountInput(game?.historicalDeduction));
-    const payerDefault =
-      game?.payer && isSharePaymentCompany(game.payer) ? game.payer : '';
-    setSharePaymentCompany(game?.sharePaymentCompany ?? payerDefault);
+    setSharePaymentCompany(game?.sharePaymentCompany ?? '');
     setSharePaymentCurrency(game?.sharePaymentCurrency ?? '人民币');
     setSharePaymentAccount(game?.sharePaymentAccount ?? '');
     setPrepayErrors({});
@@ -190,12 +196,13 @@ export function GameIncomePage() {
       ...prepayGame,
       prepayment,
       historicalDeduction,
+      prepaymentCurrency: withCurrencyOnFirstSave(prepayGame.prepaymentCurrency, prepayContract?.currency),
       sharePaymentCompany: sharePaymentCompany as SharePaymentCompany,
       sharePaymentCurrency,
       sharePaymentAccount: sharePaymentAccount.trim(),
     });
     setPrepayOpen(false);
-    setToast({ message: '保存成功', type: 'success' });
+    setToast({ message: '提交成功', type: 'success' });
   };
 
   const handleApply = (gameId: string) => {
@@ -221,9 +228,12 @@ export function GameIncomePage() {
 
   return (
     <div className="agf-card">
-      <FilterBar>
-        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} hideVendorId />
-      </FilterBar>
+      <div data-annotation-id="game-income-query">
+        <FilterBar>
+          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} hideVendorId />
+        </FilterBar>
+      </div>
+      <div data-annotation-id="game-income-table">
       <DataTable
         rowKey={(r) => r.gameId}
         data={rows}
@@ -251,11 +261,11 @@ export function GameIncomePage() {
             title: '操作',
             render: (r) => (
               <div>
-                <button type="button" className="agf-btn agf-btn--link" onClick={() => openPrepayDrawer(r.gameId)}>
+                <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-income-payment-settings" onClick={() => openPrepayDrawer(r.gameId)}>
                   付款设置
                 </button>
                 {r.balance > 0 && (
-                  <button type="button" className="agf-btn agf-btn--link" onClick={() => handleApply(r.gameId)}>
+                  <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-income-apply-payment" onClick={() => handleApply(r.gameId)}>
                     申请付款
                   </button>
                 )}
@@ -264,6 +274,7 @@ export function GameIncomePage() {
           },
         ]}
       />
+      </div>
       <Drawer
         title="付款设置"
         open={prepayOpen}
@@ -276,10 +287,10 @@ export function GameIncomePage() {
           </>
         )}
       >
+        <div data-annotation-id="game-income-payment-form">
         {prepayGame && (
           <>
-            <ReadonlyField label="游戏ID" value={prepayGame.id} />
-            <ReadonlyField label="游戏名称" value={prepayGame.onlineName} />
+            <ReadonlyField label="游戏ID / 游戏名称" value={`${prepayGame.id} / ${prepayGame.onlineName}`} />
             <FormSectionTitle>预付分成管理</FormSectionTitle>
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">预付分成款</label>
@@ -313,7 +324,7 @@ export function GameIncomePage() {
                     '历史已抵扣分成款',
                   )}
                 />
-                <FieldHint>填写线下手动已处理的预付分成款</FieldHint>
+                <FieldHint>请填写线下已抵扣处理的预付分成款，若无则填写0</FieldHint>
                 <FieldError message={prepayErrors.historicalDeduction} />
               </div>
             </div>
@@ -385,6 +396,7 @@ export function GameIncomePage() {
             </div>
           </>
         )}
+        </div>
       </Drawer>
       <Modal
         title="申请付款"
@@ -399,7 +411,7 @@ export function GameIncomePage() {
           </>
         )}
       >
-        <div className="agf-confirm-text">
+        <div className="agf-confirm-text" data-annotation-id="game-income-apply-modal">
           {confirmContent.warning && <p>{confirmContent.warning}</p>}
           <p>{confirmContent.amount}</p>
         </div>

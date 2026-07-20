@@ -1,4 +1,5 @@
 import type {
+  Contract,
   ContractCurrency,
   ExchangeRateRecord,
   Game,
@@ -35,6 +36,7 @@ export interface BuildSettlementLetterSnapshotInput {
   gameId?: string;
   vendor?: Vendor;
   game?: Game;
+  contract?: Contract;
   settlements: SettlementRecord[];
   payments: PaymentRequest[];
   gamePayments: GamePaymentRequest[];
@@ -87,6 +89,7 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
     gameId,
     vendor,
     game,
+    contract,
     payments,
     gamePayments,
     exchangeRates,
@@ -118,6 +121,7 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
       amount,
       game,
       vendor,
+      contract,
       prepaymentSummary.remainingPrepayment,
       exchangeRate,
     );

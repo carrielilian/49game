@@ -1,4 +1,5 @@
-import type { ContractCurrency, Game, Vendor } from '../data/types';
+import type { Contract, ContractCurrency, Game, Vendor } from '../data/types';
+import { resolvePrepaymentCurrency } from './currencySnapshot';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -72,6 +73,7 @@ export function resolveGameMarkPaymentDefaults(
   pendingAmount: number,
   game: Game | undefined,
   vendor: Vendor | undefined,
+  contract: Contract | undefined,
   remainingPrepayment: number,
   exchangeRate: number,
 ): GameMarkPaymentDefaults {
@@ -79,7 +81,7 @@ export function resolveGameMarkPaymentDefaults(
     pendingAmount,
     prepayment: game?.prepayment ?? 0,
     remainingPrepayment,
-    vendorCurrency: vendor?.currency ?? '人民币',
+    vendorCurrency: resolvePrepaymentCurrency(game, contract) ?? '人民币',
     paymentCurrency: game?.sharePaymentCurrency ?? '人民币',
     exchangeRate,
   });

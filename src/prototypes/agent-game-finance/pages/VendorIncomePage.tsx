@@ -14,11 +14,16 @@ import {
   calcRemainingUndeductedPrepayment,
   sumVendorPaidActualAmount,
 } from '../utils/prepayment';
-import { formatCurrencyMoney, formatMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
+import { formatCurrencyMoney, formatMoney, formatOptionalCurrencyMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
 import {
   getApplyPaymentBlock,
   getApplyPaymentBlockMessage,
 } from '../utils/vendorPaymentApply';
+import {
+  resolvePrepaymentCurrency,
+  resolveVendorContractCurrency,
+  withCurrencyOnFirstSave,
+} from '../utils/currencySnapshot';
 
 function formatPrepayAmountInput(value: number): string {
   return value.toFixed(2);
@@ -59,6 +64,8 @@ export function VendorIncomePage() {
     scopedBalances,
     scopedVendors,
     scopedPayments,
+    scopedGames,
+    contracts,
     applyPayment,
     updateVendor,
     getVendor,
@@ -77,15 +84,32 @@ export function VendorIncomePage() {
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const fmtSettlementAmount = (value: number) => formatCurrencyMoney(value, SETTLEMENT_CURRENCY);
+  const fmtPrepayAmount = (value: number, currency?: ContractCurrency) =>
+    formatOptionalCurrencyMoney(value, currency);
+
+  const contractByGameId = useMemo(
+    () => new Map(contracts.map((c) => [c.gameId, c])),
+    [contracts],
+  );
+
+  const resolveVendorPrepayCurrency = (vendorId: string, vendor?: { prepaymentCurrency?: ContractCurrency }) => {
+    const contractCurrency = resolveVendorContractCurrency(vendorId, scopedGames, contractByGameId);
+    return resolvePrepaymentCurrency(
+      vendor,
+      contractCurrency ? { currency: contractCurrency } : undefined,
+    );
+  };
 
   const rows = scopedBalances.map((b) => {
     const v = scopedVendors.find((x) => x.id === b.vendorId);
     const prepaymentUnset = v?.prepayment == null || Number.isNaN(v.prepayment);
+    const prepayCurrency = v ? resolveVendorPrepayCurrency(v.id, v) : undefined;
     return {
       ...b,
       vendorName: v?.name ?? b.vendorId,
       prepaymentUnset,
       savedPrepayment: v?.prepayment,
+      prepayCurrency,
     };
   }).filter((r) => matchesListSearch(search, { vendorId: r.vendorId, vendorName: r.vendorName }));
 
@@ -94,6 +118,13 @@ export function VendorIncomePage() {
   const prepayVendor = selectedVendor ? getVendor(selectedVendor) : undefined;
 
   const prepaymentUnset = isPrepaymentUnset(prepayVendor?.prepayment);
+  const vendorContractCurrency = prepayVendor
+    ? resolveVendorContractCurrency(prepayVendor.id, scopedGames, contractByGameId)
+    : undefined;
+  const prepayDisplayCurrency = resolvePrepaymentCurrency(
+    prepayVendor,
+    vendorContractCurrency ? { currency: vendorContractCurrency } : undefined,
+  );
 
   // 公式中的「预付分成款」「历史已抵扣分成款」均取已保存值，不随未提交的表单输入变化
   const prepayPreview = useMemo(() => {
@@ -173,12 +204,13 @@ export function VendorIncomePage() {
       ...prepayVendor,
       prepayment,
       historicalDeduction,
+      prepaymentCurrency: withCurrencyOnFirstSave(prepayVendor.prepaymentCurrency, vendorContractCurrency),
       sharePaymentCompany: sharePaymentCompany as SharePaymentCompany,
       sharePaymentCurrency,
       sharePaymentAccount: sharePaymentAccount.trim(),
     });
     setPrepayOpen(false);
-    setToast({ message: '保存成功', type: 'success' });
+    setToast({ message: '提交成功', type: 'success' });
   };
 
   const handleApply = (vendorId: string) => {
@@ -221,11 +253,29 @@ export function VendorIncomePage() {
             render: (r) => (
               r.prepaymentUnset
                 ? '-'
-                : fmtSettlementAmount(r.savedPrepayment ?? 0)
+                : fmtPrepayAmount(r.savedPrepayment ?? 0, r.prepayCurrency)
             ),
           },
-          { ...COL_ALIGN_RIGHT, key: 'deducted', title: '已抵扣分成款', render: (r) => (r.prepaymentUnset ? '-' : fmtSettlementAmount(r.deductedPrepayment)) },
-          { ...COL_ALIGN_RIGHT, key: 'remaining', title: '剩余未抵扣分成款', render: (r) => (r.prepaymentUnset ? '-' : fmtSettlementAmount(r.remainingPrepayment)) },
+          {
+            ...COL_ALIGN_RIGHT,
+            key: 'deducted',
+            title: '已抵扣分成款',
+            render: (r) => (
+              r.prepaymentUnset
+                ? '-'
+                : fmtPrepayAmount(r.deductedPrepayment, r.prepayCurrency)
+            ),
+          },
+          {
+            ...COL_ALIGN_RIGHT,
+            key: 'remaining',
+            title: '剩余未抵扣分成款',
+            render: (r) => (
+              r.prepaymentUnset
+                ? '-'
+                : fmtPrepayAmount(r.remainingPrepayment, r.prepayCurrency)
+            ),
+          },
           { ...COL_ALIGN_RIGHT, key: 'income', title: '累计收入', render: (r) => fmtSettlementAmount(r.totalIncome) },
           { ...COL_ALIGN_RIGHT, key: 'refund', title: '累计退款', render: (r) => fmtSettlementAmount(r.totalRefund) },
           {
@@ -267,7 +317,7 @@ export function VendorIncomePage() {
               <label className="agf-form-label agf-form-label--required">预付分成款</label>
               <div className="agf-form-field">
                 <CurrencyInput
-                  currency={prepayVendor.currency ?? '人民币'}
+                  currency={prepayDisplayCurrency}
                   value={prepayAmount}
                   onChange={(v) => {
                     setPrepayAmount(v);
@@ -282,7 +332,7 @@ export function VendorIncomePage() {
               <label className="agf-form-label agf-form-label--required">历史已抵扣分成款</label>
               <div className="agf-form-field">
                 <CurrencyInput
-                  currency={prepayVendor.currency ?? '人民币'}
+                  currency={prepayDisplayCurrency}
                   value={historicalAmount}
                   onChange={(v) => {
                     setHistoricalAmount(v);
@@ -295,20 +345,20 @@ export function VendorIncomePage() {
                     '历史已抵扣分成款',
                   )}
                 />
-                <FieldHint>填写线下手动已处理的预付分成款</FieldHint>
+                <FieldHint>请填写线下已抵扣处理的预付分成款，若无则填写0</FieldHint>
                 <FieldError message={prepayErrors.historicalDeduction} />
               </div>
             </div>
             <ReadonlyCurrencyField
               label="已抵扣分成款"
               amount={prepayPreview.deducted}
-              currency={prepayVendor.currency ?? '人民币'}
+              currency={prepayDisplayCurrency}
               unset={prepaymentUnset}
             />
             <ReadonlyCurrencyField
               label="剩余未抵扣分成款"
               amount={prepayPreview.remaining}
-              currency={prepayVendor.currency ?? '人民币'}
+              currency={prepayDisplayCurrency}
               unset={prepaymentUnset}
             />
             <FormSectionTitle>付费设置</FormSectionTitle>

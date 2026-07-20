@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { COL_ALIGN_RIGHT, DataTable, DualCell } from '../components/DataTable';
+import { ColumnFilter } from '../components/ColumnFilter';
 import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
 import { StatusBadge } from '../components/StatusBadge';
@@ -76,6 +77,7 @@ export function InternalSettlementPage({ type }: Props) {
   };
 
   const incomeLabel = type === 'internal' ? '结算收入' : '结算退款';
+  const ann = type === 'internal' ? 'internal-settlement' : 'internal-refund';
 
   const data = scopedSettlements.filter((s) => {
     if (s.type !== type) return false;
@@ -138,31 +140,36 @@ export function InternalSettlementPage({ type }: Props) {
 
   return (
     <div className="agf-card">
-      <FilterBar
-        actions={
-          <>
-            <button
-              type="button"
-              className="agf-btn agf-btn--primary"
-              onClick={handlePull}
-              disabled={pullDisabled}
-            >
-              {loading ? '拉取中...' : '数据拉取'}
-            </button>
-            <button
-              type="button"
-              className="agf-btn agf-btn--primary"
-              onClick={handleSettle}
-              disabled={settleDisabled}
-            >
-              结算
-            </button>
-          </>
-        }
-      >
-        <MonthRangePicker value={monthRange} onChange={handleMonthRangeChange} />
-        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
-      </FilterBar>
+      <div data-annotation-id={`${ann}-query`}>
+        <FilterBar
+          actions={
+            <>
+              <button
+                type="button"
+                className="agf-btn agf-btn--primary"
+                data-annotation-id={`${ann}-pull`}
+                onClick={handlePull}
+                disabled={pullDisabled}
+              >
+                {loading ? '拉取中...' : '数据拉取'}
+              </button>
+              <button
+                type="button"
+                className="agf-btn agf-btn--primary"
+                data-annotation-id={`${ann}-settle`}
+                onClick={handleSettle}
+                disabled={settleDisabled}
+              >
+                结算
+              </button>
+            </>
+          }
+        >
+          <MonthRangePicker value={monthRange} onChange={handleMonthRangeChange} />
+          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
+        </FilterBar>
+      </div>
+      <div data-annotation-id={`${ann}-table`}>
       <DataTable
         rowKey={(r) => r.id}
         data={data}
@@ -178,12 +185,19 @@ export function InternalSettlementPage({ type }: Props) {
           {
             key: 'channel',
             title: '渠道',
-            filter: {
-              type: 'select',
-              value: channelFilter,
-              onChange: setChannelFilter,
-              options: selectOptions(INTERNAL_CHANNELS),
-            },
+            header: (
+              <span data-annotation-id={`${ann}-channel-col`}>
+                <ColumnFilter
+                  title="渠道"
+                  filter={{
+                    type: 'select',
+                    value: channelFilter,
+                    onChange: setChannelFilter,
+                    options: selectOptions(INTERNAL_CHANNELS),
+                  }}
+                />
+              </span>
+            ),
             render: (r) => r.channel,
           },
           { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
@@ -193,16 +207,24 @@ export function InternalSettlementPage({ type }: Props) {
           {
             key: 'status',
             title: '申请付款状态',
-            filter: {
-              type: 'select',
-              value: paymentStatusFilter,
-              onChange: setPaymentStatusFilter,
-              options: PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
-            },
+            header: (
+              <span data-annotation-id={`${ann}-payment-col`}>
+                <ColumnFilter
+                  title="申请付款状态"
+                  filter={{
+                    type: 'select',
+                    value: paymentStatusFilter,
+                    onChange: setPaymentStatusFilter,
+                    options: PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
+                  }}
+                />
+              </span>
+            ),
             render: (r) => <StatusBadge text={r.paymentApplyStatus} />,
           },
         ]}
       />
+      </div>
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );

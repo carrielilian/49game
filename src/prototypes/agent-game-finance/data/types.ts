@@ -17,8 +17,6 @@ export interface Vendor {
   phone: string;
   email: string;
   address: string;
-  /** 支付币种，默认人民币 */
-  currency: ContractCurrency;
   invoiceInfo: string;
   accountName: string;
   bank: string;
@@ -27,6 +25,8 @@ export interface Vendor {
   cardNumber: string;
   /** 厂商级预付分成款；未填视为未补充 */
   prepayment?: number;
+  /** 预付分成款保存时的支付币种快照；合同改支付币种不回写 */
+  prepaymentCurrency?: ContractCurrency;
   /** 历史已抵扣分成款（线下手动处理），默认 0 */
   historicalDeduction?: number;
   /** 付费设置 — 分成付款公司 */
@@ -56,6 +56,8 @@ export interface Game {
   createdAt: string;
   /** 游戏级预付分成款；未填视为未补充 */
   prepayment?: number;
+  /** 预付分成款保存时的支付币种快照；合同改支付币种不回写 */
+  prepaymentCurrency?: ContractCurrency;
   /** 历史已抵扣分成款（线下手动处理），默认 0 */
   historicalDeduction?: number;
   /** 付费设置 — 分成付款公司 */
@@ -72,6 +74,8 @@ export type CooperationContent = '游戏代理金' | '预付分成款' | '委托
 export interface Contract {
   gameId: string;
   contractNumber: string;
+  /** 支付币种，在合同管理中维护 */
+  currency?: ContractCurrency;
   contractAmount?: number;
   /** 合作内容多选 */
   cooperationContents: CooperationContent[];

@@ -200,7 +200,7 @@ export function PaymentListPage() {
     });
     markPaid(current.id, { ...buildMarkPayload(), letterSnapshot });
     setMarkOpen(false);
-    setToast({ message: '已标记付款', type: 'success' });
+    setToast({ message: '提交成功', type: 'success' });
   };
 
   const submitDetail = () => {
@@ -366,6 +366,7 @@ export function PaymentListPage() {
           <label className="agf-form-label">结算函</label>
           <MockFileUpload
             accept=".pdf,.jpg,.jpeg,.png"
+            hint="支持的上传格式为：png、jpg、pdf"
             files={voucherFiles.settlement}
             onChange={(settlement) => setVoucherFiles((prev) => ({ ...prev, settlement }))}
           />
@@ -374,6 +375,7 @@ export function PaymentListPage() {
           <label className="agf-form-label">电子发票</label>
           <MockFileUpload
             accept=".pdf,.jpg,.jpeg,.png"
+            hint="支持的上传格式为：png、jpg、pdf"
             files={voucherFiles.invoice}
             onChange={(invoice) => setVoucherFiles((prev) => ({ ...prev, invoice }))}
           />

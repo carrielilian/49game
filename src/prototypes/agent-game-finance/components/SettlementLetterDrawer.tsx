@@ -22,6 +22,8 @@ interface SettlementLetterDrawerProps {
   applyTime?: string;
   /** 已付款记录的快照；有则不再实时计算 */
   letterSnapshot?: SettlementLetterSnapshot;
+  /** 批注锚点 id（游戏付款 / 厂商付款页传入不同值） */
+  contentAnnotationId?: string;
 }
 
 const PLATFORM_NAME = '四三九九网络股份有限公司';
@@ -195,11 +197,12 @@ function downloadLetterPdf(
 }
 
 export function SettlementLetterDrawer({
-  open, onClose, vendorId, amount, settlementIds, gameId, applyTime, letterSnapshot,
+  open, onClose, vendorId, amount, settlementIds, gameId, applyTime, letterSnapshot, contentAnnotationId,
 }: SettlementLetterDrawerProps) {
-  const { getVendor, getGame, getGameName, games, settlements, payments, gamePayments, exchangeRates } = useAppStore();
+  const { getVendor, getGame, getGameName, games, settlements, payments, gamePayments, exchangeRates, contracts } = useAppStore();
   const vendor = getVendor(vendorId);
   const game = gameId ? getGame(gameId) : undefined;
+  const contract = gameId ? contracts.find((c) => c.gameId === gameId) : undefined;
   const isGameLetter = Boolean(gameId);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const downloadRef = useRef<HTMLDivElement>(null);
@@ -255,6 +258,7 @@ export function SettlementLetterDrawer({
   const incomeTotal = letterSnapshot?.incomeTotal ?? incomeRows.reduce((sum, row) => sum + row.settlementAmount, 0);
   const refundTotal = letterSnapshot?.refundTotal ?? refundRows.reduce((sum, row) => sum + row.settlementRefund, 0);
   const netTotal = letterSnapshot?.netTotal ?? Math.round((incomeTotal - refundTotal) * 100) / 100;
+  const showRefundSection = refundRows.length > 0;
 
   const livePaymentCurrency: ContractCurrency = game?.sharePaymentCurrency ?? vendor?.sharePaymentCurrency ?? '人民币';
   const paymentCurrency = letterSnapshot?.paymentCurrency ?? livePaymentCurrency;
@@ -285,6 +289,7 @@ export function SettlementLetterDrawer({
         amount,
         game,
         vendor,
+        contract,
         prepaymentSummary.remainingPrepayment,
         exchangeRate,
       );
@@ -328,7 +333,7 @@ export function SettlementLetterDrawer({
 
   return (
     <Drawer title="结算函" open={open} onClose={onClose} width={1175}>
-      <div className="agf-settlement-letter">
+      <div className="agf-settlement-letter" data-annotation-id={contentAnnotationId}>
         <div className="agf-settlement-letter__headline">
           <h2 className="agf-settlement-letter__title">
             <span className="agf-settlement-letter__title-name">{vendor?.name ?? vendorId}</span>
@@ -404,33 +409,39 @@ export function SettlementLetterDrawer({
               <td className="agf-settlement-letter__subtotal-amount">{formatCurrency(incomeTotal)}</td>
             </tr>
           </tbody>
-          <thead>
-            <tr>
-              <th>合作产品名称</th>
-              <th>退款时间</th>
-              <th>退款金额③</th>
-              <th>结算公式</th>
-              <th>结算退款</th>
-            </tr>
-          </thead>
+          {showRefundSection && (
+            <>
+              <thead>
+                <tr>
+                  <th>合作产品名称</th>
+                  <th>退款时间</th>
+                  <th>退款金额③</th>
+                  <th>结算公式</th>
+                  <th>结算退款</th>
+                </tr>
+              </thead>
+              <tbody>
+                {refundRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{row.productName}</td>
+                    <td>{row.period}</td>
+                    <td>{formatCurrency(row.refundAmount)}</td>
+                    <td>{row.formula}</td>
+                    <td>{formatCurrency(row.settlementRefund)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={4} className="agf-settlement-letter__subtotal-label">合计④：</td>
+                  <td className="agf-settlement-letter__subtotal-amount">{formatCurrency(refundTotal)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={4} className="agf-settlement-letter__subtotal-label">总计②-④：</td>
+                  <td className="agf-settlement-letter__subtotal-amount">{formatCurrency(netTotal)}</td>
+                </tr>
+              </tbody>
+            </>
+          )}
           <tbody>
-            {refundRows.map((row) => (
-              <tr key={row.id}>
-                <td>{row.productName}</td>
-                <td>{row.period}</td>
-                <td>{formatCurrency(row.refundAmount)}</td>
-                <td>{row.formula}</td>
-                <td>{formatCurrency(row.settlementRefund)}</td>
-              </tr>
-            ))}
-            <tr>
-              <td colSpan={4} className="agf-settlement-letter__subtotal-label">合计④：</td>
-              <td className="agf-settlement-letter__subtotal-amount">{formatCurrency(refundTotal)}</td>
-            </tr>
-            <tr>
-              <td colSpan={4} className="agf-settlement-letter__subtotal-label">总计②-④：</td>
-              <td className="agf-settlement-letter__subtotal-amount">{formatCurrency(netTotal)}</td>
-            </tr>
             {showExchangeRate && (
               <tr>
                 <td colSpan={4} className="agf-settlement-letter__subtotal-label">汇率：</td>

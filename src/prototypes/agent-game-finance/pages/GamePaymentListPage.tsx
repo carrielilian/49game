@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { COL_ALIGN_RIGHT, DataTable, DualCell, TimeStackCell, TimeStackHeader } from '../components/DataTable';
+import { ColumnFilter } from '../components/ColumnFilter';
 import { CurrencyInput, ReadonlyField, FieldError } from '../components/FormFields';
 import { FilterBar } from '../components/FilterBar';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
@@ -26,7 +27,7 @@ import {
   validateOptionalUsdAmount,
 } from '../utils/payment';
 
-type MarkFormErrors = Partial<Record<'payAmount' | 'payAmountUsd' | 'sharePaymentCompany' | 'receiptInfo', string>>;
+type MarkFormErrors = Partial<Record<'payAmount' | 'payAmountUsd' | 'receiptInfo', string>>;
 
 function resolveGameSharePaymentCompany(game?: Game): string {
   return game?.sharePaymentCompany ?? '';
@@ -73,6 +74,7 @@ export function GamePaymentListPage() {
     settlements,
     games,
     payments,
+    contracts,
   } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [statusFilter, setStatusFilter] = useState('');
@@ -117,12 +119,14 @@ export function GamePaymentListPage() {
   const openMark = (p: GamePaymentRequest) => {
     const game = getGame(p.gameId);
     const vendor = game ? getVendor(game.vendorId) : undefined;
+    const contract = contracts.find((c) => c.gameId === p.gameId);
     const { remainingPrepayment } = calcGamePrepaymentSummary(game, p.gameId, gamePayments);
     const exchangeRate = getExchangeRateByApplyTime(p.applyTime, exchangeRates) ?? 7.21;
     const defaults = resolveGameMarkPaymentDefaults(
       p.pendingAmount,
       game,
       vendor,
+      contract,
       remainingPrepayment,
       exchangeRate,
     );
@@ -189,9 +193,6 @@ export function GamePaymentListPage() {
     if (payErr) errors.payAmount = payErr;
     const usdErr = validateOptionalUsdAmount(payAmountUsd);
     if (usdErr) errors.payAmountUsd = usdErr;
-    if (!resolveGameSharePaymentCompany(current ? getGame(current.gameId) : undefined).trim()) {
-      errors.sharePaymentCompany = '分成付款公司未配置，请先在游戏收入管理【付款设置】中维护';
-    }
     if (!form.receiptInfo.trim()) errors.receiptInfo = '收款信息不能为空';
     setMarkErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -205,12 +206,6 @@ export function GamePaymentListPage() {
     return true;
   };
 
-  const submitMark = () => {
-    if (!current || !validateMarkForm()) return;
-    updateGamePayment(current.id, buildMarkPayload());
-    setToast({ message: '提交成功', type: 'success' });
-  };
-
   const submitMarkPaid = () => {
     if (!current || !validateMarkForm()) return;
     const game = getGame(current.gameId);
@@ -219,6 +214,7 @@ export function GamePaymentListPage() {
     const letterPayAmountOverride = paymentCurrency === '美金'
       ? (parseOptionalAmount(payAmountUsd) ?? 0)
       : parsePayAmount(payAmount);
+    const contract = contracts.find((c) => c.gameId === current.gameId);
     const letterSnapshot = buildSettlementLetterSnapshot({
       vendorId: game?.vendorId ?? '',
       gameId: current.gameId,
@@ -227,6 +223,7 @@ export function GamePaymentListPage() {
       applyTime: current.applyTime,
       vendor,
       game,
+      contract,
       settlements,
       payments,
       gamePayments,
@@ -237,7 +234,7 @@ export function GamePaymentListPage() {
     });
     markGamePaid(current.id, { ...buildMarkPayload(), letterSnapshot });
     setMarkOpen(false);
-    setToast({ message: '已标记付款', type: 'success' });
+    setToast({ message: '提交成功', type: 'success' });
   };
 
   const submitDetail = () => {
@@ -268,9 +265,12 @@ export function GamePaymentListPage() {
 
   return (
     <div className="agf-card">
-      <FilterBar>
-        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
-      </FilterBar>
+      <div data-annotation-id="game-payment-list-query">
+        <FilterBar>
+          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
+        </FilterBar>
+      </div>
+      <div data-annotation-id="game-payment-list-table">
       <DataTable
         rowKey={(r) => r.id}
         data={data}
@@ -286,12 +286,19 @@ export function GamePaymentListPage() {
           {
             key: 'status',
             title: '付款状态',
-            filter: {
-              type: 'select',
-              value: statusFilter,
-              onChange: setStatusFilter,
-              options: PAYMENT_STATUS_FILTER_OPTIONS,
-            },
+            header: (
+              <span data-annotation-id="game-payment-list-payment-col">
+                <ColumnFilter
+                  title="付款状态"
+                  filter={{
+                    type: 'select',
+                    value: statusFilter,
+                    onChange: setStatusFilter,
+                    options: PAYMENT_STATUS_FILTER_OPTIONS,
+                  }}
+                />
+              </span>
+            ),
             render: (r) => <StatusBadge text={r.status} />,
           },
           {
@@ -302,22 +309,23 @@ export function GamePaymentListPage() {
           },
           { key: 'ops', title: '操作', render: (r) => (
             <div className="agf-actions">
-              {isPaidPayment(r.status) && <button type="button" className="agf-btn agf-btn--link" onClick={() => openDetail(r)}>详细信息</button>}
-              {isUnpaidPayment(r.status) && <button type="button" className="agf-btn agf-btn--link" onClick={() => openMark(r)}>标记付款</button>}
-              <button type="button" className="agf-btn agf-btn--link" onClick={() => openLetter(r)}>结算函</button>
-              <button type="button" className="agf-btn agf-btn--link" onClick={() => openVoucher(r)}>请款凭证</button>
+              {isPaidPayment(r.status) && <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-payment-list-detail" onClick={() => openDetail(r)}>详细信息</button>}
+              {isUnpaidPayment(r.status) && <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-payment-list-mark" onClick={() => openMark(r)}>标记付款</button>}
+              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-payment-list-letter" onClick={() => openLetter(r)}>结算函</button>
+              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-payment-list-voucher" onClick={() => openVoucher(r)}>请款凭证</button>
             </div>
           ) },
         ]}
       />
+      </div>
       <Drawer title="标记付款" open={markOpen} onClose={() => setMarkOpen(false)} large
         footer={
           <>
             <button type="button" className="agf-btn agf-btn--default" onClick={() => setMarkOpen(false)}>取消</button>
-            <button type="button" className="agf-btn agf-btn--primary" onClick={submitMark}>提交</button>
             <button type="button" className="agf-btn agf-btn--primary" onClick={submitMarkPaid}>标记已付款</button>
           </>
         }>
+        <div data-annotation-id="game-payment-list-mark-drawer">
         <ReadonlyField label="游戏ID" value={current?.gameId ?? ''} />
         <ReadonlyField label="游戏名称" value={current ? getGameName(current.gameId) : ''} />
         <ReadonlyField label="待付款金额" value={fmtPaymentAmount(current?.pendingAmount ?? 0)} />
@@ -352,14 +360,6 @@ export function GamePaymentListPage() {
           </div>
         </div>
         <ReadonlyField label="分成付款公司" value={sharePaymentCompany || '-'} />
-        {markErrors.sharePaymentCompany && (
-          <div className="agf-form-item">
-            <div className="agf-form-label" />
-            <div className="agf-form-field">
-              <FieldError message={markErrors.sharePaymentCompany} />
-            </div>
-          </div>
-        )}
         <div className="agf-form-item">
           <label className="agf-form-label agf-form-label--required">收款信息</label>
           <div className="agf-form-field">
@@ -375,6 +375,7 @@ export function GamePaymentListPage() {
           </div>
         </div>
         <div className="agf-form-item"><label className="agf-form-label">备注</label><textarea className="agf-form-textarea" value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} /></div>
+        </div>
       </Drawer>
       <Drawer title="详细信息" open={detailOpen} onClose={() => setDetailOpen(false)} large
         footer={
@@ -383,6 +384,7 @@ export function GamePaymentListPage() {
             <button type="button" className="agf-btn agf-btn--primary" onClick={submitDetail}>提交</button>
           </>
         }>
+        <div data-annotation-id="game-payment-list-detail-drawer">
         <ReadonlyField label="游戏ID" value={current?.gameId ?? ''} />
         <ReadonlyField label="游戏名称" value={current ? getGameName(current.gameId) : ''} />
         <ReadonlyField label="付款状态" value={current?.status ?? ''} />
@@ -392,6 +394,7 @@ export function GamePaymentListPage() {
         <ReadonlyField label="分成付款公司" value={sharePaymentCompany || '-'} />
         <ReadonlyField label="收款信息" value={receiptInfoDisplay(current)} multiline />
         <div className="agf-form-item"><label className="agf-form-label">备注</label><textarea className="agf-form-textarea" value={detailRemark} onChange={(e) => setDetailRemark(e.target.value)} /></div>
+        </div>
       </Drawer>
       <Drawer title="请款凭证" open={voucherOpen} onClose={() => setVoucherOpen(false)} large
         footer={
@@ -400,12 +403,14 @@ export function GamePaymentListPage() {
             <button type="button" className="agf-btn agf-btn--primary" onClick={submitVoucher}>提交</button>
           </>
         }>
+        <div data-annotation-id="game-payment-list-voucher-drawer">
         <ReadonlyField label="游戏ID" value={current?.gameId ?? ''} />
         <ReadonlyField label="游戏名称" value={current ? getGameName(current.gameId) : ''} />
         <div className="agf-form-item">
           <label className="agf-form-label">结算函</label>
           <MockFileUpload
             accept=".pdf,.jpg,.jpeg,.png"
+            hint="支持的上传格式为：png、jpg、pdf"
             files={voucherFiles.settlement}
             onChange={(settlement) => setVoucherFiles((prev) => ({ ...prev, settlement }))}
           />
@@ -414,9 +419,11 @@ export function GamePaymentListPage() {
           <label className="agf-form-label">电子发票</label>
           <MockFileUpload
             accept=".pdf,.jpg,.jpeg,.png"
+            hint="支持的上传格式为：png、jpg、pdf"
             files={voucherFiles.invoice}
             onChange={(invoice) => setVoucherFiles((prev) => ({ ...prev, invoice }))}
           />
+        </div>
         </div>
       </Drawer>
       {current && (
@@ -429,6 +436,7 @@ export function GamePaymentListPage() {
           settlementIds={current.settlementIds}
           applyTime={current.applyTime}
           letterSnapshot={current.letterSnapshot}
+          contentAnnotationId="game-payment-list-letter-drawer"
         />
       )}
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

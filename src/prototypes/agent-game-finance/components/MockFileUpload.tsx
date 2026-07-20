@@ -11,6 +11,8 @@ interface MockFileUploadProps {
   accept?: string;
   files: MockFileItem[];
   onChange: (files: MockFileItem[]) => void;
+  /** 选择文件按钮下方的灰色说明 */
+  hint?: string;
 }
 
 function mimeFromName(name: string): string {
@@ -34,7 +36,7 @@ function downloadFile(file: MockFileItem) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function MockFileUpload({ accept, files, onChange }: MockFileUploadProps) {
+export function MockFileUpload({ accept, files, onChange, hint }: MockFileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSelect = () => inputRef.current?.click();
@@ -59,6 +61,7 @@ export function MockFileUpload({ accept, files, onChange }: MockFileUploadProps)
         </button>
         <input ref={inputRef} type="file" className="agf-file-upload__input" accept={accept} onChange={handleChange} />
       </div>
+      {hint ? <p className="agf-file-upload__hint">{hint}</p> : null}
       {files.length > 0 && (
         <ul className="agf-file-upload__list">
           {files.map((file) => (

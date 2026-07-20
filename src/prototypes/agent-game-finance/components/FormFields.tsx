@@ -34,7 +34,7 @@ export function FormSectionTitle({ children }: { children: React.ReactNode }) {
   return <h4 className="agf-form-section-title">{children}</h4>;
 }
 
-/** 只读金额：左侧币种符号 + 右侧数值（与 CurrencyInput 前缀样式一致） */
+/** 只读金额：纯文本展示，不可编辑 */
 export function ReadonlyCurrencyField({
   label,
   amount,
@@ -43,28 +43,25 @@ export function ReadonlyCurrencyField({
 }: {
   label: string;
   amount: number;
-  currency: ContractCurrency;
+  currency?: ContractCurrency;
   /** 未填预付等场景显示 `-`，不带币种前缀 */
   unset?: boolean;
 }) {
+  const display = unset
+    ? '-'
+    : currency
+      ? `${currencySymbol(currency)}${formatMoney(amount)}`
+      : formatMoney(amount);
+
   return (
     <div className="agf-form-item agf-form-item--readonly">
       <label className="agf-form-label">{label}</label>
-      <div className="agf-form-field">
-        {unset ? (
-          <div className="agf-form-readonly-value">-</div>
-        ) : (
-          <div className="agf-input-affix agf-input-affix--prefix">
-            <span className="agf-input-affix__prefix">{currencySymbol(currency)}</span>
-            <input className="agf-form-input" readOnly value={formatMoney(amount)} />
-          </div>
-        )}
-      </div>
+      <div className="agf-form-readonly-value">{display}</div>
     </div>
   );
 }
 
-/** 复合型金额输入：左侧币种符号 + 右侧数字输入 */
+/** 复合型金额输入：左侧币种符号 + 右侧数字输入；未设置币种时前缀为空 */
 export function CurrencyInput({
   currency,
   value,
@@ -72,15 +69,17 @@ export function CurrencyInput({
   onBlur,
   placeholder = '请输入',
 }: {
-  currency: ContractCurrency;
+  currency?: ContractCurrency;
   value: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
   placeholder?: string;
 }) {
   return (
-    <div className="agf-input-affix agf-input-affix--prefix">
-      <span className="agf-input-affix__prefix">{currencySymbol(currency)}</span>
+    <div className={`agf-input-affix${currency ? ' agf-input-affix--prefix' : ''}`}>
+      {currency ? (
+        <span className="agf-input-affix__prefix">{currencySymbol(currency)}</span>
+      ) : null}
       <input
         className="agf-form-input"
         value={value}

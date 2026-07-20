@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useRegisterOverlay } from './OverlayScope';
 
 interface ModalProps {
   title: string;
@@ -13,6 +14,7 @@ interface ModalProps {
 }
 
 export function Modal({ title, open, onClose, children, footer, large, xl, plain, compact }: ModalProps) {
+  useRegisterOverlay(open);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -46,6 +48,7 @@ interface DrawerProps {
 }
 
 export function Drawer({ title, open, onClose, children, footer, large, width }: DrawerProps) {
+  useRegisterOverlay(open);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };

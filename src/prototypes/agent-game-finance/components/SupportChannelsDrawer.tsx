@@ -24,6 +24,7 @@ interface SupportChannelsDrawerProps {
   vendorName: string;
   formula?: FormulaConfig;
   onSave: (formula: FormulaConfig) => void;
+  formAnnotationId?: string;
 }
 
 export function SupportChannelsDrawer({
@@ -34,6 +35,7 @@ export function SupportChannelsDrawer({
   vendorName,
   formula,
   onSave,
+  formAnnotationId,
 }: SupportChannelsDrawerProps) {
   const [editing, setEditing] = useState<FormulaConfig | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -72,6 +74,7 @@ export function SupportChannelsDrawer({
     }
     onSave(editing);
     onClose();
+    setToast({ message: '提交成功', type: 'success' });
   };
 
   return (
@@ -89,7 +92,7 @@ export function SupportChannelsDrawer({
         )}
       >
         {editing && (
-          <>
+          <div data-annotation-id={formAnnotationId}>
             <div className="agf-form-readonly-grid agf-channel-drawer-meta">
               <ReadonlyField label="游戏ID / 游戏名称" value={`${gameId} / ${gameName}`} />
               <ReadonlyField label="厂商名称" value={vendorName} />
@@ -120,7 +123,7 @@ export function SupportChannelsDrawer({
                 </div>
               </div>
             ))}
-          </>
+          </div>
         )}
       </Drawer>
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

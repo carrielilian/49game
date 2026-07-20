@@ -162,6 +162,7 @@ export function FormulaListPage() {
     }
     updateFormula(editing);
     setFormulaDrawer(false);
+    setToast({ message: '提交成功', type: 'success' });
   };
 
   const logs = formulaLogs.filter((l) => l.gameId === selectedGameId);
@@ -183,9 +184,12 @@ export function FormulaListPage() {
 
   return (
     <div className="agf-card">
-      <FilterBar>
-        <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
-      </FilterBar>
+      <div data-annotation-id="formula-list-query">
+        <FilterBar>
+          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
+        </FilterBar>
+      </div>
+      <div data-annotation-id="formula-list-table">
       <DataTable
         rowKey={(r) => r.id}
         data={rows}
@@ -193,7 +197,7 @@ export function FormulaListPage() {
           { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.onlineName} sub={r.id} /> },
           { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
           { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
-          { key: 'formula', title: '结算公式', render: (r) => {
+          { key: 'formula', title: '结算公式', header: <span data-annotation-id="formula-list-formula-col">结算公式</span>, render: (r) => {
             const f = formulas.find((x) => x.gameId === r.id);
             if (!isFormulaConfigured(f)) return '-';
             return (
@@ -205,16 +209,17 @@ export function FormulaListPage() {
           } },
           { key: 'ops', title: '操作', render: (r) => (
             <div className="agf-actions">
-              <button type="button" className="agf-btn agf-btn--link" onClick={() => openFormula(r.id)}>结算公式</button>
-              <button type="button" className="agf-btn agf-btn--link" onClick={() => openLogs(r.id)}>操作记录</button>
+              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-formula" onClick={() => openFormula(r.id)}>结算公式</button>
+              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-logs" onClick={() => openLogs(r.id)}>操作记录</button>
             </div>
           ) },
         ]}
       />
+      </div>
       <Drawer title="结算公式设置" open={formulaDrawer} onClose={() => setFormulaDrawer(false)} large
         footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setFormulaDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveFormula}>保存</button></>}>
         {editing && editingGame && (
-          <>
+          <div data-annotation-id="formula-list-formula-form">
             <div className="agf-form-readonly-grid">
               <ReadonlyField label="游戏ID / 游戏名称" value={`${editing.gameId} / ${editingGame.onlineName}`} />
               <ReadonlyField label="厂商ID" value={editingGame.vendorId} />
@@ -269,10 +274,11 @@ export function FormulaListPage() {
               error={errors.externalShare}
               onChange={(v) => { clearError('externalShare'); setEditing({ ...editing, externalShare: v }); }}
             />
-          </>
+          </div>
         )}
       </Drawer>
       <Drawer title="操作记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
+        <div data-annotation-id="formula-list-logs-drawer">
         {(() => {
           const logGame = getGame(selectedGameId);
           return (
@@ -297,6 +303,7 @@ export function FormulaListPage() {
             </>
           );
         })()}
+        </div>
       </Drawer>
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
