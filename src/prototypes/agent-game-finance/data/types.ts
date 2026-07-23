@@ -172,7 +172,10 @@ export interface SettlementLetterSnapshot {
   incomeTotal: number;
   refundTotal: number;
   netTotal: number;
+  /** 付款币种（付费设置 sharePaymentCurrency）；汇率行、实际付款金额 */
   paymentCurrency: ContractCurrency;
+  /** 支付币种（合同 prepaymentCurrency ?? Contract.currency）；⑤ 结算/抵扣与剩余 */
+  contractPaymentCurrency: ContractCurrency;
   showExchangeRate: boolean;
   exchangeRate?: number;
   showPrepaymentDeductionRows: boolean;
@@ -202,6 +205,23 @@ export interface PaymentRequest {
   letterSnapshot?: SettlementLetterSnapshot;
 }
 
+/** 游戏【申请付款】成功时刻冻结的信息 */
+export interface GamePaymentApplySnapshot {
+  gameId: string;
+  gameName: string;
+  /** 支付币种：prepaymentCurrency ?? Contract.currency */
+  contractPaymentCurrency: ContractCurrency;
+  vendorId: string;
+  vendorName: string;
+  receiptInfo: string;
+  prepayment: number;
+  remainingPrepayment: number;
+  sharePaymentCompany: string;
+  sharePaymentCurrency: ContractCurrency;
+  sharePaymentAccount: string;
+  applyTime: string;
+}
+
 export interface GamePaymentRequest {
   id: string;
   gameId: string;
@@ -218,7 +238,8 @@ export interface GamePaymentRequest {
   invoice?: string;
   remark?: string;
   settlementIds?: string[];
-  /** 标记已付款时写入；打开结算函优先读此快照 */
+  applySnapshot?: GamePaymentApplySnapshot;
+  /** 申请付款时写入；标记已付款不更新本快照 */
   letterSnapshot?: SettlementLetterSnapshot;
 }
 

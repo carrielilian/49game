@@ -18,6 +18,7 @@ import type {
 import { deriveBalances, deriveGameBalances } from '../utils/balance';
 import { resolveFollowInvoiceTax } from '../utils/invoiceTax';
 import { buildSettlementLetterSnapshot } from '../utils/settlementLetterSnapshot';
+import { buildGamePaymentApplySnapshot } from '../utils/gamePaymentApplySnapshot';
 
 const BT4399 = '4399' as const satisfies BusinessType;
 const BTKB = '快爆' as const satisfies BusinessType;
@@ -287,7 +288,14 @@ export const INITIAL_SETTLEMENTS: SettlementRecord[] = [
   { id: 'S303', type: 'internal', incomeTime: '2026-06', gameId: '5003', channel: '快爆内购', grossRevenue: 86000, settlementAmount: 78779.2, settlementIncome: 39389.6, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-07-04 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2002' },
   { id: 'S304', type: 'external', incomeTime: '2026-07', gameId: '5002', channel: '游乐IOS', grossRevenue: 156000, settlementAmount: 156000, settlementIncome: 70200, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-02 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '2001' },
   { id: 'S305', type: 'internal', incomeTime: '2026-07', gameId: '5004', channel: '游戏盒付费', grossRevenue: 92000, settlementAmount: 87400, settlementIncome: 43700, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-03 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '2003' },
-  { id: 'S306', type: 'refund', incomeTime: '2026-07', gameId: '5003', channel: '快爆付费', grossRevenue: 5000, settlementAmount: 4750, settlementIncome: 2375, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-04 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '2002' },
+  { id: 'S306', type: 'refund', incomeTime: '2026-07', gameId: '5003', channel: '快爆付费', grossRevenue: 5000, settlementAmount: 4750, settlementIncome: 2375, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-04 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2002' },
+  // 结算函退款验收：同产品连续月 / 单产品 / 多游戏
+  { id: 'S029', type: 'refund', incomeTime: '2026-06', gameId: '4001', channel: '快爆付费', grossRevenue: 15000, settlementAmount: 14250, settlementIncome: 7500, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-05 10:30:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1001' },
+  { id: 'S031', type: 'refund', incomeTime: '2026-06', gameId: '4002', channel: '快爆内购', grossRevenue: 22000, settlementAmount: 20900, settlementIncome: 11000, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-05 11:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1001' },
+  { id: 'S032', type: 'refund', incomeTime: '2026-07', gameId: '4003', channel: '快爆内购', grossRevenue: 18000, settlementAmount: 16524, settlementIncome: 8280, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-08-05 11:30:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1002' },
+  { id: 'S033', type: 'refund', incomeTime: '2026-06', gameId: '5001', channel: '快爆内购', grossRevenue: 10000, settlementAmount: 9160, settlementIncome: 5000, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-08-05 12:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2001' },
+  { id: 'S034', type: 'refund', incomeTime: '2026-07', gameId: '5001', channel: '快爆内购', grossRevenue: 12000, settlementAmount: 10992, settlementIncome: 6000, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-08-05 12:30:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2001' },
+  { id: 'S035', type: 'refund', incomeTime: '2026-07', gameId: '5004', channel: '游戏盒付费', grossRevenue: 3500, settlementAmount: 3325, settlementIncome: 1750, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-05 13:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2003' },
   { id: 'S307', type: 'internal', incomeTime: '2026-07', gameId: '5001', channel: '快爆内购', grossRevenue: 178000, settlementAmount: 163016, settlementIncome: 81508, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-08-06 12:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '2001' },
 ];
 
@@ -309,30 +317,45 @@ const RAW_PAYMENTS: PaymentRequest[] = [
   { id: 'P004', vendorId: '1008', pendingAmount: 43200, actualAmount: 43000, status: '已付款', applyTime: '2026-06-25 11:20:00', payTime: '2026-07-05 09:45:00', payBank: '游家时代', receiptInfo: '极客游戏有限公司 6226012301230123', settlementLetter: '结算函_极客游戏.pdf', settlementIds: ['S014'] },
   // 快爆 2001 已付款
   { id: 'P301', vendorId: '2001', pendingAmount: 99000, actualAmount: 99000, status: '已付款', applyTime: '2026-07-12 11:20:30', payTime: '2026-07-22 15:10:18', payBank: '4399', receiptInfo: '快爆星辰科技有限公司 6229098765432109', settlementLetter: '结算函_快爆星辰科技.pdf', invoice: '电子发票_99000.pdf', settlementIds: ['S302'] },
-  // 快爆 2002 未付款
-  { id: 'P302', vendorId: '2002', pendingAmount: 39389.6, status: '未付款', applyTime: '2026-07-15 14:00:00', settlementIds: ['S303'] },
+  // 快爆 2002 未付款（结算函·含退款区）
+  { id: 'P302', vendorId: '2002', pendingAmount: 37014.6, status: '未付款', applyTime: '2026-07-15 14:00:00', settlementIds: ['S303', 'S306'] },
+  // 1001 已付款 · 结算函收入+退款+预付全额抵扣（厂商付款隐藏页深链验收）
+  { id: 'P005', vendorId: '1001', pendingAmount: 255200, actualAmount: 0, status: '已付款', applyTime: '2026-07-06 16:00:00', payTime: '2026-07-16 11:30:00', payBank: '4399', receiptInfo: '星辉互动科技有限公司 6222123412341234', settlementLetter: '结算函_星辉互动.pdf', settlementIds: ['S001', 'S002', 'S010', 'S020'] },
 ];
 
 const RAW_GAME_PAYMENTS: GamePaymentRequest[] = [
-  // 4005 已付款+历史已抵扣（厂商支付币种美金 · 结果⑤ 参考）
-  { id: 'GP001', gameId: '4005', pendingAmount: 125400, actualAmount: 125400, actualAmountUsd: 17400, status: '已付款', applyTime: '2026-07-11 10:20:15', payTime: '2026-07-21 14:30:00', payBank: '纯游（美元）', receiptInfo: '雷霆网络科技有限公司 6227901290129012', settlementLetter: '结算函_消消乐大师.pdf', invoice: '电子发票_125400.pdf', settlementIds: ['S004'] },
+  // 4005 已付款+历史已抵扣（合同支付币种美金 · 情况3 · usdNet=0）
+  { id: 'GP001', gameId: '4005', pendingAmount: 202500, actualAmount: 0, actualAmountUsd: 0, status: '已付款', applyTime: '2026-07-11 10:20:15', payTime: '2026-07-21 14:30:00', payBank: '纯游（美元）', receiptInfo: '雷霆网络科技有限公司 6227901290129012', settlementLetter: '结算函_消消乐大师.pdf', invoice: '电子发票_0.pdf', settlementIds: ['S004'] },
   // 4001 未付款 · 结果③（预付>0，厂商/付款币种均人民币，net=0）
-  { id: 'GP002', gameId: '4001', pendingAmount: 88200, status: '未付款', applyTime: '2026-07-06 11:05:30', remark: '【结果③-net=0】预付320000，剩余≥待付', settlementIds: ['S001', 'S010'] },
+  { id: 'GP002', gameId: '4001', pendingAmount: 88200, status: '未付款', applyTime: '2026-07-06 11:05:30', remark: '【情况2·net=0】预付320000，剩余≥待付', settlementIds: ['S001', 'S010'] },
   // 4008 已付款仅结算函
   { id: 'GP003', gameId: '4008', pendingAmount: 34200, actualAmount: 34200, status: '已付款', applyTime: '2026-06-30 09:00:00', payTime: '2026-07-10 11:00:00', payBank: '香港4399', receiptInfo: '梦想互娱有限公司 6228345634563456', settlementLetter: '结算函_策略争霸.pdf', settlementIds: ['S012'] },
   // 快爆 5001 未付款
   { id: 'GP301', gameId: '5001', pendingAmount: 94050, status: '未付款', applyTime: '2026-07-14 16:30:00', settlementIds: ['S301'] },
-  // —— 标记付款初始填充 · 五分支验收（均为未付款，打开【标记付款】自动重算）——
-  // 4009 未填预付 · 结果①（预付≤0，付款币种人民币）
-  { id: 'GP011', gameId: '4009', pendingAmount: 46736.4, status: '未付款', applyTime: '2026-07-08 09:20:00', remark: '【结果①】预付≤0·付款币种人民币', settlementIds: ['S013', 'S018'] },
-  // 4007 未填预付 · 结果②（预付≤0，付款币种美金）
-  { id: 'GP012', gameId: '4007', pendingAmount: 30875, status: '未付款', applyTime: '2026-07-09 10:15:00', remark: '【结果②】预付≤0·付款币种美金', settlementIds: ['S006'] },
-  // 4003 预付150000 · 结果③（预付>0，厂商/付款币种均人民币，net=30000）
-  { id: 'GP013', gameId: '4003', pendingAmount: 180000, status: '未付款', applyTime: '2026-07-10 11:30:00', remark: '【结果③-net>0】待付180000−剩余150000=30000', settlementIds: ['S003', 'S017'] },
-  // 4010 预付180000 · 结果④（预付>0，厂商人民币，付款币种美金，net=20000）
-  { id: 'GP014', gameId: '4010', pendingAmount: 200000, status: '未付款', applyTime: '2026-07-11 14:00:00', remark: '【结果④】待付200000−剩余180000=20000，美金=net÷汇率', settlementIds: ['S009'] },
-  // 4006 预付100000/历史95000 · 结果⑤（预付>0，厂商支付币种美金）
-  { id: 'GP015', gameId: '4006', pendingAmount: 88200, status: '未付款', applyTime: '2026-07-12 15:45:00', remark: '【结果⑤】厂商支付币种美金，usdNet=待付÷汇率−剩余5000', settlementIds: ['S028'] },
+  // —— 标记付款初始填充 · 三种情况验收（均为未付款，打开【标记付款】自动重算）——
+  // 4009 未填预付 · 情况1（预付≤0，付款币种人民币）
+  { id: 'GP011', gameId: '4009', pendingAmount: 46736.4, status: '未付款', applyTime: '2026-07-08 09:20:00', remark: '【情况1】预付≤0·付款币种人民币', settlementIds: ['S013', 'S018'] },
+  // 4007 未填预付 · 情况1（预付≤0，付款币种美金）
+  { id: 'GP012', gameId: '4007', pendingAmount: 30875, status: '未付款', applyTime: '2026-07-09 10:15:00', remark: '【情况1】预付≤0·付款币种美金', settlementIds: ['S006'] },
+  // 4003 预付150000 · 情况2（合同人民币；含 GP018 已付抵扣后 net≈110610.8）
+  { id: 'GP013', gameId: '4003', pendingAmount: 180000, status: '未付款', applyTime: '2026-07-10 11:30:00', remark: '【情况2】合同人民币·net≈110610.8', settlementIds: ['S003', 'S017'] },
+  // 4010 预付180000 · 情况2（合同人民币，net=20000）
+  { id: 'GP014', gameId: '4010', pendingAmount: 200000, status: '未付款', applyTime: '2026-07-11 14:00:00', remark: '【情况2】合同人民币·net=20000', settlementIds: ['S009'] },
+  // 4006 预付100000/历史95000 · 情况3（合同支付币种美金）
+  { id: 'GP015', gameId: '4006', pendingAmount: 88200, status: '未付款', applyTime: '2026-07-12 15:45:00', remark: '【情况3】合同支付币种美金·usdNet=待付÷汇率−剩余5000', settlementIds: ['S028'] },
+  // —— 结算函退款验收（未付款打开结算函实时计算；已付款读 letterSnapshot）——
+  // 4001 · 收入两产品 + 退款连续月合并（2026.06-2026.07）· 预付全额抵扣实付=0
+  { id: 'GP016', gameId: '4001', pendingAmount: 167900, status: '未付款', applyTime: '2026-07-13 10:00:00', remark: '【结算函·收入+退款·连续月合并】', settlementIds: ['S001', 'S002', 'S020', 'S029'] },
+  // 4002 · 单产品收入+退款 · 预付全额抵扣
+  { id: 'GP017', gameId: '4002', pendingAmount: 68800, status: '未付款', applyTime: '2026-07-13 11:00:00', remark: '【结算函·收入+退款·单产品】', settlementIds: ['S010', 'S031'] },
+  // 4003 · 已付款快照 · 双月收入+退款 · 实付=0
+  { id: 'GP018', gameId: '4003', pendingAmount: 80610.8, actualAmount: 0, status: '已付款', applyTime: '2026-07-08 14:00:00', payTime: '2026-07-18 10:00:00', payBank: '4399', receiptInfo: '幻境游戏工作室 6214567856785678', settlementLetter: '结算函_赛车狂飙.pdf', invoice: '电子发票_80610.pdf', settlementIds: ['S003', 'S017', 'S032'] },
+  // 5003 · 快爆 · 收入+退款
+  { id: 'GP019', gameId: '5003', pendingAmount: 37014.6, status: '未付款', applyTime: '2026-07-15 15:00:00', remark: '【结算函·快爆·收入+退款】', settlementIds: ['S303', 'S306'] },
+  // 5001 · 收入+退款连续月合并
+  { id: 'GP023', gameId: '5001', pendingAmount: 83050, status: '未付款', applyTime: '2026-07-16 10:00:00', remark: '【结算函·退款连续月2026.06-07】', settlementIds: ['S301', 'S033', 'S034'] },
+  // 5004 · 无预付 · 退款后实付>0
+  { id: 'GP022', gameId: '5004', pendingAmount: 41950, status: '未付款', applyTime: '2026-07-16 09:30:00', remark: '【结算函·无预付·退款后实付>0】', settlementIds: ['S305', 'S035'] },
 ];
 
 function mockGetGameName(id: string): string {
@@ -340,72 +363,69 @@ function mockGetGameName(id: string): string {
   return g?.onlineName ?? g?.name ?? id;
 }
 
-function enrichPaidLetterSnapshots<T extends PaymentRequest | GamePaymentRequest>(
-  items: T[],
-  kind: 'vendor' | 'game',
-): T[] {
+function enrichGamePayments(items: GamePaymentRequest[]): GamePaymentRequest[] {
   return items.map((p) => {
-    if (p.status !== '已付款') return p;
-    if (kind === 'game' && 'gameId' in p) {
-      const game = INITIAL_GAMES.find((g) => g.id === p.gameId);
-      if (!game) return p;
-      const vendor = INITIAL_VENDORS.find((v) => v.id === game.vendorId);
-      const contract = INITIAL_CONTRACTS.find((c) => c.gameId === p.gameId);
-      const paymentCurrency = game.sharePaymentCurrency ?? '人民币';
-      const letterPayAmountOverride = paymentCurrency === '美金'
-        ? (p.actualAmountUsd ?? 0)
-        : (p.actualAmount ?? p.pendingAmount);
-      return {
-        ...p,
-        letterSnapshot: buildSettlementLetterSnapshot({
-          vendorId: game.vendorId,
-          gameId: p.gameId,
-          amount: p.pendingAmount,
-          settlementIds: p.settlementIds,
-          applyTime: p.applyTime,
-          vendor,
-          game,
-          contract,
-          settlements: INITIAL_SETTLEMENTS,
-          payments: RAW_PAYMENTS,
-          gamePayments: RAW_GAME_PAYMENTS,
-          exchangeRates: INITIAL_EXCHANGE_RATES,
-          games: INITIAL_GAMES,
-          getGameName: mockGetGameName,
-          letterPayAmountOverride,
-        }),
-      };
-    }
-    if (kind === 'vendor' && 'vendorId' in p) {
-      const vendor = INITIAL_VENDORS.find((v) => v.id === p.vendorId);
-      const paymentCurrency = vendor?.sharePaymentCurrency ?? '人民币';
-      const letterPayAmountOverride = paymentCurrency === '美金'
-        ? (p.actualAmountUsd ?? 0)
-        : (p.actualAmount ?? p.pendingAmount);
-      return {
-        ...p,
-        letterSnapshot: buildSettlementLetterSnapshot({
-          vendorId: p.vendorId,
-          amount: p.pendingAmount,
-          settlementIds: p.settlementIds,
-          applyTime: p.applyTime,
-          vendor,
-          settlements: INITIAL_SETTLEMENTS,
-          payments: RAW_PAYMENTS,
-          gamePayments: RAW_GAME_PAYMENTS,
-          exchangeRates: INITIAL_EXCHANGE_RATES,
-          games: INITIAL_GAMES,
-          getGameName: mockGetGameName,
-          letterPayAmountOverride,
-        }),
-      };
-    }
-    return p;
+    const game = INITIAL_GAMES.find((g) => g.id === p.gameId);
+    if (!game) return p;
+    const vendor = INITIAL_VENDORS.find((v) => v.id === game.vendorId);
+    if (!vendor) return p;
+    const contract = INITIAL_CONTRACTS.find((c) => c.gameId === p.gameId);
+    const scopedGamePayments = items.filter((x) => x.id !== p.id);
+    const { applySnapshot, letterSnapshot } = buildGamePaymentApplySnapshot({
+      gameId: p.gameId,
+      pendingAmount: p.pendingAmount,
+      applyTime: p.applyTime,
+      settlementIds: p.settlementIds ?? [],
+      game,
+      vendor,
+      contract,
+      settlements: INITIAL_SETTLEMENTS,
+      payments: RAW_PAYMENTS,
+      gamePayments: scopedGamePayments,
+      exchangeRates: INITIAL_EXCHANGE_RATES,
+      games: INITIAL_GAMES,
+      getGameName: mockGetGameName,
+    });
+    let next: GamePaymentRequest = {
+      ...p,
+      applySnapshot,
+      letterSnapshot: p.letterSnapshot ?? letterSnapshot,
+    };
+    return next;
   });
 }
 
-export const INITIAL_PAYMENTS = enrichPaidLetterSnapshots(RAW_PAYMENTS, 'vendor');
-export const INITIAL_GAME_PAYMENTS = enrichPaidLetterSnapshots(RAW_GAME_PAYMENTS, 'game');
+function enrichPaidLetterSnapshots(items: PaymentRequest[]): PaymentRequest[] {
+  return items.map((p) => {
+    if (p.status !== '已付款') return p;
+    const vendor = INITIAL_VENDORS.find((v) => v.id === p.vendorId);
+    const paymentCurrency = vendor?.sharePaymentCurrency ?? '人民币';
+    const letterPayAmountOverride = paymentCurrency === '美金'
+      ? (p.actualAmountUsd ?? 0)
+      : (p.actualAmount ?? p.pendingAmount);
+    return {
+      ...p,
+      letterSnapshot: buildSettlementLetterSnapshot({
+        vendorId: p.vendorId,
+        paymentId: p.id,
+        amount: p.pendingAmount,
+        settlementIds: p.settlementIds,
+        applyTime: p.applyTime,
+        vendor,
+        settlements: INITIAL_SETTLEMENTS,
+        payments: RAW_PAYMENTS,
+        gamePayments: RAW_GAME_PAYMENTS,
+        exchangeRates: INITIAL_EXCHANGE_RATES,
+        games: INITIAL_GAMES,
+        getGameName: mockGetGameName,
+        letterPayAmountOverride,
+      }),
+    };
+  });
+}
+
+export const INITIAL_PAYMENTS = enrichPaidLetterSnapshots(RAW_PAYMENTS);
+export const INITIAL_GAME_PAYMENTS = enrichGamePayments(RAW_GAME_PAYMENTS);
 
 export const INITIAL_BALANCES: VendorBalance[] = deriveBalances(
   INITIAL_SETTLEMENTS, INITIAL_VENDORS, INITIAL_PAYMENTS,

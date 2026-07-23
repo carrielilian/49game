@@ -22,6 +22,14 @@ export function resolvePrepaymentCurrency(
   return entity?.prepaymentCurrency ?? contract?.currency;
 }
 
+/** 【标记付款】三分支：合同支付币种（prepaymentCurrency 快照优先 → Contract.currency） */
+export function resolveMarkPaymentContractCurrency(
+  entity: Pick<Game | Vendor, 'prepaymentCurrency'> | undefined,
+  contract: Contract | undefined,
+): ContractCurrency {
+  return resolvePrepaymentCurrency(entity, contract) ?? '人民币';
+}
+
 export function resolveVendorContractCurrency(
   vendorId: string,
   games: Game[],

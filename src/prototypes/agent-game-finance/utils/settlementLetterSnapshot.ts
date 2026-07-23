@@ -10,7 +10,8 @@ import type {
   Vendor,
 } from '../data/types';
 import { getExchangeRateByApplyTime } from './exchangeRate';
-import { resolveGameMarkPaymentDefaults } from './gamePaymentMarkDefaults';
+import { resolveMarkPaymentContractCurrency } from './currencySnapshot';
+import { resolveGameMarkPaymentDefaults, resolveLetterPayAmount } from './gamePaymentMarkDefaults';
 import { calcGamePrepaymentSummary, calcVendorPrepaymentSummary } from './prepayment';
 import { displaySettlementFormula } from './settlement';
 import {
@@ -18,6 +19,7 @@ import {
   buildLetterRefundRows,
   calcGameLetterPrepaymentDeduction,
   calcLetterPrepaymentDeduction,
+  resolveLetterShowExchangeRate,
   type LetterIncomeRow,
   type LetterRefundRow,
 } from './settlementLetter';
@@ -34,6 +36,8 @@ export interface BuildSettlementLetterSnapshotInput {
   settlementIds?: string[];
   applyTime?: string;
   gameId?: string;
+  /** 排除本笔已付款记录，使 remaining 为付款前余额（mock 重建快照时使用） */
+  paymentId?: string;
   vendor?: Vendor;
   game?: Game;
   contract?: Contract;
@@ -87,6 +91,7 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
     amount,
     applyTime,
     gameId,
+    paymentId,
     vendor,
     game,
     contract,
@@ -102,16 +107,48 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
   const refundTotal = refundRows.reduce((sum, row) => sum + row.settlementRefund, 0);
   const netTotal = Math.round((incomeTotal - refundTotal) * 100) / 100;
   const paymentCurrency: ContractCurrency = game?.sharePaymentCurrency ?? vendor?.sharePaymentCurrency ?? '人民币';
-  const showExchangeRate = paymentCurrency === '美金';
+  const contractPaymentCurrency = isGameLetter && game
+    ? resolveMarkPaymentContractCurrency(game, contract)
+    : resolveMarkPaymentContractCurrency(vendor, contract);
   const exchangeRate = (applyTime ? getExchangeRateByApplyTime(applyTime, exchangeRates) : undefined) ?? 7.21;
 
+  const scopedGamePayments = paymentId
+    ? gamePayments.filter((p) => p.id !== paymentId)
+    : gamePayments;
+  const scopedPayments = paymentId
+    ? payments.filter((p) => p.id !== paymentId)
+    : payments;
+
   const prepaymentSummary = isGameLetter && gameId
-    ? calcGamePrepaymentSummary(game, gameId, gamePayments)
-    : calcVendorPrepaymentSummary(vendor, vendorId, payments);
+    ? calcGamePrepaymentSummary(game, gameId, scopedGamePayments)
+    : calcVendorPrepaymentSummary(vendor, vendorId, scopedPayments);
+  const showExchangeRate = resolveLetterShowExchangeRate(
+    paymentCurrency,
+    contractPaymentCurrency,
+    prepaymentSummary.remainingPrepayment,
+  );
   const showPrepaymentDeductionRows = prepaymentSummary.remainingPrepayment > 0;
   const { deduction: prepaidDeduction, remainingUndeducted, payAmount: formulaPayAmount } = isGameLetter && gameId
-    ? calcGameLetterPrepaymentDeduction(game, gameId, gamePayments, incomeTotal, refundTotal)
-    : calcLetterPrepaymentDeduction(vendor, vendorId, payments, incomeTotal, refundTotal);
+    ? calcGameLetterPrepaymentDeduction(
+      game,
+      gameId,
+      gamePayments,
+      incomeTotal,
+      refundTotal,
+      contractPaymentCurrency,
+      exchangeRate,
+      paymentId,
+    )
+    : calcLetterPrepaymentDeduction(
+      vendor,
+      vendorId,
+      payments,
+      incomeTotal,
+      refundTotal,
+      contractPaymentCurrency,
+      exchangeRate,
+      paymentId,
+    );
 
   let letterPayAmount = formulaPayAmount;
   if (letterPayAmountOverride !== undefined) {
@@ -125,9 +162,7 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
       prepaymentSummary.remainingPrepayment,
       exchangeRate,
     );
-    letterPayAmount = paymentCurrency === '美金'
-      ? (defaults.actualAmountUsd ?? 0)
-      : defaults.actualAmount;
+    letterPayAmount = resolveLetterPayAmount(defaults, paymentCurrency);
   }
 
   return {
@@ -137,6 +172,7 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
     refundTotal,
     netTotal,
     paymentCurrency,
+    contractPaymentCurrency,
     showExchangeRate,
     exchangeRate: showExchangeRate ? exchangeRate : undefined,
     showPrepaymentDeductionRows,

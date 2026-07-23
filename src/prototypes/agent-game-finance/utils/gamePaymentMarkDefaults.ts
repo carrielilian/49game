@@ -1,5 +1,5 @@
-import type { Contract, ContractCurrency, Game, Vendor } from '../data/types';
-import { resolvePrepaymentCurrency } from './currencySnapshot';
+import type { Contract, ContractCurrency, Game, GamePaymentApplySnapshot, Vendor } from '../data/types';
+import { resolveMarkPaymentContractCurrency } from './currencySnapshot';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -15,7 +15,7 @@ export interface GameMarkPaymentDefaultsInput {
   pendingAmount: number;
   prepayment: number;
   remainingPrepayment: number;
-  vendorCurrency: ContractCurrency;
+  contractPaymentCurrency: ContractCurrency;
   paymentCurrency: ContractCurrency;
   exchangeRate: number;
 }
@@ -25,12 +25,18 @@ export interface GameMarkPaymentDefaults {
   actualAmountUsd?: number;
 }
 
+/**
+ * 【标记付款】三种自动填充：
+ * 1. 无预付 → ￥=待付；付款美金时 $=待付÷汇率
+ * 2. 有预付 + 合同人民币 → ￥=net，$=net÷汇率
+ * 3. 有预付 + 合同美金 → ￥=usdNet×汇率，$=usdNet
+ */
 export function calcGameMarkPaymentDefaults(input: GameMarkPaymentDefaultsInput): GameMarkPaymentDefaults {
   const {
     pendingAmount,
     prepayment,
     remainingPrepayment,
-    vendorCurrency,
+    contractPaymentCurrency,
     paymentCurrency,
     exchangeRate,
   } = input;
@@ -38,30 +44,23 @@ export function calcGameMarkPaymentDefaults(input: GameMarkPaymentDefaultsInput)
   const remaining = round2(remainingPrepayment);
   const rate = exchangeRate;
 
-  // 预付分成款 ≤ 0
   if (prepayment <= 0) {
+    const result: GameMarkPaymentDefaults = { actualAmount: pending };
     if (paymentCurrency === '美金' && rate > 0) {
-      return {
-        actualAmount: pending,
-        actualAmountUsd: nonNegative(pending / rate),
-      };
+      result.actualAmountUsd = nonNegative(pending / rate);
     }
-    return { actualAmount: pending };
+    return result;
   }
 
-  // 预付分成款 > 0，厂商支付币种 = 人民币
-  if (vendorCurrency === '人民币') {
+  if (contractPaymentCurrency === '人民币') {
     const net = nonNegative(pending - remaining);
-    if (paymentCurrency === '美金' && rate > 0) {
-      return {
-        actualAmount: net,
-        actualAmountUsd: nonNegative(net / rate),
-      };
+    const result: GameMarkPaymentDefaults = { actualAmount: net };
+    if (rate > 0) {
+      result.actualAmountUsd = nonNegative(net / rate);
     }
-    return { actualAmount: net };
+    return result;
   }
 
-  // 预付分成款 > 0，厂商支付币种 = 美金
   const usdNet = rate > 0 ? nonNegative(pending / rate - remaining) : 0;
   return {
     actualAmountUsd: usdNet,
@@ -81,8 +80,34 @@ export function resolveGameMarkPaymentDefaults(
     pendingAmount,
     prepayment: game?.prepayment ?? 0,
     remainingPrepayment,
-    vendorCurrency: resolvePrepaymentCurrency(game, contract) ?? '人民币',
+    contractPaymentCurrency: resolveMarkPaymentContractCurrency(game, contract),
     paymentCurrency: game?.sharePaymentCurrency ?? '人民币',
     exchangeRate,
   });
+}
+
+export function resolveGameMarkPaymentDefaultsFromSnapshot(
+  pendingAmount: number,
+  snapshot: GamePaymentApplySnapshot,
+  exchangeRate: number,
+): GameMarkPaymentDefaults {
+  return calcGameMarkPaymentDefaults({
+    pendingAmount,
+    prepayment: snapshot.prepayment,
+    remainingPrepayment: snapshot.remainingPrepayment,
+    contractPaymentCurrency: snapshot.contractPaymentCurrency,
+    paymentCurrency: snapshot.sharePaymentCurrency,
+    exchangeRate,
+  });
+}
+
+/** 结算函单行实付：按付款币种取 ￥ 或 $ 对应数值 */
+export function resolveLetterPayAmount(
+  defaults: GameMarkPaymentDefaults,
+  paymentCurrency: ContractCurrency,
+): number {
+  if (paymentCurrency === '美金') {
+    return defaults.actualAmountUsd ?? 0;
+  }
+  return defaults.actualAmount;
 }

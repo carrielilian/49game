@@ -381,7 +381,7 @@ export function PaymentListPage() {
           />
         </div>
       </Drawer>
-      {current && <SettlementLetterDrawer open={letterOpen} onClose={() => setLetterOpen(false)} vendorId={current.vendorId} amount={current.pendingAmount} settlementIds={current.settlementIds} applyTime={current.applyTime} letterSnapshot={current.letterSnapshot} />}
+      {current && <SettlementLetterDrawer open={letterOpen} onClose={() => setLetterOpen(false)} vendorId={current.vendorId} amount={current.pendingAmount} settlementIds={current.settlementIds} applyTime={current.applyTime} paymentId={current.id} letterSnapshot={current.letterSnapshot} />}
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );

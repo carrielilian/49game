@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Drawer } from './Modal';
 import { useAppStore } from '../data/store';
-import { displaySettlementFormula, formatMoney } from '../utils/settlement';
-import { buildLetterIncomeRows, buildLetterRefundRows, calcGameLetterPrepaymentDeduction, calcLetterPrepaymentDeduction } from '../utils/settlementLetter';
+import { displaySettlementFormula, formatMoney, currencySymbol } from '../utils/settlement';
+import { buildLetterIncomeRows, buildLetterRefundRows, calcGameLetterPrepaymentDeduction, calcLetterPrepaymentDeduction, resolveLetterShowExchangeRate } from '../utils/settlementLetter';
 import { formatExchangeRate, getExchangeRateByApplyTime } from '../utils/exchangeRate';
 import { calcGamePrepaymentSummary, calcVendorPrepaymentSummary } from '../utils/prepayment';
-import { resolveGameMarkPaymentDefaults } from '../utils/gamePaymentMarkDefaults';
+import { resolveGameMarkPaymentDefaults, resolveLetterPayAmount } from '../utils/gamePaymentMarkDefaults';
+import { resolveMarkPaymentContractCurrency } from '../utils/currencySnapshot';
 import { downloadMockPdf } from '../utils/mockPdf';
 import type { ContractCurrency, SettlementLetterSnapshot } from '../data/types';
 
@@ -22,6 +23,10 @@ interface SettlementLetterDrawerProps {
   applyTime?: string;
   /** 已付款记录的快照；有则不再实时计算 */
   letterSnapshot?: SettlementLetterSnapshot;
+  /** 付款记录 id：已付款打开结算函时排除本笔，使 remaining 为付款前余额 */
+  paymentId?: string;
+  /** 申请付款快照中的 remaining；汇率行显示条件用 */
+  applyRemainingPrepayment?: number;
   /** 批注锚点 id（游戏付款 / 厂商付款页传入不同值） */
   contentAnnotationId?: string;
 }
@@ -65,7 +70,7 @@ function formatLetterFormula(formulaText?: string, marker: '①' | '③' = '①'
 }
 
 function formatCurrency(value: number): string {
-  return `¥ ${formatMoney(value)}`;
+  return `${currencySymbol('人民币')} ${formatMoney(value)}`;
 }
 
 function formatLetterPayAmount(currency: ContractCurrency, value: number): string {
@@ -151,7 +156,10 @@ function buildLetterPdfLines(
   exchangeRate: number,
   showExchangeRate: boolean,
   remainingUndeducted: number,
+  sharePaymentCurrency: ContractCurrency,
+  contractPaymentCurrency: ContractCurrency,
 ): string[] {
+  const fmtDeduction = (v: number) => formatLetterPayAmount(contractPaymentCurrency, v);
   if (lang === 'en') {
     return [
       'Settlement Confirmation Letter (Mock)',
@@ -162,10 +170,10 @@ function buildLetterPdfLines(
       `Subtotal (2)-(4): ${formatMoney(netTotal)}`,
       ...(showExchangeRate ? [`Exchange Rate: ${formatExchangeRateDisplay(exchangeRate)}`] : []),
       ...(showPrepayment ? [
-        `Settlement/Deduction Amount: ${formatMoney(prepaidDeduction)}`,
-        `Remaining Prepaid: ${formatMoney(remainingUndeducted)}`,
+        `Settlement/Deduction Amount: ${fmtDeduction(prepaidDeduction)}`,
+        `Remaining Prepaid: ${fmtDeduction(remainingUndeducted)}`,
       ] : []),
-      `Actual Pay Amount: ${formatMoney(payAmount)}`,
+      `Actual Pay Amount: ${formatLetterPayAmount(sharePaymentCurrency, payAmount)}`,
       `Amount in words: ${payAmountUpper}`,
     ];
   }
@@ -178,10 +186,10 @@ function buildLetterPdfLines(
     `总计②-④：${formatMoney(netTotal)} 元`,
     ...(showExchangeRate ? [`汇率：${formatExchangeRateDisplay(exchangeRate)}`] : []),
     ...(showPrepayment ? [
-      `结算/抵扣金额：${formatMoney(prepaidDeduction)} 元`,
-      `剩余未抵扣预付分成款：${formatMoney(remainingUndeducted)} 元`,
+      `结算/抵扣金额：${fmtDeduction(prepaidDeduction)}`,
+      `剩余未抵扣预付分成款：${fmtDeduction(remainingUndeducted)}`,
     ] : []),
-    `实际付款金额：${formatMoney(payAmount)} 元`,
+    `实际付款金额：${formatLetterPayAmount(sharePaymentCurrency, payAmount)}`,
     `支付金额（大写）：${payAmountUpper}`,
   ];
 }
@@ -197,7 +205,7 @@ function downloadLetterPdf(
 }
 
 export function SettlementLetterDrawer({
-  open, onClose, vendorId, amount, settlementIds, gameId, applyTime, letterSnapshot, contentAnnotationId,
+  open, onClose, vendorId, amount, settlementIds, gameId, applyTime, letterSnapshot, paymentId, applyRemainingPrepayment, contentAnnotationId,
 }: SettlementLetterDrawerProps) {
   const { getVendor, getGame, getGameName, games, settlements, payments, gamePayments, exchangeRates, contracts } = useAppStore();
   const vendor = getVendor(vendorId);
@@ -260,24 +268,61 @@ export function SettlementLetterDrawer({
   const netTotal = letterSnapshot?.netTotal ?? Math.round((incomeTotal - refundTotal) * 100) / 100;
   const showRefundSection = refundRows.length > 0;
 
-  const livePaymentCurrency: ContractCurrency = game?.sharePaymentCurrency ?? vendor?.sharePaymentCurrency ?? '人民币';
-  const paymentCurrency = letterSnapshot?.paymentCurrency ?? livePaymentCurrency;
-  const showExchangeRate = letterSnapshot?.showExchangeRate ?? (livePaymentCurrency === '美金');
+  const liveSharePaymentCurrency: ContractCurrency = game?.sharePaymentCurrency ?? vendor?.sharePaymentCurrency ?? '人民币';
+  const sharePaymentCurrency = letterSnapshot?.paymentCurrency ?? liveSharePaymentCurrency;
+  const liveContractPaymentCurrency = isGameLetter && game
+    ? resolveMarkPaymentContractCurrency(game, contract)
+    : resolveMarkPaymentContractCurrency(vendor, contract);
+  const contractPaymentCurrency = letterSnapshot?.contractPaymentCurrency ?? liveContractPaymentCurrency;
+
+  const scopedGamePayments = useMemo(
+    () => (paymentId ? gamePayments.filter((p) => p.id !== paymentId) : gamePayments),
+    [gamePayments, paymentId],
+  );
+  const scopedPayments = useMemo(
+    () => (paymentId ? payments.filter((p) => p.id !== paymentId) : payments),
+    [payments, paymentId],
+  );
+
+  const prepaymentSummary = isGameLetter && gameId
+    ? calcGamePrepaymentSummary(game, gameId, scopedGamePayments)
+    : calcVendorPrepaymentSummary(vendor, vendorId, scopedPayments);
+  const remainingPrepaymentForExchange = applyRemainingPrepayment ?? prepaymentSummary.remainingPrepayment;
+  const showExchangeRate = letterSnapshot?.showExchangeRate ?? resolveLetterShowExchangeRate(
+    liveSharePaymentCurrency,
+    liveContractPaymentCurrency,
+    remainingPrepaymentForExchange,
+  );
   const liveExchangeRate = useMemo(
     () => (applyTime ? getExchangeRateByApplyTime(applyTime, exchangeRates) : undefined) ?? 7.21,
     [applyTime, exchangeRates],
   );
   const exchangeRate = letterSnapshot?.exchangeRate ?? liveExchangeRate;
 
-  const prepaymentSummary = isGameLetter && gameId
-    ? calcGamePrepaymentSummary(game, gameId, gamePayments)
-    : calcVendorPrepaymentSummary(vendor, vendorId, payments);
   const vendorRemainingPrepayment = prepaymentSummary.remainingPrepayment;
   const showPrepaymentDeductionRows = letterSnapshot?.showPrepaymentDeductionRows
     ?? (vendorRemainingPrepayment > 0);
   const liveDeduction = isGameLetter && gameId
-    ? calcGameLetterPrepaymentDeduction(game, gameId, gamePayments, incomeTotal, refundTotal)
-    : calcLetterPrepaymentDeduction(vendor, vendorId, payments, incomeTotal, refundTotal);
+    ? calcGameLetterPrepaymentDeduction(
+      game,
+      gameId,
+      gamePayments,
+      incomeTotal,
+      refundTotal,
+      contractPaymentCurrency,
+      exchangeRate,
+      paymentId,
+    )
+    : calcLetterPrepaymentDeduction(
+      vendor,
+      vendorId,
+      payments,
+      incomeTotal,
+      refundTotal,
+      contractPaymentCurrency,
+      exchangeRate,
+      paymentId,
+    );
   const prepaidDeduction = letterSnapshot?.prepaidDeduction ?? liveDeduction.deduction;
   const remainingUndeducted = letterSnapshot?.remainingUndeducted ?? liveDeduction.remainingUndeducted;
   const formulaPayAmount = liveDeduction.payAmount;
@@ -293,21 +338,19 @@ export function SettlementLetterDrawer({
         prepaymentSummary.remainingPrepayment,
         exchangeRate,
       );
-      if (paymentCurrency === '美金') {
-        return defaults.actualAmountUsd ?? 0;
-      }
-      return defaults.actualAmount;
+      return resolveLetterPayAmount(defaults, sharePaymentCurrency);
     }
     return formulaPayAmount;
   }, [
     amount,
+    contract,
     exchangeRate,
     formulaPayAmount,
     game,
     gameId,
     isGameLetter,
     letterSnapshot,
-    paymentCurrency,
+    sharePaymentCurrency,
     prepaymentSummary.remainingPrepayment,
     vendor,
   ]);
@@ -329,6 +372,8 @@ export function SettlementLetterDrawer({
     exchangeRate,
     showExchangeRate,
     remainingUndeducted,
+    sharePaymentCurrency,
+    contractPaymentCurrency,
   );
 
   return (
@@ -452,28 +497,24 @@ export function SettlementLetterDrawer({
               <>
                 <tr>
                   <td colSpan={4} className="agf-settlement-letter__subtotal-label">结算/抵扣金额：</td>
-                  <td className="agf-settlement-letter__subtotal-amount">{formatCurrency(prepaidDeduction)}</td>
+                  <td className="agf-settlement-letter__subtotal-amount">{formatLetterPayAmount(contractPaymentCurrency, prepaidDeduction)}</td>
                 </tr>
                 <tr>
                   <td colSpan={4} className="agf-settlement-letter__subtotal-label">剩余未抵扣预付分成款：</td>
-                  <td className="agf-settlement-letter__subtotal-amount">{formatCurrency(remainingUndeducted)}</td>
+                  <td className="agf-settlement-letter__subtotal-amount">{formatLetterPayAmount(contractPaymentCurrency, remainingUndeducted)}</td>
                 </tr>
               </>
             )}
             <tr>
               <td colSpan={4} className="agf-settlement-letter__subtotal-label">实际付款金额：</td>
-              <td className="agf-settlement-letter__subtotal-amount">{formatLetterPayAmount(paymentCurrency, letterPayAmount)}</td>
+              <td className="agf-settlement-letter__subtotal-amount">{formatLetterPayAmount(sharePaymentCurrency, letterPayAmount)}</td>
             </tr>
             <tr>
               <th className="agf-settlement-letter__label-cell">支付金额（大写）</th>
               <td colSpan={4} className="agf-settlement-letter__content-cell">{payAmountUpper}</td>
             </tr>
             <tr>
-              <th className="agf-settlement-letter__label-cell">
-                付款方开票信息
-                <br />
-                （增值税专用发票）
-              </th>
+              <th className="agf-settlement-letter__label-cell">付款方开票信息</th>
               <td colSpan={4} className="agf-settlement-letter__content-cell">
                 <p>发票项目：{PLATFORM_INVOICE.item}</p>
                 <p>公司名称：{PLATFORM_INVOICE.company}</p>

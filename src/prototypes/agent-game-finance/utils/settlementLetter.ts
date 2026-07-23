@@ -1,5 +1,74 @@
-import type { Game, GamePaymentRequest, PaymentRequest, SettlementRecord, Vendor } from '../data/types';
+import type { ContractCurrency, Game, GamePaymentRequest, PaymentRequest, SettlementRecord, Vendor } from '../data/types';
 import { calcGamePrepaymentSummary, calcVendorPrepaymentSummary } from './prepayment';
+
+/** 结算函汇率行：付款币种=美金，或（支付币种=美金 且 申请付款时 remaining>0） */
+export function resolveLetterShowExchangeRate(
+  sharePaymentCurrency: ContractCurrency,
+  contractPaymentCurrency: ContractCurrency,
+  remainingPrepayment: number,
+): boolean {
+  if (sharePaymentCurrency === '美金') return true;
+  if (contractPaymentCurrency === '美金' && remainingPrepayment > 0) return true;
+  return false;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export interface LetterPrepaymentDeductionResult {
+  deduction: number;
+  remainingUndeducted: number;
+  payAmount: number;
+}
+
+/**
+ * 结算函「结算/抵扣金额」与「剩余未抵扣预付分成款」。
+ * remaining > 0 时：支付币种=美金用 (②−④)/汇率 与 remain 比较；人民币用 (②−④) 与 remain 比较。
+ */
+export function calcLetterPrepaymentDeductionCore(
+  remaining: number,
+  incomeTotal: number,
+  refundTotal: number,
+  contractPaymentCurrency: ContractCurrency,
+  exchangeRate: number,
+): LetterPrepaymentDeductionResult {
+  const net = round2(incomeTotal - refundTotal);
+  const remain = round2(remaining);
+
+  if (remain <= 0) {
+    return { deduction: 0, remainingUndeducted: 0, payAmount: net };
+  }
+
+  if (contractPaymentCurrency === '美金' && exchangeRate > 0) {
+    const netUsd = round2(net / exchangeRate);
+    if (netUsd - remain >= 0) {
+      return {
+        deduction: remain,
+        remainingUndeducted: 0,
+        payAmount: round2(net - remain * exchangeRate),
+      };
+    }
+    return {
+      deduction: netUsd,
+      remainingUndeducted: round2(remain - netUsd),
+      payAmount: round2(net - netUsd * exchangeRate),
+    };
+  }
+
+  if (net - remain >= 0) {
+    return {
+      deduction: remain,
+      remainingUndeducted: 0,
+      payAmount: round2(net - remain),
+    };
+  }
+  return {
+    deduction: net,
+    remainingUndeducted: round2(remain - net),
+    payAmount: 0,
+  };
+}
 
 function monthToIndex(incomeTime: string): number {
   const [y, m] = incomeTime.split('-').map(Number);
@@ -124,15 +193,21 @@ export function calcLetterPrepaymentDeduction(
   payments: PaymentRequest[],
   incomeTotal: number,
   refundTotal: number,
-): { deduction: number; remainingUndeducted: number; payAmount: number } {
-  const net = Math.round((incomeTotal - refundTotal) * 100) / 100;
-  const { remainingPrepayment: vendorRemaining } = calcVendorPrepaymentSummary(vendor, vendorId, payments);
-  const deduction = vendorRemaining - net > 0
-    ? net
-    : Math.round(vendorRemaining * 100) / 100;
-  const remainingUndeducted = Math.round((vendorRemaining - deduction) * 100) / 100;
-  const payAmount = Math.round((net - deduction) * 100) / 100;
-  return { deduction, remainingUndeducted, payAmount };
+  contractPaymentCurrency: ContractCurrency,
+  exchangeRate: number,
+  excludePaymentId?: string,
+): LetterPrepaymentDeductionResult {
+  const scopedPayments = excludePaymentId
+    ? payments.filter((p) => p.id !== excludePaymentId)
+    : payments;
+  const { remainingPrepayment } = calcVendorPrepaymentSummary(vendor, vendorId, scopedPayments);
+  return calcLetterPrepaymentDeductionCore(
+    remainingPrepayment,
+    incomeTotal,
+    refundTotal,
+    contractPaymentCurrency,
+    exchangeRate,
+  );
 }
 
 /** 游戏维度结算函：⑤ 基于游戏「剩余未抵扣分成款」 */
@@ -142,13 +217,19 @@ export function calcGameLetterPrepaymentDeduction(
   payments: GamePaymentRequest[],
   incomeTotal: number,
   refundTotal: number,
-): { deduction: number; remainingUndeducted: number; payAmount: number } {
-  const net = Math.round((incomeTotal - refundTotal) * 100) / 100;
-  const { remainingPrepayment: gameRemaining } = calcGamePrepaymentSummary(game, gameId, payments);
-  const deduction = gameRemaining - net > 0
-    ? net
-    : Math.round(gameRemaining * 100) / 100;
-  const remainingUndeducted = Math.round((gameRemaining - deduction) * 100) / 100;
-  const payAmount = Math.round((net - deduction) * 100) / 100;
-  return { deduction, remainingUndeducted, payAmount };
+  contractPaymentCurrency: ContractCurrency,
+  exchangeRate: number,
+  excludePaymentId?: string,
+): LetterPrepaymentDeductionResult {
+  const scopedPayments = excludePaymentId
+    ? payments.filter((p) => p.id !== excludePaymentId)
+    : payments;
+  const { remainingPrepayment } = calcGamePrepaymentSummary(game, gameId, scopedPayments);
+  return calcLetterPrepaymentDeductionCore(
+    remainingPrepayment,
+    incomeTotal,
+    refundTotal,
+    contractPaymentCurrency,
+    exchangeRate,
+  );
 }

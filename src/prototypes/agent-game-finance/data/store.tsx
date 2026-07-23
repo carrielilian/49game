@@ -48,6 +48,7 @@ import {
 import type { FinanceCenterRow } from '../utils/financeCenter';
 import type { MonthRange } from '../utils/monthRange';
 import { calcRecordSettlementIncome, formatDateTime, formatFormulaText, genId } from '../utils/settlement';
+import { buildGamePaymentApplySnapshot } from '../utils/gamePaymentApplySnapshot';
 import { isFormulaConfigured } from './mock-data';
 
 function nextNumericId(items: { id: string }[], base: number): string {
@@ -395,16 +396,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const applyGamePayment = useCallback((gameId: string) => {
     const game = games.find((g) => g.id === gameId);
     if (!game || !scopedGameIds.has(gameId)) return false;
+    const vendor = vendors.find((v) => v.id === game.vendorId);
+    if (!vendor) return false;
     const bal = deriveGameBalances(settlements, games, gamePayments).find((b) => b.gameId === gameId);
     if (!bal || bal.balance <= 0) return false;
     const toApply = settlements.filter(
       (s) => s.gameId === gameId && s.settled && s.paymentApplyStatus === '未申请',
     );
     const settlementIds = toApply.map((s) => s.id);
-    setGamePayments((prev) => [{
-      id: genId('GP'), gameId, pendingAmount: bal.balance, status: '未付款',
-      applyTime: formatDateTime(),
+    const applyTime = formatDateTime();
+    const contract = contracts.find((c) => c.gameId === gameId);
+    const { applySnapshot, letterSnapshot } = buildGamePaymentApplySnapshot({
+      gameId,
+      pendingAmount: bal.balance,
+      applyTime,
       settlementIds,
+      game,
+      vendor,
+      contract,
+      settlements,
+      payments,
+      gamePayments,
+      exchangeRates: INITIAL_EXCHANGE_RATES,
+      games,
+      getGameName: (id) => {
+        const g = games.find((x) => x.id === id);
+        return g?.onlineName ?? g?.name ?? id;
+      },
+    });
+    setGamePayments((prev) => [{
+      id: genId('GP'),
+      gameId,
+      pendingAmount: bal.balance,
+      status: '未付款',
+      applyTime,
+      settlementIds,
+      applySnapshot,
+      letterSnapshot,
     }, ...prev]);
     setSettlements((prev) => prev.map((s) =>
       settlementIds.includes(s.id)
@@ -412,7 +440,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         : s,
     ));
     return true;
-  }, [scopedGameIds, settlements, games, gamePayments]);
+  }, [scopedGameIds, settlements, games, gamePayments, vendors, contracts, payments]);
 
   const markPaid = useCallback((paymentId: string, data: Partial<PaymentRequest>) => {
     setPayments((prev) => prev.map((p) => p.id === paymentId
