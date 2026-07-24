@@ -2,7 +2,7 @@
 
 > **用途**：在新 Cursor 对话中快速恢复本项目背景、已做决策和待办，避免重复对齐。  
 > **UI 细节**：改样式、表单、抽屉、分页等请优先读 [`ui-spec.md`](./ui-spec.md)。  
-> **最后更新**：2026-07-22（游戏申请付款快照；结算函⑤/汇率/实付；支付币种取申请快照）  
+> **最后更新**：2026-07-24（删除厂商收入、厂商付款管理功能及代码）  
 > **对应 Git**：见文末「Git 状态」；远程 https://github.com/carrielilian/49game.git `main`（本地可能有未推送改动）
 
 ---
@@ -53,6 +53,14 @@
 
 ## 本次对话完成的主要工作
 
+### 2026-07-24 最新（删除厂商级收入/付款功能）
+
+- 删除 `vendor-income`、`payment-list` 路由及页面渲染分支；旧深链回到默认厂商管理页。
+- 删除 `VendorIncomePage.tsx`、`PaymentListPage.tsx`、`VendorIncomeFieldHelp.tsx`、`vendorPaymentApply.ts`。
+- 删除厂商付款 mock、厂商余额/付款状态、厂商申请付款及厂商预付抵扣专属逻辑。
+- 游戏收入、游戏付款、游戏申请付款快照与游戏结算函继续保留。
+- 侧栏「财务分成管理」现仅保留：结算公式、外部/内部/退款结算、游戏收入管理、游戏付款管理。
+
 ### 2026-07-22 最新（结算函快照 · ⑤ · 支付币种 · 标记付款）
 
 | 主题 | 要点 |
@@ -81,7 +89,7 @@
 | 7 | 游戏收入(7)、游戏付款(11)、收入汇总(5，含导出) | 已验收 |
 
 - **批注约定**：自然语言；蓝逻辑 / 绿状态 / 橙表单；操作列 marker 在按钮上；抽屉内锚点仅抽屉打开时可见。
-- **侧栏隐藏页**（厂商收入、厂商付款）** intentionally 未批注**。
+- 厂商收入、厂商付款管理已于 2026-07-24 完整删除，不再存在隐藏页或深链入口。
 - **关键文件**：`docs/annotations/**`、`utils/buildAnnotationSource.ts`、`annotation-source.json`、`index.tsx`、`utils/resolveAnnotationElement.ts`、`components/OverlayScope.tsx`、`utils/annotationPanelWidth.ts`。
 
 #### 批注体验

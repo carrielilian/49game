@@ -23,18 +23,6 @@ export interface Vendor {
   bankLocation: string;
   branch: string;
   cardNumber: string;
-  /** 厂商级预付分成款；未填视为未补充 */
-  prepayment?: number;
-  /** 预付分成款保存时的支付币种快照；合同改支付币种不回写 */
-  prepaymentCurrency?: ContractCurrency;
-  /** 历史已抵扣分成款（线下手动处理），默认 0 */
-  historicalDeduction?: number;
-  /** 付费设置 — 分成付款公司 */
-  sharePaymentCompany?: SharePaymentCompany;
-  /** 付费设置 — 付款币种 */
-  sharePaymentCurrency?: ContractCurrency;
-  /** 付费设置 — 付款账号 */
-  sharePaymentAccount?: string;
 }
 
 export interface Game {
@@ -129,17 +117,6 @@ export interface SettlementRecord {
   vendorId: string;
 }
 
-export interface VendorBalance {
-  vendorId: string;
-  balance: number;
-  accountTotalIncome: number;
-  prepayment: number;
-  deductedPrepayment: number;
-  remainingPrepayment: number;
-  totalIncome: number;
-  totalRefund: number;
-}
-
 export interface GameBalance {
   gameId: string;
   balance: number;
@@ -182,27 +159,6 @@ export interface SettlementLetterSnapshot {
   prepaidDeduction?: number;
   remainingUndeducted?: number;
   letterPayAmount: number;
-}
-
-export interface PaymentRequest {
-  id: string;
-  vendorId: string;
-  pendingAmount: number;
-  actualAmount?: number;
-  /** 实际付款美金（选填） */
-  actualAmountUsd?: number;
-  status: PaymentStatus;
-  applyTime: string;
-  payTime?: string;
-  payBank?: string;
-  receiptInfo?: string;
-  settlementLetter?: string;
-  invoice?: string;
-  remark?: string;
-  /** 申请付款时标记为「已申请」的结算记录 ID */
-  settlementIds?: string[];
-  /** 标记已付款时写入；打开结算函优先读此快照 */
-  letterSnapshot?: SettlementLetterSnapshot;
 }
 
 /** 游戏【申请付款】成功时刻冻结的信息 */

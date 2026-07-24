@@ -1,7 +1,13 @@
 import type { Game, GamePaymentRequest, Vendor } from '../data/types';
 import { isUnpaidPayment } from './payment';
 import { isGamePrepaymentMissing } from './prepayment';
-import { isVendorBankInfoComplete } from './vendorPaymentApply';
+
+const BANK_FIELDS: (keyof Vendor)[] = ['accountName', 'bank', 'bankLocation', 'branch', 'cardNumber'];
+
+function isVendorBankInfoComplete(vendor?: Vendor): boolean {
+  if (!vendor) return false;
+  return BANK_FIELDS.every((key) => String(vendor[key] ?? '').trim());
+}
 
 export function hasUnpaidGamePaymentRecord(gameId: string, payments: GamePaymentRequest[]): boolean {
   return payments.some((p) => p.gameId === gameId && isUnpaidPayment(p.status));

@@ -1,5 +1,5 @@
-import type { ContractCurrency, Game, GamePaymentRequest, PaymentRequest, SettlementRecord, Vendor } from '../data/types';
-import { calcGamePrepaymentSummary, calcVendorPrepaymentSummary } from './prepayment';
+import type { ContractCurrency, Game, GamePaymentRequest, SettlementRecord } from '../data/types';
+import { calcGamePrepaymentSummary } from './prepayment';
 
 /** 结算函汇率行：付款币种=美金，或（支付币种=美金 且 申请付款时 remaining>0） */
 export function resolveLetterShowExchangeRate(
@@ -184,30 +184,6 @@ export function buildLetterRefundRows(
     }
   }
   return rows;
-}
-
-/** 结算函：⑤ 与剩余未抵扣预付分成（基于厂商「剩余未抵扣分成款」） */
-export function calcLetterPrepaymentDeduction(
-  vendor: Vendor | undefined,
-  vendorId: string,
-  payments: PaymentRequest[],
-  incomeTotal: number,
-  refundTotal: number,
-  contractPaymentCurrency: ContractCurrency,
-  exchangeRate: number,
-  excludePaymentId?: string,
-): LetterPrepaymentDeductionResult {
-  const scopedPayments = excludePaymentId
-    ? payments.filter((p) => p.id !== excludePaymentId)
-    : payments;
-  const { remainingPrepayment } = calcVendorPrepaymentSummary(vendor, vendorId, scopedPayments);
-  return calcLetterPrepaymentDeductionCore(
-    remainingPrepayment,
-    incomeTotal,
-    refundTotal,
-    contractPaymentCurrency,
-    exchangeRate,
-  );
 }
 
 /** 游戏维度结算函：⑤ 基于游戏「剩余未抵扣分成款」 */

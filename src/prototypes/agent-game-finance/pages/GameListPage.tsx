@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { COL_ALIGN_RIGHT, DataTable, DualCell, renderCurrencyTotals } from '../components/DataTable';
 import { ColumnFilter } from '../components/ColumnFilter';
-import { ColumnSort } from '../components/ColumnSort';
 import { CurrencyInput, FieldError, FieldHint, ReadonlyField } from '../components/FormFields';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
@@ -122,12 +121,6 @@ function renderGameLogAction(log: GameOperationLog) {
 }
 
 type PaidSortKey = 'paidAgencyFee' | 'paidPrepayment' | 'paidDevelopmentFee';
-
-const PAID_SORT_META: Record<PaidSortKey, { content: CooperationContent }> = {
-  paidAgencyFee: { content: '游戏代理金' },
-  paidPrepayment: { content: '预付分成款' },
-  paidDevelopmentFee: { content: '委托开发费' },
-};
 
 const AMOUNT_CELL = 'agf-table__cell--right';
 
@@ -396,8 +389,6 @@ export function GameListPage() {
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [payerFilter, setPayerFilter] = useState('');
   const [opStatus, setOpStatus] = useState('');
-  const [sortKey, setSortKey] = useState<PaidSortKey | null>(null);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [contractDrawer, setContractDrawer] = useState(false);
@@ -431,29 +422,10 @@ export function GameListPage() {
     return true;
   });
 
-  const togglePaidSort = (key: PaidSortKey) => {
-    if (sortKey === key) {
-      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-    setSortKey(key);
-    setSortOrder('desc');
-  };
-
-  const tableData = useMemo(() => {
-    const list = [...filtered];
-    if (sortKey) {
-      const { content } = PAID_SORT_META[sortKey];
-      list.sort((a, b) => {
-        const av = getPaidAmount(contractByGameId.get(a.id), sortKey, content);
-        const bv = getPaidAmount(contractByGameId.get(b.id), sortKey, content);
-        const diff = av - bv;
-        return sortOrder === 'asc' ? diff : -diff;
-      });
-      return list;
-    }
-    return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [filtered, sortKey, sortOrder, contractByGameId]);
+  const tableData = useMemo(
+    () => [...filtered].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [filtered],
+  );
 
   const getPaidCellText = (game: Game, key: PaidSortKey, content: CooperationContent): string => {
     const c = contractByGameId.get(game.id);
@@ -488,12 +460,6 @@ export function GameListPage() {
     downloadCsv(`游戏管理-${formatDateTime().slice(0, 10)}.csv`, [...GAME_LIST_EXPORT_HEADERS], rows);
     setToast({ message: '导出成功', type: 'success' });
   };
-
-  const paidSortConfig = (key: PaidSortKey) => ({
-    active: sortKey === key,
-    order: sortOrder,
-    onToggle: () => togglePaidSort(key),
-  });
 
   const clearError = (key: string) => setErrors((prev) => {
     if (!prev[key]) return prev;
@@ -621,9 +587,11 @@ export function GameListPage() {
     };
     setContractAmountFields((prev) => ({ ...prev, ...normalizedAmounts }));
 
+    const existingContract = contracts.find((x) => x.gameId === contractForm.gameId);
     updateContract({
       ...contractForm,
       contractNumber: contractForm.contractNumber.trim(),
+      currency: existingContract?.currency ?? contractForm.currency,
       contractAmount: parseContractAmount(normalizedAmounts.contractAmount),
       paidAgencyFee: contractForm.cooperationContents.includes('游戏代理金')
         ? parseContractAmount(normalizedAmounts.paidAgencyFee) : undefined,
@@ -642,6 +610,8 @@ export function GameListPage() {
   [gameLogs, selectedGameId]);
   const contractGame = contractForm ? getGame(contractForm.gameId) : null;
   const contractCurrency = contractForm?.currency;
+  const savedContract = contractForm ? contractByGameId.get(contractForm.gameId) : undefined;
+  const contractCurrencyLocked = Boolean(savedContract?.currency);
   const logGame = selectedGameId ? getGame(selectedGameId) : null;
   const channelGame = channelGameId ? getGame(channelGameId) : null;
   const channelFormula = channelGameId ? formulas.find((x) => x.gameId === channelGameId) : undefined;
@@ -704,26 +674,19 @@ export function GameListPage() {
               ...COL_ALIGN_RIGHT,
               key: 'paidAgencyFee',
               title: '已付游戏代理金',
-              header: (
-                <span data-annotation-id="game-list-paid-cols">
-                  <ColumnSort title="已付游戏代理金" sort={paidSortConfig('paidAgencyFee')} />
-                </span>
-              ),
-              sort: paidSortConfig('paidAgencyFee'),
+              header: <span data-annotation-id="game-list-paid-cols">已付游戏代理金</span>,
               render: (r) => renderPaidCell(r, 'paidAgencyFee', '游戏代理金'),
             },
             {
               ...COL_ALIGN_RIGHT,
               key: 'paidPrepayment',
               title: '已付预付分成款',
-              sort: paidSortConfig('paidPrepayment'),
               render: (r) => renderPaidCell(r, 'paidPrepayment', '预付分成款'),
             },
             {
               ...COL_ALIGN_RIGHT,
               key: 'paidDevelopmentFee',
               title: '已付委托开发费',
-              sort: paidSortConfig('paidDevelopmentFee'),
               render: (r) => renderPaidCell(r, 'paidDevelopmentFee', '委托开发费'),
             },
             {
@@ -793,26 +756,32 @@ export function GameListPage() {
               </div>
             </div>
             <div className="agf-form-item">
-              <label className="agf-form-label agf-form-label--required">支付币种</label>
-              <div className="agf-form-field">
-                <div className="agf-radio-group">
-                  {PAYMENT_CURRENCY_OPTIONS.map((opt) => (
-                    <label key={opt} className="agf-radio-item">
-                      <input
-                        type="radio"
-                        name="contractCurrency"
-                        checked={contractForm.currency === opt}
-                        onChange={() => {
-                          clearContractError('currency');
-                          setContractForm({ ...contractForm, currency: opt });
-                        }}
-                      />
-                      {opt}
-                    </label>
-                  ))}
-                </div>
-                <FieldError message={contractErrors.currency} />
-              </div>
+              {contractCurrencyLocked ? (
+                <ReadonlyField label="支付币种" value={contractForm.currency ?? '-'} />
+              ) : (
+                <>
+                  <label className="agf-form-label agf-form-label--required">支付币种</label>
+                  <div className="agf-form-field">
+                    <div className="agf-radio-group">
+                      {PAYMENT_CURRENCY_OPTIONS.map((opt) => (
+                        <label key={opt} className="agf-radio-item">
+                          <input
+                            type="radio"
+                            name="contractCurrency"
+                            checked={contractForm.currency === opt}
+                            onChange={() => {
+                              clearContractError('currency');
+                              setContractForm({ ...contractForm, currency: opt });
+                            }}
+                          />
+                          {opt}
+                        </label>
+                      ))}
+                    </div>
+                    <FieldError message={contractErrors.currency} />
+                  </div>
+                </>
+              )}
             </div>
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">合同金额</label>

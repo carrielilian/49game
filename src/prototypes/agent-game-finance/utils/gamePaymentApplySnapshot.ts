@@ -4,7 +4,6 @@ import type {
   Game,
   GamePaymentApplySnapshot,
   GamePaymentRequest,
-  PaymentRequest,
   SettlementLetterSnapshot,
   SettlementRecord,
   Vendor,
@@ -33,7 +32,6 @@ export interface BuildGamePaymentApplySnapshotInput {
   vendor: Vendor;
   contract?: Contract;
   settlements: SettlementRecord[];
-  payments: PaymentRequest[];
   gamePayments: GamePaymentRequest[];
   exchangeRates: ExchangeRateRecord[];
   games: Game[];
@@ -52,7 +50,6 @@ export function buildGamePaymentApplySnapshot(
     vendor,
     contract,
     settlements,
-    payments,
     gamePayments,
     exchangeRates,
     games,
@@ -86,7 +83,6 @@ export function buildGamePaymentApplySnapshot(
     game,
     contract,
     settlements,
-    payments,
     gamePayments,
     exchangeRates,
     games,

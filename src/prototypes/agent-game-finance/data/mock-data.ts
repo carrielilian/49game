@@ -9,51 +9,24 @@ import type {
   GameOperationLog,
   GamePaymentRequest,
   FormulaOperationLog,
-  PaymentRequest,
   SettlementRecord,
   Vendor,
-  VendorBalance,
   ExchangeRateRecord,
 } from './types';
-import { deriveBalances, deriveGameBalances } from '../utils/balance';
+import { deriveGameBalances } from '../utils/balance';
 import { resolveFollowInvoiceTax } from '../utils/invoiceTax';
-import { buildSettlementLetterSnapshot } from '../utils/settlementLetterSnapshot';
 import { buildGamePaymentApplySnapshot } from '../utils/gamePaymentApplySnapshot';
 
 const BT4399 = '4399' as const satisfies BusinessType;
 const BTKB = '快爆' as const satisfies BusinessType;
 
-/** 厂商级预付分成款 mock */
-const VENDOR_PREPAYMENTS: Partial<Record<string, number>> = {
-  '1001': 800000,
-  '1002': 600000,
-  '1003': 950000,
-  '1004': 600000,
-  // 1005 未填，验收「未补充预付分成款」拦截
-  '1006': 380000,
-  '1007': 0, // 预付为 0 合法
-  '1008': 280000,
-  '2001': 680000,
-  '2002': 180000,
-  '2003': 320000,
-};
-
-/** 厂商历史已抵扣分成款 mock */
-const VENDOR_HISTORICAL_DEDUCTIONS: Partial<Record<string, number>> = {
-  '1003': 80000, // 配合 P001 验收已抵扣/剩余
-};
-
 /** 银行五字段不全（验收「未填写银行信息」拦截） */
 const VENDOR_INCOMPLETE_BANK = new Set(['1007']);
 
-function vendorWithPrepayment(v: Omit<Vendor, 'prepayment' | 'historicalDeduction' | 'prepaymentCurrency'> & { prepayment?: number }): Vendor {
-  const prepayment = VENDOR_PREPAYMENTS[v.id];
-  const historicalDeduction = VENDOR_HISTORICAL_DEDUCTIONS[v.id];
+function vendorWithPrepayment(v: Vendor): Vendor {
   const bankIncomplete = VENDOR_INCOMPLETE_BANK.has(v.id);
   return {
     ...v,
-    ...(prepayment != null ? { prepayment } : {}),
-    ...(historicalDeduction != null ? { historicalDeduction } : {}),
     ...(bankIncomplete ? { cardNumber: '' } : {}),
   };
 }
@@ -168,13 +141,6 @@ function enrichMockPrepaymentCurrency() {
     if (game.prepayment != null && !game.prepaymentCurrency) {
       const currency = contractMap.get(game.id)?.currency;
       if (currency) Object.assign(game, { prepaymentCurrency: currency });
-    }
-  }
-  for (const vendor of INITIAL_VENDORS) {
-    if (vendor.prepayment != null && !vendor.prepaymentCurrency) {
-      const firstGame = INITIAL_GAMES.find((g) => g.vendorId === vendor.id);
-      const currency = firstGame ? contractMap.get(firstGame.id)?.currency : undefined;
-      if (currency) Object.assign(vendor, { prepaymentCurrency: currency });
     }
   }
 }
@@ -306,23 +272,6 @@ export const INITIAL_EXCHANGE_RATES: ExchangeRateRecord[] = [
   { month: '2026-06', rate: 7.21, fetchDate: '2026-06-30' },
 ];
 
-const RAW_PAYMENTS: PaymentRequest[] = [
-  // 1003 已付款+完整凭证+历史已抵扣（结算函⑤验收）
-  { id: 'P001', vendorId: '1003', pendingAmount: 367800, actualAmount: 367800, actualAmountUsd: 51200, status: '已付款', applyTime: '2026-07-10 14:30:25', payTime: '2026-07-20 16:45:08', payBank: '4399', receiptInfo: '雷霆网络科技有限公司 6227901290129012', settlementLetter: '结算函_雷霆网络科技.pdf', invoice: '电子发票_367800.pdf', settlementIds: ['S004', 'S016', 'S007'] },
-  // 1001 未付款（验收「存在未付款记录」拦截）
-  { id: 'P002', vendorId: '1001', pendingAmount: 255200, status: '未付款', applyTime: '2026-07-05 09:15:42', settlementIds: ['S001', 'S002', 'S010', 'S020'] },
-  // 1006 已付款缺凭证（请款凭证空态）
-  { id: 'P003', vendorId: '1006', pendingAmount: 144000, actualAmount: 144000, status: '已付款', applyTime: '2026-06-28 10:00:00', payTime: '2026-07-08 15:30:00', payBank: '4399', receiptInfo: '云端游创科技有限公司 6222234523452345', settlementIds: ['S011'] },
-  // 1008 已付款仅结算函（缺电子发票）
-  { id: 'P004', vendorId: '1008', pendingAmount: 43200, actualAmount: 43000, status: '已付款', applyTime: '2026-06-25 11:20:00', payTime: '2026-07-05 09:45:00', payBank: '游家时代', receiptInfo: '极客游戏有限公司 6226012301230123', settlementLetter: '结算函_极客游戏.pdf', settlementIds: ['S014'] },
-  // 快爆 2001 已付款
-  { id: 'P301', vendorId: '2001', pendingAmount: 99000, actualAmount: 99000, status: '已付款', applyTime: '2026-07-12 11:20:30', payTime: '2026-07-22 15:10:18', payBank: '4399', receiptInfo: '快爆星辰科技有限公司 6229098765432109', settlementLetter: '结算函_快爆星辰科技.pdf', invoice: '电子发票_99000.pdf', settlementIds: ['S302'] },
-  // 快爆 2002 未付款（结算函·含退款区）
-  { id: 'P302', vendorId: '2002', pendingAmount: 37014.6, status: '未付款', applyTime: '2026-07-15 14:00:00', settlementIds: ['S303', 'S306'] },
-  // 1001 已付款 · 结算函收入+退款+预付全额抵扣（厂商付款隐藏页深链验收）
-  { id: 'P005', vendorId: '1001', pendingAmount: 255200, actualAmount: 0, status: '已付款', applyTime: '2026-07-06 16:00:00', payTime: '2026-07-16 11:30:00', payBank: '4399', receiptInfo: '星辉互动科技有限公司 6222123412341234', settlementLetter: '结算函_星辉互动.pdf', settlementIds: ['S001', 'S002', 'S010', 'S020'] },
-];
-
 const RAW_GAME_PAYMENTS: GamePaymentRequest[] = [
   // 4005 已付款+历史已抵扣（合同支付币种美金 · 情况3 · usdNet=0）
   { id: 'GP001', gameId: '4005', pendingAmount: 202500, actualAmount: 0, actualAmountUsd: 0, status: '已付款', applyTime: '2026-07-11 10:20:15', payTime: '2026-07-21 14:30:00', payBank: '纯游（美元）', receiptInfo: '雷霆网络科技有限公司 6227901290129012', settlementLetter: '结算函_消消乐大师.pdf', invoice: '电子发票_0.pdf', settlementIds: ['S004'] },
@@ -380,7 +329,6 @@ function enrichGamePayments(items: GamePaymentRequest[]): GamePaymentRequest[] {
       vendor,
       contract,
       settlements: INITIAL_SETTLEMENTS,
-      payments: RAW_PAYMENTS,
       gamePayments: scopedGamePayments,
       exchangeRates: INITIAL_EXCHANGE_RATES,
       games: INITIAL_GAMES,
@@ -395,41 +343,7 @@ function enrichGamePayments(items: GamePaymentRequest[]): GamePaymentRequest[] {
   });
 }
 
-function enrichPaidLetterSnapshots(items: PaymentRequest[]): PaymentRequest[] {
-  return items.map((p) => {
-    if (p.status !== '已付款') return p;
-    const vendor = INITIAL_VENDORS.find((v) => v.id === p.vendorId);
-    const paymentCurrency = vendor?.sharePaymentCurrency ?? '人民币';
-    const letterPayAmountOverride = paymentCurrency === '美金'
-      ? (p.actualAmountUsd ?? 0)
-      : (p.actualAmount ?? p.pendingAmount);
-    return {
-      ...p,
-      letterSnapshot: buildSettlementLetterSnapshot({
-        vendorId: p.vendorId,
-        paymentId: p.id,
-        amount: p.pendingAmount,
-        settlementIds: p.settlementIds,
-        applyTime: p.applyTime,
-        vendor,
-        settlements: INITIAL_SETTLEMENTS,
-        payments: RAW_PAYMENTS,
-        gamePayments: RAW_GAME_PAYMENTS,
-        exchangeRates: INITIAL_EXCHANGE_RATES,
-        games: INITIAL_GAMES,
-        getGameName: mockGetGameName,
-        letterPayAmountOverride,
-      }),
-    };
-  });
-}
-
-export const INITIAL_PAYMENTS = enrichPaidLetterSnapshots(RAW_PAYMENTS);
 export const INITIAL_GAME_PAYMENTS = enrichGamePayments(RAW_GAME_PAYMENTS);
-
-export const INITIAL_BALANCES: VendorBalance[] = deriveBalances(
-  INITIAL_SETTLEMENTS, INITIAL_VENDORS, INITIAL_PAYMENTS,
-);
 
 export const INITIAL_GAME_BALANCES: GameBalance[] = deriveGameBalances(
   INITIAL_SETTLEMENTS, INITIAL_GAMES, INITIAL_GAME_PAYMENTS,

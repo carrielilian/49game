@@ -1,4 +1,4 @@
-import type { BusinessType, Game, GameBalance, GamePaymentRequest, PaymentRequest, SettlementRecord, Vendor, VendorBalance } from '../data/types';
+import type { BusinessType, Game, GameBalance, GamePaymentRequest, SettlementRecord, Vendor } from '../data/types';
 
 export const BUSINESS_TYPE_OPTIONS: { value: BusinessType; label: string }[] = [
   { value: '4399', label: '游戏盒' },
@@ -29,14 +29,6 @@ export function filterGamesByBusiness(games: Game[], vendorIds: Set<string>): Ga
 
 export function filterSettlementsByBusiness(settlements: SettlementRecord[], vendorIds: Set<string>): SettlementRecord[] {
   return settlements.filter((s) => vendorIds.has(s.vendorId));
-}
-
-export function filterPaymentsByBusiness(payments: PaymentRequest[], vendorIds: Set<string>): PaymentRequest[] {
-  return payments.filter((p) => vendorIds.has(p.vendorId));
-}
-
-export function filterBalancesByBusiness(balances: VendorBalance[], vendorIds: Set<string>): VendorBalance[] {
-  return balances.filter((b) => vendorIds.has(b.vendorId));
 }
 
 export function filterGamePaymentsByBusiness(payments: GamePaymentRequest[], gameIds: Set<string>): GamePaymentRequest[] {

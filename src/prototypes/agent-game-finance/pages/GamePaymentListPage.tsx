@@ -73,7 +73,6 @@ export function GamePaymentListPage() {
     exchangeRates,
     settlements,
     games,
-    payments,
     contracts,
   } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);

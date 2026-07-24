@@ -3,9 +3,9 @@ import { ChevronDown } from 'lucide-react';
 import { Drawer } from './Modal';
 import { useAppStore } from '../data/store';
 import { displaySettlementFormula, formatMoney, currencySymbol } from '../utils/settlement';
-import { buildLetterIncomeRows, buildLetterRefundRows, calcGameLetterPrepaymentDeduction, calcLetterPrepaymentDeduction, resolveLetterShowExchangeRate } from '../utils/settlementLetter';
+import { buildLetterIncomeRows, buildLetterRefundRows, calcGameLetterPrepaymentDeduction, resolveLetterShowExchangeRate } from '../utils/settlementLetter';
 import { formatExchangeRate, getExchangeRateByApplyTime } from '../utils/exchangeRate';
-import { calcGamePrepaymentSummary, calcVendorPrepaymentSummary } from '../utils/prepayment';
+import { calcGamePrepaymentSummary } from '../utils/prepayment';
 import { resolveGameMarkPaymentDefaults, resolveLetterPayAmount } from '../utils/gamePaymentMarkDefaults';
 import { resolveMarkPaymentContractCurrency } from '../utils/currencySnapshot';
 import { downloadMockPdf } from '../utils/mockPdf';
@@ -17,8 +17,7 @@ interface SettlementLetterDrawerProps {
   vendorId: string;
   amount: number;
   settlementIds?: string[];
-  /** 游戏付款管理：按游戏维度计算预付抵扣 */
-  gameId?: string;
+  gameId: string;
   /** 付款记录申请时间：结算函汇率与【标记付款】同源（取申请月上月末汇率） */
   applyTime?: string;
   /** 已付款记录的快照；有则不再实时计算 */
@@ -27,7 +26,7 @@ interface SettlementLetterDrawerProps {
   paymentId?: string;
   /** 申请付款快照中的 remaining；汇率行显示条件用 */
   applyRemainingPrepayment?: number;
-  /** 批注锚点 id（游戏付款 / 厂商付款页传入不同值） */
+  /** 批注锚点 id */
   contentAnnotationId?: string;
 }
 
@@ -207,11 +206,10 @@ function downloadLetterPdf(
 export function SettlementLetterDrawer({
   open, onClose, vendorId, amount, settlementIds, gameId, applyTime, letterSnapshot, paymentId, applyRemainingPrepayment, contentAnnotationId,
 }: SettlementLetterDrawerProps) {
-  const { getVendor, getGame, getGameName, games, settlements, payments, gamePayments, exchangeRates, contracts } = useAppStore();
+  const { getVendor, getGame, getGameName, games, settlements, gamePayments, exchangeRates, contracts } = useAppStore();
   const vendor = getVendor(vendorId);
-  const game = gameId ? getGame(gameId) : undefined;
-  const contract = gameId ? contracts.find((c) => c.gameId === gameId) : undefined;
-  const isGameLetter = Boolean(gameId);
+  const game = getGame(gameId);
+  const contract = contracts.find((c) => c.gameId === gameId);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const downloadRef = useRef<HTMLDivElement>(null);
 
@@ -247,7 +245,7 @@ export function SettlementLetterDrawer({
       };
     }
 
-    const fallbackGame = gameId ? games.find((g) => g.id === gameId) : games.find((g) => g.vendorId === vendorId);
+    const fallbackGame = games.find((g) => g.id === gameId);
     if (!fallbackGame) return { incomeRows: [], refundRows: [] };
 
     return {
@@ -268,25 +266,16 @@ export function SettlementLetterDrawer({
   const netTotal = letterSnapshot?.netTotal ?? Math.round((incomeTotal - refundTotal) * 100) / 100;
   const showRefundSection = refundRows.length > 0;
 
-  const liveSharePaymentCurrency: ContractCurrency = game?.sharePaymentCurrency ?? vendor?.sharePaymentCurrency ?? '人民币';
+  const liveSharePaymentCurrency: ContractCurrency = game?.sharePaymentCurrency ?? '人民币';
   const sharePaymentCurrency = letterSnapshot?.paymentCurrency ?? liveSharePaymentCurrency;
-  const liveContractPaymentCurrency = isGameLetter && game
-    ? resolveMarkPaymentContractCurrency(game, contract)
-    : resolveMarkPaymentContractCurrency(vendor, contract);
+  const liveContractPaymentCurrency = resolveMarkPaymentContractCurrency(game, contract);
   const contractPaymentCurrency = letterSnapshot?.contractPaymentCurrency ?? liveContractPaymentCurrency;
 
   const scopedGamePayments = useMemo(
     () => (paymentId ? gamePayments.filter((p) => p.id !== paymentId) : gamePayments),
     [gamePayments, paymentId],
   );
-  const scopedPayments = useMemo(
-    () => (paymentId ? payments.filter((p) => p.id !== paymentId) : payments),
-    [payments, paymentId],
-  );
-
-  const prepaymentSummary = isGameLetter && gameId
-    ? calcGamePrepaymentSummary(game, gameId, scopedGamePayments)
-    : calcVendorPrepaymentSummary(vendor, vendorId, scopedPayments);
+  const prepaymentSummary = calcGamePrepaymentSummary(game, gameId, scopedGamePayments);
   const remainingPrepaymentForExchange = applyRemainingPrepayment ?? prepaymentSummary.remainingPrepayment;
   const showExchangeRate = letterSnapshot?.showExchangeRate ?? resolveLetterShowExchangeRate(
     liveSharePaymentCurrency,
@@ -302,53 +291,35 @@ export function SettlementLetterDrawer({
   const vendorRemainingPrepayment = prepaymentSummary.remainingPrepayment;
   const showPrepaymentDeductionRows = letterSnapshot?.showPrepaymentDeductionRows
     ?? (vendorRemainingPrepayment > 0);
-  const liveDeduction = isGameLetter && gameId
-    ? calcGameLetterPrepaymentDeduction(
-      game,
-      gameId,
-      gamePayments,
-      incomeTotal,
-      refundTotal,
-      contractPaymentCurrency,
-      exchangeRate,
-      paymentId,
-    )
-    : calcLetterPrepaymentDeduction(
-      vendor,
-      vendorId,
-      payments,
-      incomeTotal,
-      refundTotal,
-      contractPaymentCurrency,
-      exchangeRate,
-      paymentId,
-    );
+  const liveDeduction = calcGameLetterPrepaymentDeduction(
+    game,
+    gameId,
+    gamePayments,
+    incomeTotal,
+    refundTotal,
+    contractPaymentCurrency,
+    exchangeRate,
+    paymentId,
+  );
   const prepaidDeduction = letterSnapshot?.prepaidDeduction ?? liveDeduction.deduction;
   const remainingUndeducted = letterSnapshot?.remainingUndeducted ?? liveDeduction.remainingUndeducted;
-  const formulaPayAmount = liveDeduction.payAmount;
-
   const letterPayAmount = useMemo(() => {
     if (letterSnapshot) return letterSnapshot.letterPayAmount;
-    if (isGameLetter && gameId) {
-      const defaults = resolveGameMarkPaymentDefaults(
-        amount,
-        game,
-        vendor,
-        contract,
-        prepaymentSummary.remainingPrepayment,
-        exchangeRate,
-      );
-      return resolveLetterPayAmount(defaults, sharePaymentCurrency);
-    }
-    return formulaPayAmount;
+    const defaults = resolveGameMarkPaymentDefaults(
+      amount,
+      game,
+      vendor,
+      contract,
+      prepaymentSummary.remainingPrepayment,
+      exchangeRate,
+    );
+    return resolveLetterPayAmount(defaults, sharePaymentCurrency);
   }, [
     amount,
     contract,
     exchangeRate,
-    formulaPayAmount,
     game,
     gameId,
-    isGameLetter,
     letterSnapshot,
     sharePaymentCurrency,
     prepaymentSummary.remainingPrepayment,

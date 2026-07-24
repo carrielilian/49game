@@ -2,7 +2,7 @@
 
 > 原型路径：`src/prototypes/agent-game-finance/`  
 > 预览：`/prototypes/agent-game-finance`  
-> 最后更新：2026-07-22（游戏申请付款快照；结算函⑤/汇率/实付；支付币种取申请快照）
+> 最后更新：2026-07-24（删除厂商收入、厂商付款管理功能及代码）
 
 本文档汇总「代理游戏台账」原型的 UI/交互规范，供后续对话、改页、加功能时统一引用。
 
@@ -100,7 +100,7 @@
 |------|------|
 | `gameAndVendor` + `showContractName` | **游戏管理** |
 | `gameAndVendor` | 结算公式、**收入汇总统计**、**外部/内部/退款结算** |
-| `vendor` | 厂商管理（**厂商收入**、**厂商付款管理** 侧栏已隐藏，路由仍保留） |
+| `vendor` | 厂商管理 |
 
 **结算页时间查询**：外部收入结算、内部收入结算、内部退款结算顶部查询栏使用 `MonthRangePicker`；默认 `getRecentTwoMonthsRange()`（**近两个月** = 上个月 + 当前月）；**【数据拉取】成功后时间保持近两个月，不切换为单月**（范围存 `internalSettlementButtons[type].monthRange`）；表头「收入时间 / 退款时间」列仅展示，不用 `ColumnFilter`。
 
@@ -150,7 +150,7 @@
 | 数据统计 | **仅**「收入汇总统计」（`stats-summary`） |
 
 - 平台名称（侧栏 Logo、面包屑）：**代理游戏台账**。
-- **侧栏隐藏页**（`vendor-income` 厂商收入、`payment-list` 厂商付款管理）：不在 `MENU_GROUPS` 展示，但已注册于 `defineHashPageRoute`，深链 `#page=vendor-income` / `#page=payment-list` 可访问。
+- **已删除功能**：厂商收入、厂商付款管理不再提供菜单、路由或页面代码；旧深链会回到默认的厂商管理页。
 
 ---
 
@@ -177,7 +177,7 @@
 - 厂商 ID、厂商名称：**分两列**，不合并
 - 枚举列：表头带漏斗筛选（`ColumnFilter` + `utils/columnFilters.ts`）
 - **列头筛选下拉**：选项文字 `font-weight: 400`，不继承表头 `700` 加粗（`.agf-col-filter__menu` / `__item`）；菜单通过 Portal 挂到 `body`，`position: fixed` + `z-index: 10000`，列表高度不足时不被表格容器裁切
-- **列头排序**：`ColumnSort.tsx`；点击切换升/降序；用于游戏管理三项已付金额列
+- **列头排序**：`ColumnSort.tsx`；点击切换升/降序（**游戏管理三项已付列已移除排序**）
 
 ### 主列表金额展示
 
@@ -468,7 +468,7 @@
 | 游戏ID / 游戏名称 | `DualCell`，`onlineName` |
 | 合同游戏名称 | `name` |
 | 厂商ID、厂商名称 | 分两列 |
-| **已付游戏代理金** / **已付预付分成款** / **已付委托开发费** | 表头**排序**；有值 `formatCurrencyMoney`（厂商币种 + 千分位）；无值 `-` |
+| **已付游戏代理金** / **已付预付分成款** / **已付委托开发费** | 有值 `formatCurrencyMoney`（厂商币种 + 千分位）；无值 `-`；**无表头排序** |
 | 运营状态 | 表头筛选 |
 | 操作 | 编辑、合同管理、**支持渠道**、操作记录 |
 
@@ -509,7 +509,7 @@
 
 1. 游戏ID / 游戏名称（只读，`4001 / 星际探险OL`，无分割线）  
 2. **合同编号** *  
-3. **支付币种** * — 单选「人民币」/「美金」（`agf-radio-group`）；保存必填；选中后下方金额输入框显示对应 ￥/$ 前缀  
+3. **支付币种** * — 单选「人民币」/「美金」（`agf-radio-group`）；保存必填；**首次保存前**可选，**保存后**再次进入改为只读展示（`ReadonlyField`），不可修改；选中后下方金额输入框显示对应 ￥/$ 前缀  
 4. **合同金额** * — 复合型输入框（`CurrencyInput`）；前缀取 `Contract.currency`；未选币种时前缀为空；≥0，精确至小数点后两位  
 5. **合作内容** * — 必填多选（`agf-checkbox-group`）；选项：**游戏代理金**、**预付分成款**、**委托开发费**；至少勾选一项  
    - 勾选 **游戏代理金** → 显示 **已付游戏代理金** *（复合型输入框 + `FieldHint`「请输入目前已支付的游戏代理金」）  
@@ -524,7 +524,7 @@
 
 **校验**：合同编号、**支付币种**、合同金额、合作内容（至少一项）、**合作状态**必填；已勾选合作内容对应的已付金额必填；失败 → 字段红字 + Toast「请完善所有信息」。
 
-> **支付币种**仅在**合同管理**维护（`Contract.currency`）。游戏/厂商级预付在【**付款设置**】维护，首次保存写入 `prepaymentCurrency` 快照。
+> **支付币种**仅在**合同管理**维护（`Contract.currency`）。**首次**保存前可选；**保存后**不可再改，再次打开仅展示。游戏/厂商级预付在【**付款设置**】维护，首次保存写入 `prepaymentCurrency` 快照。
 
 ### 游戏管理 — 支持渠道（抽屉）
 
@@ -675,7 +675,7 @@
 | 时间列标题 | 退款时间 |
 | 收入列标题 | 结算退款 |
 
-### 厂商收入 — 列表（`VendorIncomePage`）
+### 厂商收入 — 列表（已删除，以下仅保留历史规范）
 
 **查询栏**：`ListSearchFields`（`vendor`）
 
@@ -754,7 +754,7 @@
 | 1005 | 厂商**未填**预付分成款 → 测「像素工坊未补充预付分成款信息」 |
 | 1001 | P002 未付款（余额 ≤ 0 无按钮） |
 
-### 厂商付款管理 — 列表（`PaymentListPage`）
+### 厂商付款管理 — 列表（已删除，以下仅保留历史规范）
 
 **查询栏**：`ListSearchFields`（`vendor`）
 
@@ -1225,7 +1225,6 @@ src/prototypes/agent-game-finance/
 │   ├── ColumnFilter.tsx
 │   ├── StatusBadge.tsx
 │   ├── MonthRangePicker.tsx     # 月份范围选择器
-│   ├── VendorIncomeFieldHelp.tsx # 厂商收入字段说明 ? + Modal
 │   ├── MockFileUpload.tsx       # 模拟文件上传（标记付款/详细信息）
 │   ├── SettlementLetterDrawer.tsx # 结算函 1175px
 │   ├── AdminLayout.tsx          # 布局；breadcrumbExtra 注入页级说明
@@ -1241,7 +1240,6 @@ src/prototypes/agent-game-finance/
 │   ├── settlement.ts            # calcSettlement、displaySettlementFormula、calcRecordSettlementIncome
 │   ├── financeCenter.ts         # 财务中心 mock（拉取校验与按渠道+渠道游戏ID取数）
 │   ├── externalImport.ts        # 外部导入解析与结算
-│   ├── vendorPaymentApply.ts    # 厂商收入【申请付款】拦截校验
 │   ├── prepayment.ts            # 厂商预付/已抵扣/剩余计算
 │   ├── payment.ts               # 付款状态、可选金额校验、￥/$ 展示辅助
 │   ├── settlementLetter.ts      # 连续月份合并、结算函⑤、calcLetterPrepaymentDeduction
@@ -1302,7 +1300,7 @@ src/prototypes/agent-game-finance/
 42. **mockPdf.ts**：结算函下载生成合法 PDF，勿用纯文本 Blob 冒充 PDF  
 43. **prepayment.ts**：厂商/游戏已抵扣/剩余与结算函共用  
 44. **结算按钮状态**：`internalSettlementButtons` / `externalSettlementButtons` 按 `businessType` 分桶  
-45. **游戏管理列表**：付款方筛选；三项已付可排序；默认 `createdAt` 新→旧；金额币种+千分位  
+45. **游戏管理列表**：付款方筛选；三项已付**无排序**；默认 `createdAt` 新→旧；金额币种+千分位  
 46. **游戏表单**：**付款方/版号/运营状态必填**；游戏负责人选填；合同抽屉含合作内容/复合型金额输入  
 47. **厂商表单**：必填 **7 项**；联系人/手机/邮箱/地址选填  
 48. **内部渠道**：无 H5游戏（6 项）；外部渠道含**游乐外放**（5 项）  
@@ -1314,13 +1312,13 @@ src/prototypes/agent-game-finance/
 54. **主列表金额**：`formatCurrencyMoney` = 符号+千分位；结算三页固定 ￥  
 55. **收入汇总**：支付金额=合同三项已付之和；列表列=总收入+结算付款金额（已移除结算收入/退款）；结算付款金额=游戏付款 `actualAmount` 按付款月累加  
 56. **操作记录合同变更**：`"字段"变更为"值"` 多行；未填 `"-"`；金额带币种符号与千分位（`formatOptionalCurrencyMoney` + `Contract.currency`）  
-57. **侧栏隐藏**：厂商收入、厂商付款管理（路由保留）  
+57. **功能删除**：厂商收入、厂商付款管理的菜单、路由、页面、专属组件与厂商付款数据链路均已移除。  
 58. **游戏付款时间列**：申请时间+付款时间同一列堆叠  
 59. **结算公式扣税点**：标签「扣税点」；复合 `%` 输入  
 60. **复合输入灰底**：币种前缀与 `%` 后缀统一 `#f5f7fa`  
 61. **合同金额初始**：未填不显示 `0.00`  
 62. **操作记录时间**：`YYYY-MM-DD HH:mm:ss`  
-63. **ColumnSort**：游戏管理已付三列表头排序  
+63. **ColumnSort**：表头升/降序组件（游戏管理已付三列**未使用**）  
 64. **收入页结算币种**：账户余额/累计收入等结算口径列固定 **￥**；预付三列取 `prepaymentCurrency` 快照；预付未填 `-`  
 65. **付款列表币种**：待付/实付 ￥；与 `Contract.currency` 展示无关  
 66. **actualAmountUsd**：厂商/游戏付款【标记付款】选填；【详细信息】只读 $ 或 `-`  
@@ -1338,7 +1336,7 @@ src/prototypes/agent-game-finance/
 78. **付款设置抽屉**：预付分成管理 + 付费设置；`sharePaymentCompany/Currency/Account`；选项 `SHARE_PAYMENT_COMPANY_OPTIONS`（含纯游（美元）；无游乐/游戏之家）  
 79. **预付未填**：列表/抽屉已抵扣与剩余显示 `-`；历史未保存输入框为空  
 80. **游戏收入列序**：账户余额 → 账户总收入  
-81. **合同管理支付币种**：单选「人民币」/「美金」；`Contract.currency`；保存必填  
+81. **合同管理支付币种**：单选「人民币」/「美金」；`Contract.currency`；**首次保存前**必填可选；**保存后**只读不可改  
 82. **游戏/合同必填**：版号、运营状态、合作状态纳入校验  
 83. **游戏标记付款初始填充**：`gamePaymentMarkDefaults.ts`；三种情况；每次打开重算；实付 ≥ 0；**不**反写结算函  
 84. **汇率表**：`ExchangeRateRecord` + `getExchangeRateByApplyTime`；申请月上月月末 rate  
@@ -1403,6 +1401,7 @@ src/resources/agent-game-finance/ui-spec.md 为准。
 
 | 日期 | 摘要 |
 |------|------|
+| 2026-07-24 | 删除厂商收入、厂商付款管理的菜单、深链路由、页面、专属组件、厂商付款 mock 与状态逻辑 |
 | 2026-07-22 | 游戏【申请付款】冻结 `applySnapshot` + `letterSnapshot`；结算函只读与付款状态无关 |
 | 2026-07-22 | 结算函⑤按**支付币种**（申请快照）分支；汇率行=付款美金或（支付美金快照且剩余>0） |
 | 2026-07-22 | 支付币种/剩余未抵扣分成款取【申请付款】时刻快照；批注改自然业务语言 |

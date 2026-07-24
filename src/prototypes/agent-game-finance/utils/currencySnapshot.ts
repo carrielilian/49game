@@ -1,4 +1,4 @@
-import type { Contract, ContractCurrency, Game, Vendor } from '../data/types';
+import type { Contract, ContractCurrency, Game } from '../data/types';
 import { calcContractPaymentTotal } from './contractLog';
 
 export function withCurrencyOnFirstSave(
@@ -16,7 +16,7 @@ export function resolveContractCurrency(
 }
 
 export function resolvePrepaymentCurrency(
-  entity: Pick<Game | Vendor, 'prepaymentCurrency'> | undefined,
+  entity: Pick<Game, 'prepaymentCurrency'> | undefined,
   contract: Contract | undefined,
 ): ContractCurrency | undefined {
   return entity?.prepaymentCurrency ?? contract?.currency;
@@ -24,23 +24,10 @@ export function resolvePrepaymentCurrency(
 
 /** 【标记付款】三分支：合同支付币种（prepaymentCurrency 快照优先 → Contract.currency） */
 export function resolveMarkPaymentContractCurrency(
-  entity: Pick<Game | Vendor, 'prepaymentCurrency'> | undefined,
+  entity: Pick<Game, 'prepaymentCurrency'> | undefined,
   contract: Contract | undefined,
 ): ContractCurrency {
   return resolvePrepaymentCurrency(entity, contract) ?? '人民币';
-}
-
-export function resolveVendorContractCurrency(
-  vendorId: string,
-  games: Game[],
-  contractMap: Map<string, Contract>,
-): ContractCurrency | undefined {
-  for (const game of games) {
-    if (game.vendorId !== vendorId) continue;
-    const currency = contractMap.get(game.id)?.currency;
-    if (currency) return currency;
-  }
-  return undefined;
 }
 
 export function sumContractPaymentsByCurrency(
