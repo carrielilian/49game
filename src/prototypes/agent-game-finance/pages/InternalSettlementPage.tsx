@@ -5,7 +5,6 @@ import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
 import { StatusBadge } from '../components/StatusBadge';
 import { Toast, type ToastType } from '../components/Modal';
-import { isFormulaConfigured } from '../data/mock-data';
 import { useAppStore } from '../data/store';
 import { PAYMENT_APPLY_STATUS_FILTER_OPTIONS, selectOptions } from '../utils/columnFilters';
 import {
@@ -56,7 +55,7 @@ export function InternalSettlementPage({ type }: Props) {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [loading, setLoading] = useState(false);
-  const { pullCompleted, settleCompleted } = internalSettlementButtons[businessType][type];
+  const { pullCompleted } = internalSettlementButtons[businessType][type];
 
   useEffect(() => {
     const prevMonth = getPreviousMonthKey();
@@ -82,7 +81,7 @@ export function InternalSettlementPage({ type }: Props) {
   };
 
   const incomeLabel = type === 'internal' ? '结算收入' : '结算退款';
-  const ann = type === 'internal' ? 'internal-settlement' : 'internal-refund';
+  const ann = type === 'internal' ? 'income-settlement' : 'internal-refund';
   const amountLabel = type === 'internal' ? '待结算金额' : '退款金额';
   const displayFormula = (formulaText?: string) => {
     const formula = displaySettlementFormula(formulaText);
@@ -104,7 +103,8 @@ export function InternalSettlementPage({ type }: Props) {
   });
 
   const pullDisabled = loading || pullCompleted;
-  const settleDisabled = loading || !pullCompleted || settleCompleted;
+  const unsettled = data.filter((record) => isUnsettledSettlement(record));
+  const settleDisabled = loading || unsettled.length === 0;
 
   const handlePull = async () => {
     if (pullDisabled) return;
@@ -116,7 +116,7 @@ export function InternalSettlementPage({ type }: Props) {
         return;
       }
       const incomeMonthKey = getPreviousMonthKey();
-      const rows = fetchFinanceCenterRows(type, scopedFormulas, scopedGames, incomeMonthKey);
+      const rows = fetchFinanceCenterRows(type, scopedFormulas, scopedGames, incomeMonthKey, businessType);
       pullInternal(type, rows, incomeMonthKey);
       const range = getRecentTwoMonthsRange();
       setMonthRange(range);
@@ -129,22 +129,25 @@ export function InternalSettlementPage({ type }: Props) {
 
   const handleSettle = () => {
     if (settleDisabled) return;
-    const unsettled = data.filter((s) => isUnsettledSettlement(s));
     if (unsettled.length === 0) {
       setToast({ message: '没有待结算数据', type: 'error' });
       return;
     }
-    const missingGameIds = [...new Set(unsettled.map((s) => s.gameId))].filter((gameId) => {
-      const formula = scopedFormulas.find((f) => f.gameId === gameId);
-      return !isFormulaConfigured(formula);
-    });
-    if (missingGameIds.length > 0) {
-      const names = missingGameIds.map((id) => getGameName(id)).join('、');
-      setToast({ message: `${names}未设置结算公式`, type: 'error' });
+    const ids = unsettled.map((record) => record.id);
+    const result = settleRecords(ids);
+    if (!result.ok) {
+      setToast({ message: result.message ?? '结算失败，本次数据均未结算', type: 'error' });
       return;
     }
-    settleRecords(unsettled.map((s) => s.id));
-    setInternalSettlementButtons(type, { pullCompleted, settleCompleted: true });
+    const settledIdSet = new Set(ids);
+    const hasRemaining = scopedSettlements.some((record) =>
+      record.type === type
+      && isUnsettledSettlement(record)
+      && !settledIdSet.has(record.id));
+    setInternalSettlementButtons(type, {
+      pullCompleted,
+      settleCompleted: pullCompleted && !hasRemaining,
+    });
     setToast({ message: '结算成功', type: 'success' });
   };
 

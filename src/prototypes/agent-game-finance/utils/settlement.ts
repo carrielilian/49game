@@ -1,5 +1,13 @@
-import type { ContractCurrency, FormulaConfig, SettlementRecord, Vendor } from '../data/types';
+import type {
+  ChannelOwnership,
+  ContractCurrency,
+  FormulaConfig,
+  SettlementDataSource,
+  SettlementRecord,
+  Vendor,
+} from '../data/types';
 import { resolveFollowInvoiceTax } from './invoiceTax';
+import { getInternalChannelCategory, getSelfChannelCategory } from './financeCenter';
 
 export const SETTLEMENT_CURRENCY: ContractCurrency = '人民币';
 
@@ -50,9 +58,69 @@ export function formatFormulaText(
 export function displaySettlementFormula(text?: string): string {
   if (!text) return '-';
   return text
-    .replace(/^(外部渠道|外部|内部渠道|内部|退款)：/, '')
+    .replace(/^(自有渠道|外部渠道|外部|内部渠道|内部|退款)：/, '')
     .replace(/^收入×/, '待结算金额*')
     .replace(/×/g, '*');
+}
+
+export function getSettlementDataSource(record: SettlementRecord): SettlementDataSource {
+  return record.dataSource ?? (record.type === 'external' ? '文件导入' : '系统拉取');
+}
+
+export function getSettlementChannelOwnership(
+  record: SettlementRecord,
+  vendor: Vendor | undefined,
+): ChannelOwnership {
+  if (record.channelOwnership) return record.channelOwnership;
+  if (record.type === 'external') return 'external';
+  if (!vendor) return 'own';
+  return getInternalChannelCategory(record.channel) === getSelfChannelCategory(vendor.businessType)
+    ? 'own'
+    : 'external';
+}
+
+export function isFormulaConfiguredForOwnership(
+  formula: FormulaConfig | undefined,
+  ownership: ChannelOwnership,
+): boolean {
+  if (!formula) return false;
+  const fields = ownership === 'own'
+    ? [formula.internalTax, formula.internalChannelFee, formula.internalShare]
+    : [formula.externalTax, formula.externalChannelFee, formula.externalShare];
+  return fields.every(Number.isFinite);
+}
+
+export function isFormulaValidForOwnership(
+  formula: FormulaConfig | undefined,
+  ownership: ChannelOwnership,
+): boolean {
+  if (!isFormulaConfiguredForOwnership(formula, ownership)) return false;
+  const fields = ownership === 'own'
+    ? [formula!.internalTax, formula!.internalChannelFee, formula!.internalShare]
+    : [formula!.externalTax, formula!.externalChannelFee, formula!.externalShare];
+  return fields.every((value) => value >= 0 && value <= 1);
+}
+
+export function getSettlementFormulaText(
+  formula: FormulaConfig | undefined,
+  vendor: Vendor | undefined,
+  ownership: ChannelOwnership,
+  amountLabel = '待结算金额',
+): string {
+  if (!isFormulaConfiguredForOwnership(formula, ownership)) return '-';
+  const isOwn = ownership === 'own';
+  const configuredTax = isOwn ? formula!.internalTax : formula!.externalTax;
+  const taxMode = isOwn ? formula!.internalTaxMode : formula!.externalTaxMode;
+  const tax = taxMode === '跟随发票' && vendor
+    ? resolveFollowInvoiceTax(vendor.invoiceInfo, configuredTax)
+    : configuredTax;
+  const text = formatFormulaText(
+    tax,
+    isOwn ? formula!.internalChannelFee : formula!.externalChannelFee,
+    isOwn ? formula!.internalShare : formula!.externalShare,
+    isOwn ? '自有渠道' : '外部渠道',
+  );
+  return amountLabel === '退款金额' ? text.replace('待结算金额', amountLabel) : text;
 }
 
 export function isUnsettledSettlement(s: SettlementRecord): boolean {
@@ -72,8 +140,9 @@ export function calcRecordSettlementIncome(
   formula: FormulaConfig | undefined,
   vendor: Vendor | undefined,
 ): number {
-  if (!formula) return record.settlementIncome;
-  if (record.type === 'external') {
+  const ownership = getSettlementChannelOwnership(record, vendor);
+  if (!isFormulaConfiguredForOwnership(formula, ownership)) return record.settlementIncome;
+  if (ownership === 'external') {
     const tax = formula.externalTaxMode === '跟随发票' && vendor
       ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.externalTax)
       : formula.externalTax;

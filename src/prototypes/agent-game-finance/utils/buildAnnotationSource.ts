@@ -33,6 +33,8 @@ import externalSettlementImportModal from '../docs/annotations/external-settleme
 import externalSettlementPaymentCol from '../docs/annotations/external-settlement/payment-status-column.md?raw';
 import externalSettlementQuery from '../docs/annotations/external-settlement/query-bar.md?raw';
 import externalSettlementSettle from '../docs/annotations/external-settlement/settle-button.md?raw';
+import externalSettlementPull from '../docs/annotations/external-settlement/pull-button.md?raw';
+import externalSettlementSourceCol from '../docs/annotations/external-settlement/source-column.md?raw';
 import gameIncomeApplyModal from '../docs/annotations/game-income/apply-payment-modal.md?raw';
 import gameIncomeApplyAction from '../docs/annotations/game-income/apply-payment-action.md?raw';
 import gameIncomeTable from '../docs/annotations/game-income/data-table.md?raw';
@@ -110,25 +112,27 @@ const MARKDOWN_BY_NODE_ID: Record<string, string> = {
   'formula-list-logs-drawer': formulaListLogsDrawer,
   'formula-list-internal-channels': formulaListInternalChannelsAction,
   'formula-list-internal-channels-form': formulaListInternalChannelsForm,
-  'external-settlement-query': externalSettlementQuery,
-  'external-settlement-import': externalSettlementImportBtn,
-  'external-settlement-settle': externalSettlementSettle,
-  'external-settlement-table': externalSettlementTable,
-  'external-settlement-channel-col': externalSettlementChannelCol,
-  'external-settlement-payment-col': externalSettlementPaymentCol,
-  'external-settlement-import-modal': externalSettlementImportModal,
+  'income-settlement-query': externalSettlementQuery,
+  'income-settlement-pull': externalSettlementPull,
+  'income-settlement-import': externalSettlementImportBtn,
+  'income-settlement-settle': externalSettlementSettle,
+  'income-settlement-table': externalSettlementTable,
+  'income-settlement-channel-col': externalSettlementChannelCol,
+  'income-settlement-source-col': externalSettlementSourceCol,
+  'income-settlement-payment-col': externalSettlementPaymentCol,
+  'income-settlement-import-modal': externalSettlementImportModal,
   'internal-settlement-query': internalSettlementQuery,
   'internal-settlement-pull': internalSettlementPull,
   'internal-settlement-settle': internalSettlementSettle,
   'internal-settlement-table': internalSettlementTable,
   'internal-settlement-channel-col': internalSettlementChannelCol,
   'internal-settlement-payment-col': internalSettlementPaymentCol,
-  'internal-refund-query': internalRefundQuery,
-  'internal-refund-pull': internalRefundPull,
-  'internal-refund-settle': internalRefundSettle,
-  'internal-refund-table': internalRefundTable,
-  'internal-refund-channel-col': internalRefundChannelCol,
-  'internal-refund-payment-col': internalRefundPaymentCol,
+  'refund-settlement-query': internalRefundQuery,
+  'refund-settlement-pull': internalRefundPull,
+  'refund-settlement-settle': internalRefundSettle,
+  'refund-settlement-table': internalRefundTable,
+  'refund-settlement-channel-col': internalRefundChannelCol,
+  'refund-settlement-payment-col': internalRefundPaymentCol,
   'game-income-query': gameIncomeQuery,
   'game-income-table': gameIncomeTable,
   'game-income-field-help': gameIncomeFieldHelp,

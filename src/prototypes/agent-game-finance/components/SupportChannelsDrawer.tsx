@@ -159,7 +159,7 @@ export function SupportChannelsDrawer({
   return (
     <>
       <Drawer
-        title="内部渠道"
+        title="渠道映射"
         open={open}
         onClose={onClose}
         large
@@ -177,12 +177,12 @@ export function SupportChannelsDrawer({
               <ReadonlyField label="厂商名称" value={vendorName} />
             </div>
             {renderChannelGroup(
-              '代理渠道',
+              '自有渠道',
               CHANNEL_CATEGORIES_BY_BUSINESS[businessType].agency,
               CHANNEL_GROUPS_BY_BUSINESS[businessType].agency,
             )}
             {renderChannelGroup(
-              '发行渠道',
+              '外部渠道',
               CHANNEL_CATEGORIES_BY_BUSINESS[businessType].distribution,
               CHANNEL_GROUPS_BY_BUSINESS[businessType].distribution,
             )}

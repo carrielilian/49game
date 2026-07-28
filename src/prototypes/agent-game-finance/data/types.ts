@@ -8,6 +8,10 @@ export type SharePaymentCompany = '4399' | '纯游' | '纯游（美元）' | '�
 export type SettlementType = 'external' | 'internal' | 'refund';
 export type ChannelType = 'internal' | 'external';
 export type BusinessType = '4399' | '快爆';
+export type SettlementDataSource = '系统拉取' | '文件导入';
+export type ChannelOwnership = 'own' | 'external';
+export type ExternalChannelType = 'related' | 'thirdParty';
+export type SettlementRole = 'agency' | 'distribution' | 'thirdParty';
 
 export interface Vendor {
   id: string;
@@ -125,6 +129,20 @@ export interface SettlementRecord {
   paymentApplyStatus: PaymentApplyStatus;
   settled: boolean;
   vendorId: string;
+  /** 数据进入系统的方式；历史记录未保存时由 type 兼容推导 */
+  dataSource?: SettlementDataSource;
+  /** 相对于当前业务类型的渠道归属 */
+  channelOwnership?: ChannelOwnership;
+  /** 外部渠道细分；自有渠道不填写 */
+  externalChannelType?: ExternalChannelType;
+  /** 结算业务角色 */
+  settlementRole?: SettlementRole;
+  /** 渠道总类；系统拉取为游戏盒/快爆，文件导入为实际渠道 */
+  channelCategory?: string;
+  /** 拉取时冻结的渠道游戏ID */
+  channelGameId?: string;
+  /** 记录生成时的业务类型快照 */
+  businessType?: BusinessType;
 }
 
 export interface GameBalance {

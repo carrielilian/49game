@@ -1,4 +1,4 @@
-import type { FormulaConfig, Game } from '../data/types';
+import type { BusinessType, ChannelOwnership, FormulaConfig, Game, SettlementRole } from '../data/types';
 
 /** 原型 mock：false 时模拟财务中心本月尚有业务未结算 */
 export const MOCK_FINANCE_CENTER_READY = true;
@@ -8,6 +8,8 @@ export interface FinanceCenterRow {
   channelGameId: string;
   gameId: string;
   amount: number;
+  channelOwnership: ChannelOwnership;
+  settlementRole: SettlementRole;
 }
 
 const PULL_DELAY_MS = 800;
@@ -22,6 +24,10 @@ export function getInternalChannelCategory(channel: string): string {
     return '快爆';
   }
   return channel;
+}
+
+export function getSelfChannelCategory(businessType: BusinessType): string {
+  return businessType === '4399' ? '游戏盒' : '快爆';
 }
 
 export function delay(ms: number): Promise<void> {
@@ -46,7 +52,7 @@ function mockAmount(gameId: string, channelGameId: string, type: 'internal' | 'r
 
 /**
  * 按「渠道 + 渠道游戏ID」从财务中心拉取待结算/待退款数据（原型 mock）。
- * 仅包含已上线游戏、结算公式中已勾选的内部渠道。
+ * 仅包含已上线游戏、渠道映射中已勾选的自有渠道及外部关联平台。
  */
 /** @param incomeMonthKey 拉取的收入月份（上一自然月，YYYY-MM） */
 export function fetchFinanceCenterRows(
@@ -54,6 +60,7 @@ export function fetchFinanceCenterRows(
   formulas: FormulaConfig[],
   games: Game[],
   incomeMonthKey: string,
+  businessType: BusinessType,
 ): FinanceCenterRow[] {
   void incomeMonthKey;
   const rows: FinanceCenterRow[] = [];
@@ -64,15 +71,37 @@ export function fetchFinanceCenterRows(
     for (const ch of formula.channels) {
       if (ch.type !== 'internal' || !ch.enabled || !ch.channelGameId) continue;
       const channelGameIds = ch.channelGameId.split(',').map((id) => id.trim()).filter(Boolean);
+      const channel = getInternalChannelCategory(ch.name);
+      const isOwnChannel = channel === getSelfChannelCategory(businessType);
       for (const channelGameId of channelGameIds) {
         rows.push({
-          channel: getInternalChannelCategory(ch.name),
+          channel,
           channelGameId,
           gameId: game.id,
           amount: mockAmount(game.id, channelGameId, type),
+          channelOwnership: isOwnChannel ? 'own' : 'external',
+          settlementRole: isOwnChannel ? 'agency' : 'distribution',
         });
       }
     }
   }
-  return rows;
+  const grouped = new Map<string, FinanceCenterRow>();
+  for (const row of rows) {
+    const key = `${row.gameId}::${row.channel}`;
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, { ...row });
+      continue;
+    }
+    const channelGameIds = [...new Set([
+      ...current.channelGameId.split(',').map((id) => id.trim()).filter(Boolean),
+      row.channelGameId,
+    ])];
+    grouped.set(key, {
+      ...current,
+      amount: current.amount + row.amount,
+      channelGameId: channelGameIds.join(','),
+    });
+  }
+  return [...grouped.values()];
 }

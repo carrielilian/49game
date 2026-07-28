@@ -22,7 +22,7 @@ type FieldErrors = Record<string, string>;
 function effectiveFormulaDisplay(f: FormulaConfig | undefined): string {
   if (!isFormulaConfigured(f)) return '-';
   return [
-    formatFormulaText(f!.internalTax, f!.internalChannelFee, f!.internalShare, '内部渠道'),
+    formatFormulaText(f!.internalTax, f!.internalChannelFee, f!.internalShare, '自有渠道'),
     formatFormulaText(f!.externalTax, f!.externalChannelFee, f!.externalShare, '外部渠道'),
   ].join('\n');
 }
@@ -199,7 +199,7 @@ export function FormulaListPage() {
             if (!isFormulaConfigured(f)) return '-';
             return (
               <span>
-                <span className="agf-cell-main">{formatFormulaText(f!.internalTax, f!.internalChannelFee, f!.internalShare, '内部渠道')}</span>
+                <span className="agf-cell-main">{formatFormulaText(f!.internalTax, f!.internalChannelFee, f!.internalShare, '自有渠道')}</span>
                 <span className="agf-cell-main">{formatFormulaText(f!.externalTax, f!.externalChannelFee, f!.externalShare, '外部渠道')}</span>
               </span>
             );
@@ -207,7 +207,7 @@ export function FormulaListPage() {
           { key: 'ops', title: '操作', render: (r) => (
             <div className="agf-actions">
               <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-formula" onClick={() => openFormula(r.id)}>结算公式</button>
-              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-internal-channels" onClick={() => openChannels(r.id)}>内部渠道</button>
+              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-internal-channels" onClick={() => openChannels(r.id)}>渠道映射</button>
               <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-logs" onClick={() => openLogs(r.id)}>操作记录</button>
             </div>
           ) },
@@ -224,7 +224,7 @@ export function FormulaListPage() {
               <ReadonlyField label="厂商名称" value={getVendorName(editingGame.vendorId)} />
               <ReadonlyField label="结算公式" value={effectiveFormula} multiline />
             </div>
-            <FormSectionTitle>内部渠道</FormSectionTitle>
+            <FormSectionTitle>自有渠道结算公式</FormSectionTitle>
             <TaxRateField
               tax={editing.internalTax}
               invoiceInfo={invoiceInfo}
@@ -245,7 +245,7 @@ export function FormulaListPage() {
               error={errors.internalShare}
               onChange={(v) => { clearError('internalShare'); setEditing({ ...editing, internalShare: v }); }}
             />
-            <FormSectionTitle>外部渠道</FormSectionTitle>
+            <FormSectionTitle>外部渠道结算公式</FormSectionTitle>
             <TaxRateField
               tax={editing.externalTax}
               invoiceInfo={invoiceInfo}

@@ -370,7 +370,7 @@
       {
         "id": "formula-list-internal-channels",
         "index": 5,
-        "title": "内部渠道",
+        "title": "渠道映射",
         "pageId": "formula-list",
         "locator": {
           "selectors": [
@@ -379,7 +379,7 @@
           "fingerprint": "button|formula-list-internal-channels",
           "path": []
         },
-        "aiPrompt": "说明内部渠道入口。",
+        "aiPrompt": "说明渠道映射入口。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -490,7 +490,7 @@
       {
         "id": "formula-list-internal-channels-form",
         "index": 8,
-        "title": "内部渠道表单",
+        "title": "渠道映射表单",
         "pageId": "formula-list",
         "locator": {
           "selectors": [
@@ -499,7 +499,7 @@
           "fingerprint": "div|formula-list-internal-channels-form",
           "path": []
         },
-        "aiPrompt": "说明内部渠道表单。",
+        "aiPrompt": "说明渠道映射表单。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#D97706",
@@ -668,10 +668,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "external-settlement-query",
+        "id": "income-settlement-query",
         "index": 1,
         "title": "查询栏",
-        "pageId": "external-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"external-settlement-query\"]"
@@ -679,7 +679,7 @@
           "fingerprint": "div|external-settlement-query",
           "path": []
         },
-        "aiPrompt": "说明外部收入结算查询栏。",
+        "aiPrompt": "说明统一收入结算查询栏。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -688,10 +688,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "external-settlement-import",
+        "id": "income-settlement-import",
         "index": 2,
         "title": "数据导入",
-        "pageId": "external-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"external-settlement-import\"]"
@@ -708,10 +708,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "external-settlement-settle",
+        "id": "income-settlement-settle",
         "index": 3,
         "title": "结算",
-        "pageId": "external-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"external-settlement-settle\"]"
@@ -728,10 +728,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "external-settlement-table",
+        "id": "income-settlement-table",
         "index": 4,
         "title": "外部收入列表",
-        "pageId": "external-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"external-settlement-table\"]"
@@ -748,10 +748,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "external-settlement-channel-col",
+        "id": "income-settlement-channel-col",
         "index": 5,
         "title": "渠道列",
-        "pageId": "external-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"external-settlement-channel-col\"]"
@@ -768,10 +768,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "external-settlement-payment-col",
+        "id": "income-settlement-payment-col",
         "index": 6,
         "title": "申请付款状态列",
-        "pageId": "external-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"external-settlement-payment-col\"]"
@@ -788,10 +788,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "external-settlement-import-modal",
+        "id": "income-settlement-import-modal",
         "index": 7,
         "title": "数据导入弹窗",
-        "pageId": "external-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"external-settlement-import-modal\"]"
@@ -808,10 +808,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "internal-settlement-query",
+        "id": "income-settlement-source-col",
         "index": 1,
         "title": "查询栏",
-        "pageId": "internal-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"internal-settlement-query\"]"
@@ -828,10 +828,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "internal-settlement-pull",
+        "id": "income-settlement-pull",
         "index": 2,
         "title": "数据拉取",
-        "pageId": "internal-settlement",
+        "pageId": "income-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"internal-settlement-pull\"]"
@@ -928,10 +928,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "internal-refund-query",
+        "id": "refund-settlement-query",
         "index": 1,
         "title": "查询栏",
-        "pageId": "internal-refund",
+        "pageId": "refund-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"internal-refund-query\"]"
@@ -948,10 +948,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "internal-refund-pull",
+        "id": "refund-settlement-pull",
         "index": 2,
         "title": "数据拉取",
-        "pageId": "internal-refund",
+        "pageId": "refund-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"internal-refund-pull\"]"
@@ -968,10 +968,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "internal-refund-settle",
+        "id": "refund-settlement-settle",
         "index": 3,
         "title": "结算",
-        "pageId": "internal-refund",
+        "pageId": "refund-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"internal-refund-settle\"]"
@@ -988,10 +988,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "internal-refund-table",
+        "id": "refund-settlement-table",
         "index": 4,
         "title": "内部退款列表",
-        "pageId": "internal-refund",
+        "pageId": "refund-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"internal-refund-table\"]"
@@ -1008,10 +1008,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "internal-refund-channel-col",
+        "id": "refund-settlement-channel-col",
         "index": 5,
         "title": "渠道列",
-        "pageId": "internal-refund",
+        "pageId": "refund-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"internal-refund-channel-col\"]"
@@ -1028,10 +1028,10 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "internal-refund-payment-col",
+        "id": "refund-settlement-payment-col",
         "index": 6,
         "title": "申请付款状态列",
-        "pageId": "internal-refund",
+        "pageId": "refund-settlement",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"internal-refund-payment-col\"]"
@@ -1553,21 +1553,15 @@
               },
               {
                 "type": "route",
-                "id": "route-external-settlement",
-                "title": "外部收入结算",
-                "route": "external-settlement"
+                "id": "route-income-settlement",
+                "title": "收入结算",
+                "route": "income-settlement"
               },
               {
                 "type": "route",
-                "id": "route-internal-settlement",
-                "title": "内部收入结算",
-                "route": "internal-settlement"
-              },
-              {
-                "type": "route",
-                "id": "route-internal-refund",
-                "title": "内部退款结算",
-                "route": "internal-refund"
+                "id": "route-refund-settlement",
+                "title": "退款结算",
+                "route": "refund-settlement"
               },
               {
                 "type": "route",

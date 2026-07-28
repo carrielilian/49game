@@ -388,7 +388,7 @@ export const INITIAL_GAME_LOGS: GameOperationLog[] = [
 ];
 
 export const INITIAL_FORMULA_LOGS: FormulaOperationLog[] = [
-  { id: 'FL001', gameId: '4001', operator: '财务-王丽', time: '2024-03-01 09:00:00', formulaText: '内部渠道：待结算金额*（1-5%-0%）*50%\n外部渠道：待结算金额*（1-0%-0%）*45%' },
+  { id: 'FL001', gameId: '4001', operator: '财务-王丽', time: '2024-03-01 09:00:00', formulaText: '自有渠道：待结算金额*（1-5%-0%）*50%\n外部渠道：待结算金额*（1-0%-0%）*45%' },
 ];
 
 export { INTERNAL_CHANNELS, EXTERNAL_CHANNELS };

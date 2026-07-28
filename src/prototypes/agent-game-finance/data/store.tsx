@@ -41,9 +41,18 @@ import {
 } from '../utils/businessScope';
 import type { FinanceCenterRow } from '../utils/financeCenter';
 import type { MonthRange } from '../utils/monthRange';
-import { calcRecordSettlementIncome, formatDateTime, formatFormulaText, genId } from '../utils/settlement';
+import {
+  calcRecordSettlementIncome,
+  formatDateTime,
+  formatFormulaText,
+  genId,
+  getSettlementChannelOwnership,
+  getSettlementFormulaText,
+  isFormulaConfiguredForOwnership,
+  isFormulaValidForOwnership,
+  isUnsettledSettlement,
+} from '../utils/settlement';
 import { buildGamePaymentApplySnapshot } from '../utils/gamePaymentApplySnapshot';
-import { isFormulaConfigured } from './mock-data';
 import { getExternalFormulaText } from '../utils/externalImport';
 
 function nextNumericId(items: { id: string }[], base: number): string {
@@ -102,7 +111,7 @@ interface AppContextValue extends AppState {
   addGameLog: (log: Omit<GameOperationLog, 'id'>) => void;
   importExternal: (rows: ImportPreviewRow[]) => void;
   pullInternal: (type: 'internal' | 'refund', rows: FinanceCenterRow[], monthKey: string) => number;
-  settleRecords: (ids: string[]) => void;
+  settleRecords: (ids: string[]) => { ok: boolean; message?: string };
   applyGamePayment: (gameId: string, exchangeRateDate: string, exchangeRate: number) => boolean;
   markGamePaid: (paymentId: string, data: Partial<GamePaymentRequest>) => void;
   updateGamePayment: (paymentId: string, data: Partial<GamePaymentRequest>) => void;
@@ -245,7 +254,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateFormula = useCallback((f: FormulaConfig, operator = '当前用户') => {
     setFormulas((prev) => prev.map((x) => (x.gameId === f.gameId ? f : x)));
     const text = [
-      formatFormulaText(f.internalTax, f.internalChannelFee, f.internalShare, '内部渠道'),
+      formatFormulaText(f.internalTax, f.internalChannelFee, f.internalShare, '自有渠道'),
       formatFormulaText(f.externalTax, f.externalChannelFee, f.externalShare, '外部渠道'),
     ].join('\n');
     setFormulaLogs((prev) => [...prev, { id: genId('FL'), gameId: f.gameId, operator, time: formatDateTime(), formulaText: text }]);
@@ -267,6 +276,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         formulaText: getExternalFormulaText(formula, vendor),
         paymentApplyStatus: '未申请' as const,
         settled: false, vendorId: game?.vendorId ?? '',
+        dataSource: '文件导入',
+        channelOwnership: 'external',
+        externalChannelType: 'thirdParty',
+        settlementRole: 'thirdParty',
+        channelCategory: r.channel,
+        businessType: vendor?.businessType,
       };
     });
     setSettlements((prev) => [...newRecords, ...prev]);
@@ -276,13 +291,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newRecords: SettlementRecord[] = rows.map((row) => {
       const game = games.find((g) => g.id === row.gameId);
       const f = formulas.find((x) => x.gameId === row.gameId);
-      const tax = f?.internalTax ?? 0;
-      const fee = f?.internalChannelFee ?? 0;
-      const share = f?.internalShare ?? 0;
-      const label = type === 'refund' ? '退款' : '内部';
-      const formulaText = isFormulaConfigured(f)
-        ? formatFormulaText(tax, fee, share, label)
-        : '-';
+      const vendor = vendors.find((v) => v.id === game?.vendorId);
+      const formulaText = getSettlementFormulaText(
+        f,
+        vendor,
+        row.channelOwnership,
+        type === 'refund' ? '退款金额' : '待结算金额',
+      );
       return {
         id: genId('S'),
         type,
@@ -296,6 +311,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         paymentApplyStatus: '未申请' as const,
         settled: false,
         vendorId: game?.vendorId ?? '',
+        dataSource: '系统拉取',
+        channelOwnership: row.channelOwnership,
+        externalChannelType: row.channelOwnership === 'external' ? 'related' : undefined,
+        settlementRole: row.settlementRole,
+        channelCategory: row.channel,
+        channelGameId: row.channelGameId,
+        businessType: vendor?.businessType,
       };
     });
     setSettlements((prev) => {
@@ -303,21 +325,71 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [...newRecords, ...kept];
     });
     return newRecords.length;
-  }, [games, formulas]);
+  }, [games, formulas, vendors]);
 
   const settleRecords = useCallback((ids: string[]) => {
-    setSettlements((prev) => prev.map((s) => {
-      if (!ids.includes(s.id)) return s;
-      const f = formulas.find((x) => x.gameId === s.gameId);
-      const vendor = vendors.find((v) => v.id === s.vendorId);
-      return {
-        ...s,
+    const uniqueIds = [...new Set(ids)];
+    const records = uniqueIds
+      .map((id) => settlements.find((record) => record.id === id))
+      .filter((record): record is SettlementRecord => Boolean(record));
+    if (records.length !== uniqueIds.length || records.some((record) => !isUnsettledSettlement(record))) {
+      return { ok: false, message: '结算失败，本次数据均未结算：记录状态已变化' };
+    }
+
+    const missingFormulaGameIds = [...new Set(records
+      .filter((record) => {
+        const vendor = vendors.find((item) => item.id === record.vendorId);
+        const formula = formulas.find((item) => item.gameId === record.gameId);
+        const ownership = getSettlementChannelOwnership(record, vendor);
+        return !isFormulaConfiguredForOwnership(formula, ownership);
+      })
+      .map((record) => record.gameId))];
+    if (missingFormulaGameIds.length > 0) {
+      return { ok: false, message: `${missingFormulaGameIds.join('、')}缺少结算公式` };
+    }
+
+    const hasInvalidFormula = records.some((record) => {
+      const vendor = vendors.find((item) => item.id === record.vendorId);
+      const formula = formulas.find((item) => item.gameId === record.gameId);
+      return !isFormulaValidForOwnership(
+        formula,
+        getSettlementChannelOwnership(record, vendor),
+      );
+    });
+    if (hasInvalidFormula) {
+      return { ok: false, message: '结算失败，本次数据均未结算：结算公式无效' };
+    }
+
+    if (records.some((record) => !Number.isFinite(record.settlementAmount) || record.settlementAmount < 0)) {
+      return { ok: false, message: '结算失败，本次数据均未结算：来源金额无效' };
+    }
+
+    const settlementTime = formatDateTime();
+    const updates = new Map<string, SettlementRecord>();
+    for (const record of records) {
+      const formula = formulas.find((item) => item.gameId === record.gameId);
+      const vendor = vendors.find((item) => item.id === record.vendorId);
+      const ownership = getSettlementChannelOwnership(record, vendor);
+      const settlementIncome = calcRecordSettlementIncome(record, formula, vendor);
+      if (!Number.isFinite(settlementIncome)) {
+        return { ok: false, message: '结算失败，本次数据均未结算：结算公式无效' };
+      }
+      updates.set(record.id, {
+        ...record,
         settled: true,
-        settlementTime: formatDateTime(),
-        settlementIncome: calcRecordSettlementIncome(s, f, vendor),
-      };
-    }));
-  }, [formulas, vendors]);
+        settlementTime,
+        settlementIncome,
+        formulaText: getSettlementFormulaText(
+          formula,
+          vendor,
+          ownership,
+          record.type === 'refund' ? '退款金额' : '待结算金额',
+        ),
+      });
+    }
+    setSettlements((prev) => prev.map((record) => updates.get(record.id) ?? record));
+    return { ok: true };
+  }, [settlements, formulas, vendors]);
 
   const applyGamePayment = useCallback((gameId: string, exchangeRateDate: string, exchangeRate: number) => {
     const game = games.find((g) => g.id === gameId);

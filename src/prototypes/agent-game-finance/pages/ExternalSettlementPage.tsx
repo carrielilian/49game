@@ -7,7 +7,7 @@ import { MonthRangePicker } from '../components/MonthRangePicker';
 import { Modal, Toast, type ToastType } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
-import { EXTERNAL_CHANNELS, isFormulaConfigured } from '../data/mock-data';
+import { EXTERNAL_CHANNELS } from '../data/mock-data';
 import type { ImportPreviewRow } from '../data/types';
 import {
   PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
@@ -15,7 +15,13 @@ import {
 } from '../utils/columnFilters';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
-import { getRecentTwoMonthsRange, isMonthInRange } from '../utils/monthRange';
+import { getPreviousMonthKey, getRecentTwoMonthsRange, isMonthInRange } from '../utils/monthRange';
+import {
+  checkFinanceCenterReady,
+  fetchFinanceCenterRows,
+  getInternalChannelCategory,
+  INTERNAL_CHANNEL_CATEGORIES,
+} from '../utils/financeCenter';
 import {
   buildMockImportRows,
   enrichImportRowsOnParse,
@@ -26,6 +32,7 @@ import {
   formatCurrencyMoney,
   formatSettlementIncome,
   formatSettlementTime,
+  getSettlementDataSource,
   isUnsettledSettlement,
   SETTLEMENT_CURRENCY,
 } from '../utils/settlement';
@@ -67,8 +74,11 @@ function buildImportTotalRow(rows: ImportPreviewRow[]): React.ReactNode {
   );
 }
 
-export function ExternalSettlementPage() {
+const DATA_SOURCE_OPTIONS = ['系统拉取', '文件导入'];
+
+export function IncomeSettlementPage() {
   const {
+    businessType,
     scopedSettlements,
     formulas,
     scopedGames,
@@ -76,7 +86,10 @@ export function ExternalSettlementPage() {
     getGameName,
     getVendorName,
     importExternal,
+    pullInternal,
     settleRecords,
+    internalSettlementButtons,
+    setInternalSettlementButtons,
   } = useAppStore();
   const scopedGameIds = useMemo(() => new Set(scopedGames.map((game) => game.id)), [scopedGames]);
   const scopedFormulas = useMemo(
@@ -86,16 +99,19 @@ export function ExternalSettlementPage() {
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [monthRange, setMonthRange] = useState(getRecentTwoMonthsRange);
   const [channelFilter, setChannelFilter] = useState('');
+  const [dataSourceFilter, setDataSourceFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewRow[]>(EMPTY_IMPORT);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [pulling, setPulling] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const importUploaded = preview.length > 0;
   const canConfirmImport = importUploaded && preview.every((row) => !row.error);
 
+  const { pullCompleted } = internalSettlementButtons[businessType].internal;
   const data = scopedSettlements.filter((record) => {
-    if (record.type !== 'external') return false;
+    if (record.type !== 'external' && record.type !== 'internal') return false;
     if (!isMonthInRange(record.incomeTime, monthRange)) return false;
     if (!matchesListSearch(search, {
       gameId: record.gameId,
@@ -103,7 +119,11 @@ export function ExternalSettlementPage() {
       vendorId: record.vendorId,
       vendorName: getVendorName(record.vendorId),
     })) return false;
-    if (channelFilter && record.channel !== channelFilter) return false;
+    const displayChannel = record.type === 'internal'
+      ? getInternalChannelCategory(record.channel)
+      : record.channel;
+    if (channelFilter && displayChannel !== channelFilter) return false;
+    if (dataSourceFilter && getSettlementDataSource(record) !== dataSourceFilter) return false;
     if (paymentStatusFilter && record.paymentApplyStatus !== paymentStatusFilter) return false;
     return true;
   });
@@ -116,6 +136,36 @@ export function ExternalSettlementPage() {
   };
 
   const showToast = (message: string, type: ToastType) => setToast({ message, type });
+
+  const handlePull = async () => {
+    if (pulling || pullCompleted) return;
+    setPulling(true);
+    try {
+      const ready = await checkFinanceCenterReady();
+      if (!ready) {
+        showToast('财务中心还未结算完成', 'error');
+        return;
+      }
+      const incomeMonthKey = getPreviousMonthKey();
+      const rows = fetchFinanceCenterRows(
+        'internal',
+        scopedFormulas,
+        scopedGames,
+        incomeMonthKey,
+        businessType,
+      );
+      pullInternal('internal', rows, incomeMonthKey);
+      setMonthRange(getRecentTwoMonthsRange());
+      setInternalSettlementButtons('internal', {
+        pullCompleted: true,
+        settleCompleted: false,
+        monthRange: getRecentTwoMonthsRange(),
+      });
+      showToast('已从财务中心拉取待结算数据', 'success');
+    } finally {
+      setPulling(false);
+    }
+  };
 
   const handleFileChange = () => {
     const raw = buildMockImportRows(scopedFormulas, scopedGames, scopedVendors);
@@ -139,7 +189,7 @@ export function ExternalSettlementPage() {
     if (!canConfirmImport) return;
     importExternal(preview);
     closeImport();
-    showToast('导入成功，已加入外部收入结算列表', 'success');
+    showToast('导入成功，已加入收入结算列表', 'success');
   };
 
   const handleSettlement = () => {
@@ -147,17 +197,20 @@ export function ExternalSettlementPage() {
       showToast('没有待结算数据', 'error');
       return;
     }
-    const missingGameIds = [...new Set(unsettled.map((record) => record.gameId))]
-      .filter((gameId) => {
-        const formula = scopedFormulas.find((item) => item.gameId === gameId);
-        return !isFormulaConfigured(formula);
-      });
-    if (missingGameIds.length > 0) {
-      const names = missingGameIds.map((gameId) => getGameName(gameId)).join('、');
-      showToast(`${names}未设置结算公式`, 'error');
+    const ids = unsettled.map((record) => record.id);
+    const result = settleRecords(ids);
+    if (!result.ok) {
+      showToast(result.message ?? '结算失败，本次数据均未结算', 'error');
       return;
     }
-    settleRecords(unsettled.map((record) => record.id));
+    const settledIdSet = new Set(ids);
+    const hasRemainingPulledIncome = scopedSettlements.some((record) =>
+      record.type === 'internal'
+      && isUnsettledSettlement(record)
+      && !settledIdSet.has(record.id));
+    if (pullCompleted && !hasRemainingPulledIncome) {
+      setInternalSettlementButtons('internal', { settleCompleted: true });
+    }
     showToast('结算成功', 'success');
   };
 
@@ -167,6 +220,15 @@ export function ExternalSettlementPage() {
         <FilterBar
           actions={(
             <>
+              <button
+                type="button"
+                className="agf-btn agf-btn--primary"
+                data-annotation-id="internal-settlement-pull"
+                onClick={handlePull}
+                disabled={pulling || pullCompleted}
+              >
+                {pulling ? '拉取中...' : '数据拉取'}
+              </button>
               <button
                 type="button"
                 className="agf-btn agf-btn--primary"
@@ -184,7 +246,7 @@ export function ExternalSettlementPage() {
                 className="agf-btn agf-btn--primary"
                 data-annotation-id="external-settlement-settle"
                 onClick={handleSettlement}
-                disabled={unsettled.length === 0}
+                disabled={pulling || unsettled.length === 0}
               >
                 结算
               </button>
@@ -215,12 +277,32 @@ export function ExternalSettlementPage() {
                       type: 'select',
                       value: channelFilter,
                       onChange: setChannelFilter,
-                      options: selectOptions(EXTERNAL_CHANNELS),
+                      options: selectOptions([...INTERNAL_CHANNEL_CATEGORIES, ...EXTERNAL_CHANNELS]),
                     }}
                   />
                 </span>
               ),
-              render: (record) => record.channel,
+              render: (record) => record.type === 'internal'
+                ? getInternalChannelCategory(record.channel)
+                : record.channel,
+            },
+            {
+              key: 'dataSource',
+              title: '数据来源',
+              header: (
+                <span data-annotation-id="internal-settlement-query">
+                  <ColumnFilter
+                    title="数据来源"
+                    filter={{
+                      type: 'select',
+                      value: dataSourceFilter,
+                      onChange: setDataSourceFilter,
+                      options: selectOptions(DATA_SOURCE_OPTIONS),
+                    }}
+                  />
+                </span>
+              ),
+              render: (record) => <StatusBadge text={getSettlementDataSource(record)} />,
             },
             { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (record) => formatCurrencyMoney(record.settlementAmount, SETTLEMENT_CURRENCY) },
             { ...COL_ALIGN_RIGHT, key: 'settleInc', title: '结算收入', render: (record) => formatSettlementIncome(record) },

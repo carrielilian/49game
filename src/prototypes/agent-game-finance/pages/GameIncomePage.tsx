@@ -123,7 +123,7 @@ export function GameIncomePage() {
       && internalSettlementButtons[businessType].refund.settleCompleted;
     if (internalChannelSettled) return { warning: null as string | null, amount: amountText };
     return {
-      warning: `${getPreviousMonthKey()}内部渠道还未结算，是否继续申请付款？`,
+      warning: `${getPreviousMonthKey()}收入或退款还未结算，是否继续申请付款？`,
       amount: amountText,
     };
   }, [confirmAmount, businessType, internalSettlementButtons]);

@@ -5,9 +5,8 @@ import type {
   SettlementRecord,
   Vendor,
 } from '../data/types';
-import { EXTERNAL_CHANNELS, isFormulaConfigured } from '../data/mock-data';
-import { resolveFollowInvoiceTax } from './invoiceTax';
-import { formatFormulaText, genId } from './settlement';
+import { EXTERNAL_CHANNELS } from '../data/mock-data';
+import { genId, getSettlementFormulaText, isFormulaConfiguredForOwnership } from './settlement';
 
 export function resolveGameFromImportRow(
   games: Game[],
@@ -22,16 +21,7 @@ export function getExternalFormulaText(
   formula: FormulaConfig | undefined,
   vendor: Vendor | undefined,
 ): string {
-  if (!formula || !isFormulaConfigured(formula)) return '-';
-  const tax = formula.externalTaxMode === '跟随发票' && vendor
-    ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.externalTax)
-    : formula.externalTax;
-  return formatFormulaText(
-    tax,
-    formula.externalChannelFee,
-    formula.externalShare,
-    '外部渠道',
-  );
+  return getSettlementFormulaText(formula, vendor, 'external');
 }
 
 /** 模拟解析上传表格（字段：收入时间、渠道、游戏ID、游戏名称、厂商名称、待结算金额） */
@@ -41,7 +31,7 @@ export function buildMockImportRows(
   vendors: Vendor[],
 ): ImportPreviewRow[] {
   const candidates = formulas
-    .filter((formula) => isFormulaConfigured(formula))
+    .filter((formula) => isFormulaConfiguredForOwnership(formula, 'external'))
     .flatMap((formula) => {
       const game = games.find((item) => item.id === formula.gameId);
       const vendor = game ? vendors.find((item) => item.id === game.vendorId) : undefined;
