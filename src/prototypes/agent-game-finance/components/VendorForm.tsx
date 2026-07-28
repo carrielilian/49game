@@ -141,8 +141,6 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
               <th><GridLabel required>开户名称</GridLabel></th>
               <th><GridLabel required>开户银行</GridLabel></th>
               <th><GridLabel required>开户银行所在地</GridLabel></th>
-              <th><GridLabel required>支行名称</GridLabel></th>
-              <th><GridLabel required>银行卡号</GridLabel></th>
             </tr>
           </thead>
           <tbody>
@@ -150,8 +148,16 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
               <td><GridInput value={form.accountName} onChange={set('accountName')} error={errors.accountName} /></td>
               <td><GridSelect value={form.bank} onChange={set('bank')} options={BANK_OPTIONS} error={errors.bank} /></td>
               <td><GridSelect value={form.bankLocation} onChange={set('bankLocation')} options={LOCATION_OPTIONS} error={errors.bankLocation} /></td>
+            </tr>
+            <tr>
+              <th><GridLabel required>支行名称</GridLabel></th>
+              <th><GridLabel required>银行卡号</GridLabel></th>
+              <th><GridLabel>银行代码</GridLabel></th>
+            </tr>
+            <tr>
               <td><GridInput value={form.branch} onChange={set('branch')} error={errors.branch} /></td>
               <td><GridInput value={form.cardNumber} onChange={set('cardNumber')} error={errors.cardNumber} /></td>
+              <td><GridInput value={form.bankCode ?? ''} onChange={set('bankCode')} error={errors.bankCode} /></td>
             </tr>
           </tbody>
         </table>
@@ -169,6 +175,7 @@ export const EMPTY_VENDOR_FORM: VendorFormData = {
   invoiceInfo: '',
   accountName: '',
   bank: '',
+  bankCode: '',
   bankLocation: '',
   branch: '',
   cardNumber: '',

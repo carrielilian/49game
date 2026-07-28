@@ -1,5 +1,6 @@
 import type { Contract, ContractCurrency, Game, GamePaymentApplySnapshot, Vendor } from '../data/types';
 import { resolveMarkPaymentContractCurrency } from './currencySnapshot';
+import { getGamePrepayment } from './prepayment';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -78,7 +79,7 @@ export function resolveGameMarkPaymentDefaults(
 ): GameMarkPaymentDefaults {
   return calcGameMarkPaymentDefaults({
     pendingAmount,
-    prepayment: game?.prepayment ?? 0,
+    prepayment: getGamePrepayment(game, contract),
     remainingPrepayment,
     contractPaymentCurrency: resolveMarkPaymentContractCurrency(game, contract),
     paymentCurrency: game?.sharePaymentCurrency ?? '人民币',

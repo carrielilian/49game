@@ -91,6 +91,7 @@ export function GamePaymentListPage() {
     settlement: [],
     invoice: [],
   });
+  const [voucherSettlementError, setVoucherSettlementError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const parseSavedFiles = (raw?: string) =>
@@ -119,7 +120,11 @@ export function GamePaymentListPage() {
     const game = getGame(p.gameId);
     const vendor = game ? getVendor(game.vendorId) : undefined;
     const contract = contracts.find((c) => c.gameId === p.gameId);
-    const exchangeRate = getExchangeRateByApplyTime(p.applyTime, exchangeRates) ?? 7.21;
+    const exchangeRate =
+      p.applySnapshot?.exchangeRate
+      ?? p.exchangeRate
+      ?? getExchangeRateByApplyTime(p.applyTime, exchangeRates)
+      ?? 7.21;
     const defaults = p.applySnapshot
       ? resolveGameMarkPaymentDefaultsFromSnapshot(p.pendingAmount, p.applySnapshot, exchangeRate)
       : resolveGameMarkPaymentDefaults(
@@ -127,7 +132,7 @@ export function GamePaymentListPage() {
         game,
         vendor,
         contract,
-        calcGamePrepaymentSummary(game, p.gameId, gamePayments).remainingPrepayment,
+        calcGamePrepaymentSummary(game, contract, p.gameId, gamePayments).remainingPrepayment,
         exchangeRate,
       );
     setCurrent(p);
@@ -152,6 +157,7 @@ export function GamePaymentListPage() {
   const openVoucher = (p: GamePaymentRequest) => {
     setCurrent(p);
     setVoucherFiles(loadPaymentFiles(p));
+    setVoucherSettlementError('');
     setVoucherOpen(true);
   };
 
@@ -222,6 +228,11 @@ export function GamePaymentListPage() {
 
   const submitVoucher = () => {
     if (!current) return;
+    if (voucherFiles.settlement.length === 0) {
+      setVoucherSettlementError('结算函不能为空');
+      setToast({ message: '请上传结算函', type: 'error' });
+      return;
+    }
     updateGamePayment(current.id, {
       settlementLetter: voucherFiles.settlement.map((f) => f.name).join(', ') || undefined,
       invoice: voucherFiles.invoice.map((f) => f.name).join(', ') || undefined,
@@ -263,6 +274,7 @@ export function GamePaymentListPage() {
           } },
           { ...COL_ALIGN_RIGHT, key: 'pending', title: '待付款金额', render: (r) => fmtPaymentAmount(r.pendingAmount) },
           { ...COL_ALIGN_RIGHT, key: 'actual', title: '实际付款金额', render: (r) => r.actualAmount ? fmtPaymentAmount(r.actualAmount) : '-' },
+          { ...COL_ALIGN_RIGHT, key: 'actualUsd', title: '实际付款美金', render: (r) => formatUsdAmountDisplay(r.actualAmountUsd) },
           {
             key: 'status',
             title: '付款状态',
@@ -387,22 +399,30 @@ export function GamePaymentListPage() {
         <ReadonlyField label="游戏ID" value={resolvePaymentGameId(current)} />
         <ReadonlyField label="游戏名称" value={resolvePaymentGameName(current, getGameName)} />
         <div className="agf-form-item">
-          <label className="agf-form-label">结算函</label>
-          <MockFileUpload
-            accept=".pdf,.jpg,.jpeg,.png"
-            hint="支持的上传格式为：png、jpg、pdf"
-            files={voucherFiles.settlement}
-            onChange={(settlement) => setVoucherFiles((prev) => ({ ...prev, settlement }))}
-          />
+          <label className="agf-form-label agf-form-label--required">结算函</label>
+          <div className="agf-form-field">
+            <MockFileUpload
+              accept=".pdf,.jpg,.jpeg,.png"
+              hint="支持的上传格式为：png、jpg、pdf"
+              files={voucherFiles.settlement}
+              onChange={(settlement) => {
+                setVoucherFiles((prev) => ({ ...prev, settlement }));
+                if (settlement.length > 0) setVoucherSettlementError('');
+              }}
+            />
+            <FieldError message={voucherSettlementError} />
+          </div>
         </div>
         <div className="agf-form-item">
-          <label className="agf-form-label">电子发票</label>
-          <MockFileUpload
-            accept=".pdf,.jpg,.jpeg,.png"
-            hint="支持的上传格式为：png、jpg、pdf"
-            files={voucherFiles.invoice}
-            onChange={(invoice) => setVoucherFiles((prev) => ({ ...prev, invoice }))}
-          />
+          <label className="agf-form-label">发票</label>
+          <div className="agf-form-field">
+            <MockFileUpload
+              accept=".pdf,.jpg,.jpeg,.png"
+              hint="支持的上传格式为：png、jpg、pdf"
+              files={voucherFiles.invoice}
+              onChange={(invoice) => setVoucherFiles((prev) => ({ ...prev, invoice }))}
+            />
+          </div>
         </div>
         </div>
       </Drawer>
@@ -417,6 +437,9 @@ export function GamePaymentListPage() {
           applyTime={current.applyTime}
           paymentId={current.id}
           applyRemainingPrepayment={current.applySnapshot?.remainingPrepayment}
+          paymentCompany={current.applySnapshot?.sharePaymentCompany ?? current.payBank ?? currentGame?.sharePaymentCompany}
+          gameName={current.applySnapshot?.gameName ?? currentGame?.onlineName}
+          gameEnglishName={current.applySnapshot?.gameEnglishName ?? currentGame?.englishName}
           letterSnapshot={current.letterSnapshot}
           contentAnnotationId="game-payment-list-letter-drawer"
         />

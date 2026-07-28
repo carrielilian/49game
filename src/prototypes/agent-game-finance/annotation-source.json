@@ -348,18 +348,38 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "game-list-channels",
+        "id": "game-list-paid-items",
         "index": 11,
-        "title": "支持渠道",
+        "title": "已付款项",
         "pageId": "game-list",
         "locator": {
           "selectors": [
-            "[data-annotation-id=\"game-list-channels\"]"
+            "[data-annotation-id=\"game-list-paid-items\"]"
           ],
-          "fingerprint": "button|game-list-channels",
+          "fingerprint": "button|game-list-paid-items",
           "path": []
         },
-        "aiPrompt": "说明支持渠道入口。",
+        "aiPrompt": "说明已付款项入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-internal-channels",
+        "index": 5,
+        "title": "内部渠道",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-internal-channels\"]"
+          ],
+          "fingerprint": "button|formula-list-internal-channels",
+          "path": []
+        },
+        "aiPrompt": "说明内部渠道入口。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -448,18 +468,38 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "game-list-channels-form",
+        "id": "game-list-paid-items-form",
         "index": 16,
-        "title": "支持渠道表单",
+        "title": "已付款项表单",
         "pageId": "game-list",
         "locator": {
           "selectors": [
-            "[data-annotation-id=\"game-list-channels-form\"]"
+            "[data-annotation-id=\"game-list-paid-items-form\"]"
           ],
-          "fingerprint": "div|game-list-channels-form",
+          "fingerprint": "div|game-list-paid-items-form",
           "path": []
         },
-        "aiPrompt": "说明支持渠道表单。",
+        "aiPrompt": "说明已付款项表单。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#D97706",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "formula-list-internal-channels-form",
+        "index": 8,
+        "title": "内部渠道表单",
+        "pageId": "formula-list",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"formula-list-internal-channels-form\"]"
+          ],
+          "fingerprint": "div|formula-list-internal-channels-form",
+          "path": []
+        },
+        "aiPrompt": "说明内部渠道表单。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#D97706",
@@ -499,7 +539,7 @@
           "fingerprint": "div|formula-list-query",
           "path": []
         },
-        "aiPrompt": "说明结算公式管理查询栏。",
+        "aiPrompt": "说明结算配置管理查询栏。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -569,7 +609,7 @@
       },
       {
         "id": "formula-list-logs",
-        "index": 5,
+        "index": 6,
         "title": "操作记录",
         "pageId": "formula-list",
         "locator": {
@@ -589,7 +629,7 @@
       },
       {
         "id": "formula-list-formula-form",
-        "index": 6,
+        "index": 7,
         "title": "结算公式表单",
         "pageId": "formula-list",
         "locator": {
@@ -609,7 +649,7 @@
       },
       {
         "id": "formula-list-logs-drawer",
-        "index": 7,
+        "index": 9,
         "title": "操作记录抽屉",
         "pageId": "formula-list",
         "locator": {
@@ -650,7 +690,7 @@
       {
         "id": "external-settlement-import",
         "index": 2,
-        "title": "导入并结算",
+        "title": "数据导入",
         "pageId": "external-settlement",
         "locator": {
           "selectors": [
@@ -659,7 +699,27 @@
           "fingerprint": "button|external-settlement-import",
           "path": []
         },
-        "aiPrompt": "说明导入并结算入口。",
+        "aiPrompt": "说明数据导入入口。",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#2563EB",
+        "images": [],
+        "createdAt": 1784515200000,
+        "updatedAt": 1784515200000
+      },
+      {
+        "id": "external-settlement-settle",
+        "index": 3,
+        "title": "结算",
+        "pageId": "external-settlement",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"external-settlement-settle\"]"
+          ],
+          "fingerprint": "button|external-settlement-settle",
+          "path": []
+        },
+        "aiPrompt": "说明外部收入主列表结算。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -669,7 +729,7 @@
       },
       {
         "id": "external-settlement-table",
-        "index": 3,
+        "index": 4,
         "title": "外部收入列表",
         "pageId": "external-settlement",
         "locator": {
@@ -689,7 +749,7 @@
       },
       {
         "id": "external-settlement-channel-col",
-        "index": 4,
+        "index": 5,
         "title": "渠道列",
         "pageId": "external-settlement",
         "locator": {
@@ -709,7 +769,7 @@
       },
       {
         "id": "external-settlement-payment-col",
-        "index": 5,
+        "index": 6,
         "title": "申请付款状态列",
         "pageId": "external-settlement",
         "locator": {
@@ -729,8 +789,8 @@
       },
       {
         "id": "external-settlement-import-modal",
-        "index": 6,
-        "title": "导入并结算弹窗",
+        "index": 7,
+        "title": "数据导入弹窗",
         "pageId": "external-settlement",
         "locator": {
           "selectors": [
@@ -739,7 +799,7 @@
           "fingerprint": "div|external-settlement-import-modal",
           "path": []
         },
-        "aiPrompt": "说明导入并结算弹窗流程。",
+        "aiPrompt": "说明数据导入弹窗流程。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#D97706",
@@ -1488,7 +1548,7 @@
               {
                 "type": "route",
                 "id": "route-formula-list",
-                "title": "结算公式管理",
+                "title": "结算配置管理",
                 "route": "formula-list"
               },
               {

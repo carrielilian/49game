@@ -1,4 +1,4 @@
-import type { Game, GamePaymentRequest, SettlementRecord, GameBalance } from '../data/types';
+import type { Contract, Game, GamePaymentRequest, SettlementRecord, GameBalance } from '../data/types';
 import {
   calcDeductedPrepayment,
   calcGamePrepaymentSummary,
@@ -18,6 +18,7 @@ export function deriveGameBalances(
   settlements: SettlementRecord[],
   games: Game[],
   gamePayments: GamePaymentRequest[],
+  contracts: Contract[],
 ): GameBalance[] {
   return games.map((g) => {
     const gameSettled = settlements.filter((s) => s.gameId === g.id && s.settled);
@@ -41,7 +42,13 @@ export function deriveGameBalances(
     const balance = Math.round((internalIncome + externalIncome - unappliedRefund) * 100) / 100;
     const accountTotalIncome = Math.round((totalIncome - totalRefund) * 100) / 100;
 
-    const { prepayment, deductedPrepayment, remainingPrepayment } = calcGamePrepaymentSummary(g, g.id, gamePayments);
+    const contract = contracts.find((item) => item.gameId === g.id);
+    const { prepayment, deductedPrepayment, remainingPrepayment } = calcGamePrepaymentSummary(
+      g,
+      contract,
+      g.id,
+      gamePayments,
+    );
 
     return {
       gameId: g.id,

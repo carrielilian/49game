@@ -11,9 +11,21 @@ interface ModalProps {
   xl?: boolean;
   plain?: boolean;
   compact?: boolean;
+  overflowVisible?: boolean;
 }
 
-export function Modal({ title, open, onClose, children, footer, large, xl, plain, compact }: ModalProps) {
+export function Modal({
+  title,
+  open,
+  onClose,
+  children,
+  footer,
+  large,
+  xl,
+  plain,
+  compact,
+  overflowVisible,
+}: ModalProps) {
   useRegisterOverlay(open);
   useEffect(() => {
     if (!open) return;
@@ -25,7 +37,7 @@ export function Modal({ title, open, onClose, children, footer, large, xl, plain
   if (!open) return null;
   return (
     <div className="agf-overlay" onClick={onClose} role="presentation">
-      <div className={`agf-modal${xl ? ' agf-modal--xl' : large ? ' agf-modal--lg' : compact ? ' agf-modal--compact' : ''}${plain ? ' agf-modal--plain' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog">
+      <div className={`agf-modal${xl ? ' agf-modal--xl' : large ? ' agf-modal--lg' : compact ? ' agf-modal--compact' : ''}${plain ? ' agf-modal--plain' : ''}${overflowVisible ? ' agf-modal--overflow-visible' : ''}`} onClick={(e) => e.stopPropagation()} role="dialog">
         <div className="agf-modal__header">
           <span>{title}</span>
           <button type="button" className="agf-modal__close" onClick={onClose} aria-label="关闭">×</button>

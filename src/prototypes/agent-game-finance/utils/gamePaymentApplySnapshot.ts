@@ -11,16 +11,19 @@ import type {
 import { resolveMarkPaymentContractCurrency } from './currencySnapshot';
 import { calcGamePrepaymentSummary } from './prepayment';
 import { buildSettlementLetterSnapshot } from './settlementLetterSnapshot';
+import { getExchangeRateByApplyTime } from './exchangeRate';
 
 export function formatVendorReceiptInfo(vendor?: Vendor): string {
   if (!vendor) return '';
-  return [
+  const lines = [
     `开户名称：${vendor.accountName}`,
     `开户银行：${vendor.bank}`,
     `开户银行所在地：${vendor.bankLocation}`,
     `支行名称：${vendor.branch}`,
     `银行卡号：${vendor.cardNumber.replace(/\s+/g, '')}`,
-  ].join('\n');
+  ];
+  if (vendor.bankCode?.trim()) lines.splice(2, 0, `银行代码：${vendor.bankCode.trim()}`);
+  return lines.join('\n');
 }
 
 export interface BuildGamePaymentApplySnapshotInput {
@@ -36,6 +39,8 @@ export interface BuildGamePaymentApplySnapshotInput {
   exchangeRates: ExchangeRateRecord[];
   games: Game[];
   getGameName: (id: string) => string;
+  exchangeRateDate?: string;
+  exchangeRate?: number;
 }
 
 export function buildGamePaymentApplySnapshot(
@@ -54,13 +59,19 @@ export function buildGamePaymentApplySnapshot(
     exchangeRates,
     games,
     getGameName,
+    exchangeRateDate,
+    exchangeRate,
   } = input;
 
-  const prepaymentSummary = calcGamePrepaymentSummary(game, gameId, gamePayments);
+  const prepaymentSummary = calcGamePrepaymentSummary(game, contract, gameId, gamePayments);
+  const lockedExchangeRate =
+    exchangeRate ?? getExchangeRateByApplyTime(applyTime, exchangeRates) ?? 7.21;
+  const lockedExchangeRateDate = exchangeRateDate ?? applyTime.slice(0, 10);
 
   const applySnapshot: GamePaymentApplySnapshot = {
     gameId,
     gameName: getGameName(gameId),
+    gameEnglishName: game.englishName?.trim() ?? '',
     contractPaymentCurrency: resolveMarkPaymentContractCurrency(game, contract),
     vendorId: vendor.id,
     vendorName: vendor.name,
@@ -69,7 +80,8 @@ export function buildGamePaymentApplySnapshot(
     remainingPrepayment: prepaymentSummary.remainingPrepayment,
     sharePaymentCompany: game.sharePaymentCompany ?? '',
     sharePaymentCurrency: game.sharePaymentCurrency ?? '人民币',
-    sharePaymentAccount: game.sharePaymentAccount ?? '',
+    exchangeRateDate: lockedExchangeRateDate,
+    exchangeRate: lockedExchangeRate,
     applyTime,
   };
 
@@ -87,6 +99,7 @@ export function buildGamePaymentApplySnapshot(
     exchangeRates,
     games,
     getGameName,
+    exchangeRateOverride: lockedExchangeRate,
   });
 
   return { applySnapshot, letterSnapshot };

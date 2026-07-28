@@ -7,6 +7,12 @@ const PAID_FIELD_META: { key: keyof Pick<Contract, 'paidAgencyFee' | 'paidPrepay
   { key: 'paidDevelopmentFee', label: '已付委托开发费', content: '委托开发费' },
 ];
 
+const CONTRACT_CONTENT_FIELD_META: { key: keyof Pick<Contract, 'agencyFee' | 'prepaymentAmount' | 'developmentFee'>; label: string; content: CooperationContent }[] = [
+  { key: 'agencyFee', label: '游戏代理金', content: '游戏代理金' },
+  { key: 'prepaymentAmount', label: '预付分成款', content: '预付分成款' },
+  { key: 'developmentFee', label: '委托开发费', content: '委托开发费' },
+];
+
 function formatLogMoney(c: Contract, value: number | undefined): string {
   if (value == null || Number.isNaN(value)) return '-';
   return formatOptionalCurrencyMoney(value, c.currency);
@@ -38,6 +44,15 @@ function formatPaidForLog(
   return formatLogMoney(c, c[key]);
 }
 
+function formatContractContentForLog(
+  c: Contract,
+  key: typeof CONTRACT_CONTENT_FIELD_META[number]['key'],
+  content: CooperationContent,
+): string {
+  if (!c.cooperationContents.includes(content)) return '-';
+  return formatLogMoney(c, c[key]);
+}
+
 export function getPaidAmount(c: Contract | undefined, key: typeof PAID_FIELD_META[number]['key'], content: CooperationContent): number {
   if (!c || !c.cooperationContents.includes(content)) return -1;
   const val = c[key];
@@ -61,6 +76,12 @@ export function buildContractChangeDetail(oldC: Contract, newC: Contract): strin
   const lines: string[] = [];
   if (formatContractAmountDisplay(oldC) !== formatContractAmountDisplay(newC)) {
     lines.push(`"合同金额"变更为"${formatContractAmountForLog(newC)}"`);
+  }
+
+  for (const { key, label, content } of CONTRACT_CONTENT_FIELD_META) {
+    if (formatContractContentForLog(oldC, key, content) !== formatContractContentForLog(newC, key, content)) {
+      lines.push(`"${label}"变更为"${formatContractContentForLog(newC, key, content)}"`);
+    }
   }
 
   for (const { key, label, content } of PAID_FIELD_META) {

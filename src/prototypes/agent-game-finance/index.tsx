@@ -35,7 +35,7 @@ import './style.css';
 const ROUTE = defineHashPageRoute([
   { id: 'vendor-list', title: '厂商管理' },
   { id: 'game-list', title: '游戏管理' },
-  { id: 'formula-list', title: '结算公式管理' },
+  { id: 'formula-list', title: '结算配置管理' },
   { id: 'external-settlement', title: '外部收入结算' },
   { id: 'internal-settlement', title: '内部收入结算' },
   { id: 'internal-refund', title: '内部退款结算' },
@@ -55,7 +55,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     title: '财务分成管理',
     items: [
-      { id: 'formula-list', label: '结算公式管理' },
+      { id: 'formula-list', label: '结算配置管理' },
       { id: 'external-settlement', label: '外部收入结算' },
       { id: 'internal-settlement', label: '内部收入结算' },
       { id: 'internal-refund', label: '内部退款结算' },
@@ -74,7 +74,7 @@ const MENU_GROUPS: MenuGroup[] = [
 const PAGE_META: Record<string, { group: string; title: string }> = {
   'vendor-list': { group: '游戏支付管理', title: '厂商管理' },
   'game-list': { group: '游戏支付管理', title: '游戏管理' },
-  'formula-list': { group: '财务分成管理', title: '结算公式管理' },
+  'formula-list': { group: '财务分成管理', title: '结算配置管理' },
   'external-settlement': { group: '财务分成管理', title: '外部收入结算' },
   'internal-settlement': { group: '财务分成管理', title: '内部收入结算' },
   'internal-refund': { group: '财务分成管理', title: '内部退款结算' },

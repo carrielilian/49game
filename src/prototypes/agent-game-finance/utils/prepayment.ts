@@ -1,4 +1,4 @@
-import type { Game, GamePaymentRequest } from '../data/types';
+import type { Contract, Game, GamePaymentRequest } from '../data/types';
 import { isPaidPayment } from './payment';
 
 /** 已抵扣分成款 = 已付款待付款金额之和 + 历史已抵扣分成款；若预付分成款 − 上述合计 ≤ 0，则取预付分成款 */
@@ -20,8 +20,13 @@ export function calcRemainingUndeductedPrepayment(prepayment: number, deducted: 
   return 0;
 }
 
-export function getGamePrepayment(game?: Game): number {
-  return game?.prepayment ?? 0;
+export function hasGamePrepayment(game?: Game, contract?: Contract): boolean {
+  return game?.hasPrepayment ?? (contract?.paidPrepayment != null && !Number.isNaN(contract.paidPrepayment));
+}
+
+export function getGamePrepayment(game?: Game, contract?: Contract): number {
+  if (!hasGamePrepayment(game, contract)) return 0;
+  return contract?.paidPrepayment ?? 0;
 }
 
 export function getGameHistoricalDeduction(game?: Game): number {
@@ -36,10 +41,11 @@ export function sumGamePaidActualAmount(gameId: string, payments: GamePaymentReq
 
 export function calcGamePrepaymentSummary(
   game: Game | undefined,
+  contract: Contract | undefined,
   gameId: string,
   payments: GamePaymentRequest[],
 ) {
-  const prepayment = getGamePrepayment(game);
+  const prepayment = getGamePrepayment(game, contract);
   const historicalDeduction = getGameHistoricalDeduction(game);
   const paidActualSum = sumGamePaidActualAmount(gameId, payments);
   const deductedPrepayment = calcDeductedPrepayment(prepayment, paidActualSum, historicalDeduction);
@@ -47,6 +53,7 @@ export function calcGamePrepaymentSummary(
   return { prepayment, historicalDeduction, paidActualSum, deductedPrepayment, remainingPrepayment };
 }
 
-export function isGamePrepaymentMissing(game?: Game): boolean {
-  return !game || game.prepayment == null || Number.isNaN(game.prepayment);
+export function isGamePrepaymentMissing(game?: Game, contract?: Contract): boolean {
+  if (!hasGamePrepayment(game, contract)) return false;
+  return contract?.paidPrepayment == null || Number.isNaN(contract.paidPrepayment);
 }

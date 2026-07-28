@@ -46,6 +46,8 @@ export interface BuildSettlementLetterSnapshotInput {
   getGameName: (id: string) => string;
   /** 标记已付款时写入表单中的实际付款金额（优先于实时计算） */
   letterPayAmountOverride?: number;
+  /** 申请付款时手工填写的汇率；提供后不再按申请时间查汇率表 */
+  exchangeRateOverride?: number;
 }
 
 function buildLetterRows(input: BuildSettlementLetterSnapshotInput): {
@@ -103,12 +105,14 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
   const netTotal = Math.round((incomeTotal - refundTotal) * 100) / 100;
   const paymentCurrency: ContractCurrency = game?.sharePaymentCurrency ?? '人民币';
   const contractPaymentCurrency = resolveMarkPaymentContractCurrency(game, contract);
-  const exchangeRate = (applyTime ? getExchangeRateByApplyTime(applyTime, exchangeRates) : undefined) ?? 7.21;
+  const exchangeRate = input.exchangeRateOverride
+    ?? (applyTime ? getExchangeRateByApplyTime(applyTime, exchangeRates) : undefined)
+    ?? 7.21;
 
   const scopedGamePayments = paymentId
     ? gamePayments.filter((p) => p.id !== paymentId)
     : gamePayments;
-  const prepaymentSummary = calcGamePrepaymentSummary(game, gameId, scopedGamePayments);
+  const prepaymentSummary = calcGamePrepaymentSummary(game, contract, gameId, scopedGamePayments);
   const showExchangeRate = resolveLetterShowExchangeRate(
     paymentCurrency,
     contractPaymentCurrency,
@@ -118,6 +122,7 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
   const { deduction: prepaidDeduction, remainingUndeducted, payAmount: formulaPayAmount } =
     calcGameLetterPrepaymentDeduction(
       game,
+      contract,
       gameId,
       gamePayments,
       incomeTotal,

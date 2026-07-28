@@ -2,8 +2,6 @@ import type { AnnotationSourceDocument } from '@axhub/annotation';
 import annotationSourceDocument from '../annotation-source.json';
 import gameListAdd from '../docs/annotations/game-list/add-button.md?raw';
 import gameListAddForm from '../docs/annotations/game-list/add-form.md?raw';
-import gameListChannelsAction from '../docs/annotations/game-list/channels-action.md?raw';
-import gameListChannelsForm from '../docs/annotations/game-list/channels-form.md?raw';
 import gameListContractAction from '../docs/annotations/game-list/contract-action.md?raw';
 import gameListContractForm from '../docs/annotations/game-list/contract-form.md?raw';
 import gameListTable from '../docs/annotations/game-list/data-table.md?raw';
@@ -14,6 +12,8 @@ import gameListLogsAction from '../docs/annotations/game-list/logs-action.md?raw
 import gameListLogsDrawer from '../docs/annotations/game-list/logs-drawer.md?raw';
 import gameListOpStatus from '../docs/annotations/game-list/op-status-column.md?raw';
 import gameListPaidCols from '../docs/annotations/game-list/paid-columns.md?raw';
+import gameListPaidItemsAction from '../docs/annotations/game-list/paid-items-action.md?raw';
+import gameListPaidItemsForm from '../docs/annotations/game-list/paid-items-form.md?raw';
 import gameListPayerCol from '../docs/annotations/game-list/payer-column.md?raw';
 import gameListQuery from '../docs/annotations/game-list/query-bar.md?raw';
 import gameListSummary from '../docs/annotations/game-list/summary-row.md?raw';
@@ -24,12 +24,15 @@ import formulaListTable from '../docs/annotations/formula-list/data-table.md?raw
 import formulaListLogsAction from '../docs/annotations/formula-list/logs-action.md?raw';
 import formulaListLogsDrawer from '../docs/annotations/formula-list/logs-drawer.md?raw';
 import formulaListQuery from '../docs/annotations/formula-list/query-bar.md?raw';
+import formulaListInternalChannelsAction from '../docs/annotations/formula-list/internal-channels-action.md?raw';
+import formulaListInternalChannelsForm from '../docs/annotations/formula-list/internal-channels-form.md?raw';
 import externalSettlementChannelCol from '../docs/annotations/external-settlement/channel-column.md?raw';
 import externalSettlementTable from '../docs/annotations/external-settlement/data-table.md?raw';
 import externalSettlementImportBtn from '../docs/annotations/external-settlement/import-button.md?raw';
 import externalSettlementImportModal from '../docs/annotations/external-settlement/import-modal.md?raw';
 import externalSettlementPaymentCol from '../docs/annotations/external-settlement/payment-status-column.md?raw';
 import externalSettlementQuery from '../docs/annotations/external-settlement/query-bar.md?raw';
+import externalSettlementSettle from '../docs/annotations/external-settlement/settle-button.md?raw';
 import gameIncomeApplyModal from '../docs/annotations/game-income/apply-payment-modal.md?raw';
 import gameIncomeApplyAction from '../docs/annotations/game-income/apply-payment-action.md?raw';
 import gameIncomeTable from '../docs/annotations/game-income/data-table.md?raw';
@@ -91,12 +94,12 @@ const MARKDOWN_BY_NODE_ID: Record<string, string> = {
   'game-list-summary': gameListSummary,
   'game-list-edit': gameListEdit,
   'game-list-contract': gameListContractAction,
-  'game-list-channels': gameListChannelsAction,
+  'game-list-paid-items': gameListPaidItemsAction,
   'game-list-logs': gameListLogsAction,
   'game-list-add-form': gameListAddForm,
   'game-list-edit-form': gameListEditForm,
   'game-list-contract-form': gameListContractForm,
-  'game-list-channels-form': gameListChannelsForm,
+  'game-list-paid-items-form': gameListPaidItemsForm,
   'game-list-logs-drawer': gameListLogsDrawer,
   'formula-list-query': formulaListQuery,
   'formula-list-table': formulaListTable,
@@ -105,8 +108,11 @@ const MARKDOWN_BY_NODE_ID: Record<string, string> = {
   'formula-list-logs': formulaListLogsAction,
   'formula-list-formula-form': formulaListFormulaForm,
   'formula-list-logs-drawer': formulaListLogsDrawer,
+  'formula-list-internal-channels': formulaListInternalChannelsAction,
+  'formula-list-internal-channels-form': formulaListInternalChannelsForm,
   'external-settlement-query': externalSettlementQuery,
   'external-settlement-import': externalSettlementImportBtn,
+  'external-settlement-settle': externalSettlementSettle,
   'external-settlement-table': externalSettlementTable,
   'external-settlement-channel-col': externalSettlementChannelCol,
   'external-settlement-payment-col': externalSettlementPaymentCol,

@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代理游戏财务平台｜主规格</title>
+  <style>
+    :root {
+      --brand: #4169e1;
+      --brand-soft: #eef3ff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #e4e8f0;
+      --surface: #ffffff;
+      --canvas: #f7f8fb;
+      --success: #067647;
+      --success-soft: #ecfdf3;
+      --warning: #b54708;
+      --warning-soft: #fffaeb;
+      --danger: #b42318;
+      --danger-soft: #fef3f2;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 24px 72px;
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+      line-height: 1.65;
+    }
+
+    a { color: #175cd3; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1, h2, h3, h4 { margin: 0; line-height: 1.35; }
+    h2 { margin-top: 42px; font-size: 24px; scroll-margin-top: 84px; }
+    h3 { margin-top: 28px; font-size: 18px; scroll-margin-top: 84px; }
+    h4 { margin-top: 20px; font-size: 15px; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 8px 0 8px 22px; padding: 0; }
+    code {
+      padding: 2px 6px;
+      border-radius: 5px;
+      color: #344054;
+      background: #f2f4f7;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .hero {
+      padding: 30px;
+      border: 1px solid #dbe3ff;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #ffffff 0%, #f1f5ff 100%);
+      box-shadow: 0 10px 28px rgba(39, 64, 139, 0.08);
+    }
+    .hero__eyebrow {
+      margin-bottom: 8px;
+      color: var(--brand);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+    .hero h1 { font-size: 34px; }
+    .hero__desc { max-width: 780px; color: #475467; font-size: 15px; }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border: 1px solid #c7d7fe;
+      border-radius: 999px;
+      color: #1849a9;
+      background: #f5f8ff;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 6px;
+      margin: 18px 0 28px;
+      padding: 10px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 4px 16px rgba(16, 24, 40, 0.06);
+      backdrop-filter: blur(8px);
+    }
+    nav a {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border-radius: 7px;
+      color: #344054;
+      font-size: 13px;
+    }
+    nav a:hover { color: #1849a9; background: var(--brand-soft); text-decoration: none; }
+
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .card h3, .card h4 { margin-top: 0; }
+    .card__label { margin-bottom: 5px; color: var(--muted); font-size: 12px; font-weight: 600; }
+    .card__value { font-size: 20px; font-weight: 700; }
+    .muted { color: var(--muted); }
+
+    .callout {
+      margin: 16px 0;
+      padding: 14px 16px;
+      border-left: 4px solid var(--brand);
+      border-radius: 8px;
+      background: var(--brand-soft);
+    }
+    .callout--warning { border-color: #f79009; background: var(--warning-soft); }
+    .callout--success { border-color: #12b76a; background: var(--success-soft); }
+    .callout--danger { border-color: #f04438; background: var(--danger-soft); }
+
+    .table-wrap {
+      margin: 12px 0 20px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 680px; font-size: 13px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #344054; background: #f8fafc; font-weight: 700; white-space: nowrap; }
+    tr:last-child td { border-bottom: 0; }
+
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      margin: 16px 0;
+      overflow-x: auto;
+    }
+    .flow__step {
+      flex: 1 0 150px;
+      padding: 13px;
+      border: 1px solid #d0d5dd;
+      border-radius: 9px;
+      background: #fff;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .flow__arrow { align-self: center; color: #98a2b3; font-size: 20px; }
+
+    .checklist { list-style: none; margin-left: 0; }
+    .checklist li {
+      position: relative;
+      margin: 8px 0;
+      padding-left: 26px;
+    }
+    .checklist li::before {
+      position: absolute;
+      left: 0;
+      top: 3px;
+      width: 17px;
+      height: 17px;
+      border: 1.5px solid #98a2b3;
+      border-radius: 4px;
+      content: "";
+      background: #fff;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 999px;
+      color: #344054;
+      background: #f2f4f7;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tag--required { color: var(--danger); background: var(--danger-soft); }
+    .tag--snapshot { color: #1849a9; background: var(--brand-soft); }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 760px) {
+      body { padding: 16px 14px 48px; }
+      .hero { padding: 22px; }
+      .hero h1 { font-size: 27px; }
+      .grid, .grid--3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__eyebrow">Main Specification · Agent Game Finance</div>
+    <h1>代理游戏财务平台主规格</h1>
+    <p class="hero__desc">
+      本规格是当前原型的产品与验收基准，覆盖厂商、游戏、合同、结算配置、收入结算、付款申请、付款管理、结算函和收入汇总。
+      在规格确认前不得继续修改原型；确认后，原型与本规格需要保持双向同步。
+    </p>
+    <div class="badges">
+      <span class="badge">规格状态：已确认</span>
+      <span class="badge">业务类型：游戏盒 / 快爆</span>
+      <span class="badge">原型：agent-game-finance</span>
+      <span class="badge">主规格：HTML</span>
+    </div>
+  </header>
+
+  <nav aria-label="规格目录">
+    <a href="#overview">概览</a>
+    <a href="#architecture">信息架构</a>
+    <a href="#master-data">基础资料</a>
+    <a href="#settlement-config">结算配置</a>
+    <a href="#settlement">收入结算</a>
+    <a href="#payment">付款流程</a>
+    <a href="#letter">结算函</a>
+    <a href="#statistics">统计</a>
+    <a href="#acceptance">验收</a>
+    <a href="#open-issues">待确认</a>
+  </nav>
+
+  <main>
+    <section id="overview">
+      <h2>1. 规格概览</h2>
+      <div class="grid grid--3">
+        <article class="card">
+          <div class="card__label">核心目标</div>
+          <div class="card__value">收入到付款闭环</div>
+          <p class="muted">从基础资料、收入结算到付款申请和结算函留档。</p>
+        </article>
+        <article class="card">
+          <div class="card__label">关键原则</div>
+          <div class="card__value">申请时冻结</div>
+          <p class="muted">付款申请和结算函读取申请成功时的快照，不随源数据漂移。</p>
+        </article>
+        <article class="card">
+          <div class="card__label">验收重点</div>
+          <div class="card__value">口径一致</div>
+          <p class="muted">列表、导出、汇总、付款与结算函使用一致的数据规则。</p>
+        </article>
+      </div>
+
+      <h3>1.1 目标用户</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>角色</th><th>核心任务</th></tr></thead>
+          <tbody>
+            <tr><td>游戏运营</td><td>维护厂商、游戏、合同、合作内容和渠道游戏ID。</td></tr>
+            <tr><td>财务人员</td><td>配置结算公式、导入/拉取收入数据、结算、申请付款、登记付款结果和凭证。</td></tr>
+            <tr><td>财务负责人</td><td>查看付款记录、结算函和收入汇总，核对业务结果。</td></tr>
+            <tr><td>开发与测试</td><td>按本规格实现并覆盖字段、流程、状态、异常、计算和快照验收。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>1.2 范围边界</h3>
+      <div class="grid">
+        <article class="card">
+          <h4>本次包含</h4>
+          <ul>
+            <li>厂商、游戏、合同与已付款项</li>
+            <li>结算配置与内部渠道</li>
+            <li>外部收入、内部收入、内部退款</li>
+            <li>游戏收入、付款设置、付款申请</li>
+            <li>游戏付款、凭证、结算函、收入汇总</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h4>不在范围</h4>
+          <ul>
+            <li>已移除的【厂商收入】、【厂商付款管理】</li>
+            <li>角色权限、审批流、通知、会计总账</li>
+            <li>真实财务中心接口、真实报表解析、正式PDF与文件存储</li>
+            <li>日期版本规格与 <code>spec-state.json</code></li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout callout--warning">
+        <strong>评审门禁：</strong>本规格确认前，不修改原型；确认后，任何功能、字段、文案、状态或口径调整必须同时更新原型和本规格。
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2>2. 信息架构与通用规则</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>一级分组</th><th>菜单</th><th>职责</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="2">游戏支付管理</td><td>厂商管理</td><td>厂商、发票与银行信息。</td></tr>
+            <tr><td>游戏管理</td><td>游戏、合同、合作金额、已付款项和操作记录。</td></tr>
+            <tr><td rowspan="6">财务分成管理</td><td>结算配置管理</td><td>内部/外部结算公式和内部渠道。</td></tr>
+            <tr><td>外部收入结算</td><td>外部报表导入、查重和结算。</td></tr>
+            <tr><td>内部收入结算</td><td>从财务中心拉取内部收入并结算。</td></tr>
+            <tr><td>内部退款结算</td><td>从财务中心拉取退款并结算。</td></tr>
+            <tr><td>游戏收入管理</td><td>游戏账户、预付分成、付款设置和申请付款。</td></tr>
+            <tr><td>游戏付款管理</td><td>实付登记、凭证、详情和结算函。</td></tr>
+            <tr><td>数据统计</td><td>收入汇总统计</td><td>按游戏、渠道、厂商汇总收入与付款。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>2.1 通用展示</h3>
+      <ul>
+        <li>业务类型为“游戏盒 / 快爆”，切换后数据隔离展示。</li>
+        <li>多查询条件使用 AND 关系；无数据时显示“暂无数据”。</li>
+        <li>游戏信息统一显示为 <code>游戏ID / 游戏名称</code>。</li>
+        <li>人民币使用“￥”，美金使用“$”；金额使用千分位并保留两位小数。</li>
+        <li>未产生或不适用的数据统一显示“-”。</li>
+        <li>保存成功使用绿色反馈；校验失败显示字段红字和明确提示。</li>
+      </ul>
+
+      <h3>2.2 主流程</h3>
+      <div class="flow">
+        <div class="flow__step">维护厂商与游戏</div><div class="flow__arrow">→</div>
+        <div class="flow__step">维护合同与结算配置</div><div class="flow__arrow">→</div>
+        <div class="flow__step">导入/拉取收入</div><div class="flow__arrow">→</div>
+        <div class="flow__step">完成结算</div><div class="flow__arrow">→</div>
+        <div class="flow__step">申请付款并冻结</div><div class="flow__arrow">→</div>
+        <div class="flow__step">标记付款与留档</div>
+      </div>
+    </section>
+
+    <section id="master-data">
+      <h2>3. 基础资料</h2>
+      <h3>3.1 厂商管理</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>区块</th><th>字段</th><th>规则</th></tr></thead>
+          <tbody>
+            <tr><td>厂商信息</td><td>厂商编号</td><td>添加时“-”，保存后系统生成；编辑只读。</td></tr>
+            <tr><td>厂商信息</td><td>厂商名称、发票信息</td><td><span class="tag tag--required">必填</span> 发票：专票6%、专票3%、专票1%、普通发票、其他。</td></tr>
+            <tr><td>厂商信息</td><td>联系人、手机、邮箱、单位地址</td><td>选填。</td></tr>
+            <tr><td>银行信息第一行</td><td>开户名称、开户银行、开户银行所在地</td><td><span class="tag tag--required">必填</span></td></tr>
+            <tr><td>银行信息第二行</td><td>支行名称、银行卡号</td><td><span class="tag tag--required">必填</span></td></tr>
+            <tr><td>银行信息第二行</td><td>银行代码</td><td>选填。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>编辑不可修改厂商编号和所属业务类型。</li>
+        <li>发票变化后，结算配置中“跟随发票”的扣税点同步变化。</li>
+      </ul>
+
+      <h3>3.2 游戏管理</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>添加</th><th>编辑</th><th>规则</th></tr></thead>
+          <tbody>
+            <tr><td>游戏ID</td><td>系统生成</td><td>只读</td><td>不可人工修改。</td></tr>
+            <tr><td>游戏名称</td><td>必填</td><td>可编辑</td><td>去除首尾空格后全局精确查重；重名提示“游戏名称已存在”。</td></tr>
+            <tr><td>游戏英文名称</td><td>选填</td><td>可编辑</td><td>申请付款时冻结，英文结算函优先使用。</td></tr>
+            <tr><td>合同游戏名称</td><td>必填</td><td>可编辑</td><td>合同签约名称，可与上线名称不同。</td></tr>
+            <tr><td>归属厂商</td><td>必填可搜索</td><td>只读</td><td>支持厂商ID或名称搜索。</td></tr>
+            <tr><td>付款方</td><td>必填</td><td>只读</td><td>4399、纯游、游乐、游戏之家、香港4399、游家时代。</td></tr>
+            <tr><td>版号、运营状态</td><td>必填</td><td>可编辑</td><td>版号：有/无；状态：未上线/已上线。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>游戏列表列序</h4>
+      <p>
+        游戏ID / 游戏名称 → 合同游戏名称 → 厂商ID → 厂商名称 →
+        已付游戏代理金 → 已付预付分成款 → 已付委托开发费 → <strong>付款方</strong> → 运营状态 → 操作。
+      </p>
+      <ul>
+        <li>付款方位于运营状态左侧，保留表头筛选。</li>
+        <li>操作顺序：编辑 → 合同管理 → 已付款项 → 操作记录。</li>
+        <li>列表最后一行显示“查询总计”，三项已付按币种分别汇总。</li>
+        <li>导出不含操作和总计行，字段顺序与列表一致。</li>
+      </ul>
+
+      <h3>3.3 合同管理与已付款项</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>模块</th><th>字段/动作</th><th>规则</th></tr></thead>
+          <tbody>
+            <tr><td>合同管理</td><td>合同编号、合同金额、合作状态</td><td><span class="tag tag--required">必填</span> 金额≥0，最多两位小数。</td></tr>
+            <tr><td>合同管理</td><td>支付币种</td><td>人民币/美金；首次保存前可选，保存后锁定。</td></tr>
+            <tr><td>合同管理</td><td>合作内容</td><td>至少一项：游戏代理金、预付分成款、委托开发费。</td></tr>
+            <tr><td>合同管理</td><td>三项约定金额</td><td>勾选对应合作内容后显示并必填。</td></tr>
+            <tr><td>已付款项</td><td>三项已付金额</td><td>仅显示合同已勾选项；必填、≥0、两位小数。</td></tr>
+            <tr><td>取消合作内容</td><td>清空数据</td><td>同时清空对应约定金额和已付款金额。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="settlement-config">
+      <h2>4. 结算配置管理</h2>
+      <h3>4.1 结算公式</h3>
+      <p>内部渠道与外部渠道分别维护扣税点、渠道费和分成。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发票信息</th><th>扣税点</th><th>编辑规则</th></tr></thead>
+          <tbody>
+            <tr><td>增值税专用发票（6%）</td><td>0%</td><td>跟随发票，只读。</td></tr>
+            <tr><td>增值税专用发票（3%）</td><td>3.36%</td><td>跟随发票，只读。</td></tr>
+            <tr><td>增值税专用发票（1%）</td><td>5.6%</td><td>跟随发票，只读。</td></tr>
+            <tr><td>普通发票</td><td>6.72%</td><td>跟随发票，只读。</td></tr>
+            <tr><td>其他</td><td>手工填写</td><td>百分数输入。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>公式：</strong><code>结算结果 = 金额基数 × (1 - 扣税点 - 渠道费) × 分成</code></p>
+      <ul>
+        <li>渠道费、分成：0–100整数。</li>
+        <li>抽屉内部小标题为“内部渠道”“外部渠道”。</li>
+        <li>操作顺序：结算公式 → 内部渠道 → 操作记录。</li>
+      </ul>
+
+      <h3>4.2 内部渠道</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>业务类型</th><th>代理渠道</th><th>发行渠道</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>游戏盒</td>
+              <td>总类“游戏盒”：游戏盒付费、游戏盒内购、49广告联盟</td>
+              <td>总类“快爆”：快爆付费、快爆内购、快爆小游戏广告</td>
+            </tr>
+            <tr>
+              <td>快爆</td>
+              <td>总类“快爆”：快爆付费、快爆内购、快爆小游戏广告</td>
+              <td>总类“游戏盒”：游戏盒付费、游戏盒内购、49广告联盟</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>总类使用黑色加粗文字，展示在具体渠道上方。</li>
+        <li>勾选渠道后，渠道游戏ID必填。</li>
+        <li>一个渠道支持多个游戏ID，使用英文半角逗号“,”分隔；保存时去除各游戏ID首尾空格，并过滤空段。</li>
+      </ul>
+    </section>
+
+    <section id="settlement">
+      <h2>5. 收入与退款结算</h2>
+      <h3>5.1 外部收入结算</h3>
+      <p><strong>允许渠道：</strong>小米、荣耀、华为、爱九游、vivo、oppo、B站、TapTap、应用宝、ios。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>阶段</th><th>规则</th></tr></thead>
+          <tbody>
+            <tr><td>数据导入</td><td>字段：收入时间、渠道、游戏ID、游戏名称、厂商名称、待结算金额。</td></tr>
+            <tr><td>重复判断</td><td>按“收入时间 + 渠道 + 游戏ID”检查历史和本批次。</td></tr>
+            <tr><td>重复提示</td><td>单个：“{游戏ID}数据重复上传”；多个游戏ID用“、”连接。</td></tr>
+            <tr><td>成功预览</td><td>第一行显示总计，仅汇总待结算金额。</td></tr>
+            <tr><td>确认导入</td><td>写入主列表；结算收入、结算时间初始为“-”。</td></tr>
+            <tr><td>结算</td><td>按游戏外部渠道公式计算，写入结算收入和结算时间。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>5.2 内部收入结算</h3>
+      <p>从【财务中心－结算管理－游戏收入结算】拉取，最终按<strong>月 + 游戏ID + 渠道总类</strong>汇总一条记录。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>渠道类型</th><th>渠道总类</th><th>具体渠道</th><th>取值字段</th></tr></thead>
+          <tbody>
+            <tr><td>代理渠道</td><td>当前业务平台</td><td>付费、内购、广告渠道</td><td>待结算金额</td></tr>
+            <tr><td>发行渠道</td><td>另一平台</td><td>付费、内购、广告渠道</td><td>结算收入</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>5.3 内部退款结算</h3>
+      <p>从【财务中心－结算管理－玩家退款记录】拉取，最终按<strong>月 + 游戏ID + 渠道总类</strong>汇总一条记录。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>渠道类型</th><th>取值规则</th><th>主列表文案</th></tr></thead>
+          <tbody>
+            <tr><td>代理渠道</td><td>退款金额</td><td>退款金额 / 结算退款</td></tr>
+            <tr><td>发行渠道</td><td>退款金额 × 发行平台结算公式</td><td>退款金额 / 结算退款</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>5.4 拉取按钮状态</h3>
+      <ol>
+        <li>每月首次进入：“数据拉取”可用，“结算”置灰。</li>
+        <li>财务中心仍有未结算数据：提示“财务中心还未结算完成”。</li>
+        <li>拉取成功：提示已拉取，“数据拉取”置灰，“结算”可用。</li>
+        <li>同月再次进入保持已拉取状态。</li>
+      </ol>
+    </section>
+
+    <section id="payment">
+      <h2>6. 游戏收入与付款</h2>
+      <h3>6.1 游戏收入列表</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>口径</th></tr></thead>
+          <tbody>
+            <tr><td>账户余额</td><td>当前可申请付款金额。</td></tr>
+            <tr><td>账户总收入</td><td>累计收入 - 累计退款。</td></tr>
+            <tr><td>预付分成款</td><td>取【游戏管理－已付款项】的已付预付分成款；不可修改。</td></tr>
+            <tr><td>已抵扣 / 剩余未抵扣</td><td>预付未维护时显示“-”；币种为合同支付币种。</td></tr>
+            <tr><td>操作</td><td>付款设置始终显示；余额 &gt; 0 时显示申请付款。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>6.2 付款设置</h3>
+      <div class="grid">
+        <article class="card">
+          <h4>预付分成管理</h4>
+          <ul>
+            <li>先选择“有无预付分成款”。</li>
+            <li>选择“有”：显示只读预付分成款和必填历史已抵扣。</li>
+            <li>选择“无”：隐藏两项并按预付0计算。</li>
+            <li>抽屉不显示已抵扣和剩余未抵扣字段。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h4>付费设置</h4>
+          <ul>
+            <li>分成付款公司：4399、纯游、纯游（美元）、香港4399、游家时代。</li>
+            <li>付款币种：人民币 / 美金；未保存默认人民币。</li>
+            <li>不提供付款账号字段。</li>
+          </ul>
+        </article>
+      </div>
+
+      <h3>6.3 申请付款</h3>
+      <h4>前置校验顺序</h4>
+      <ol>
+        <li>厂商五项必填银行信息不完整 → “未填写银行信息”。</li>
+        <li>选择有预付但未维护已付预付分成款 → “{游戏名称}未补充预付分成款信息”。金额0视为已维护。</li>
+      </ol>
+      <p>不再因该游戏存在未付款记录而拦截再次申请。</p>
+
+      <h4>确认弹窗</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>规则</th></tr></thead>
+          <tbody>
+            <tr><td>汇率取值时间</td><td><span class="tag tag--required">必填</span> 日期选择器，精确至天，默认当天；日历图层置顶且弹窗无上下滚动。</td></tr>
+            <tr><td>汇率</td><td><span class="tag tag--required">必填</span> 正数小数，最多四位，失焦格式化为四位。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>申请成功联动</h4>
+      <div class="flow">
+        <div class="flow__step">结算记录改“已申请”</div><div class="flow__arrow">→</div>
+        <div class="flow__step">游戏账户余额清零</div><div class="flow__arrow">→</div>
+        <div class="flow__step">付款列表首行新增“未付款”</div><div class="flow__arrow">→</div>
+        <div class="flow__step">保存付款与结算函快照</div>
+      </div>
+
+      <h3>6.4 申请付款快照</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>分类</th><th>冻结内容</th></tr></thead>
+          <tbody>
+            <tr><td>游戏</td><td>游戏ID、游戏名称、游戏英文名称、合同支付币种。</td></tr>
+            <tr><td>厂商</td><td>厂商ID、厂商名称、银行收款信息。</td></tr>
+            <tr><td>预付</td><td>预付分成款、剩余未抵扣预付分成款。</td></tr>
+            <tr><td>付费设置</td><td>付款币种、分成付款公司。</td></tr>
+            <tr><td>时间与金额</td><td>申请时间、待付款金额、汇率取值时间、汇率。</td></tr>
+            <tr><td>结算明细</td><td>本次纳入的收入与退款。</td></tr>
+            <tr><td>结算函</td><td>明细、合计、汇率、抵扣、剩余和初始实际付款金额。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout callout--success">
+        <strong>快照原则：</strong>申请成功后，修改游戏、英文名、厂商银行、合同、预付或付款设置，不影响已申请记录。后续换算使用申请时填写并冻结的汇率。
+      </div>
+
+      <h3>6.5 游戏付款管理</h3>
+      <p>主列表列：游戏信息、厂商ID、厂商名称、待付款金额、实际付款金额、实际付款美金、付款状态、申请/付款时间、操作。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>功能</th><th>规则</th></tr></thead>
+          <tbody>
+            <tr><td>标记付款</td><td>未付款可操作；实付人民币必填且≥0，实付美金选填；分成付款公司只读。</td></tr>
+            <tr><td>详细信息</td><td>已付款可查看；金额、状态、付款方和收款信息只读，备注可编辑。</td></tr>
+            <tr><td>请款凭证</td><td>结算函必填，发票选填；支持png、jpg、pdf。</td></tr>
+            <tr><td>结算函</td><td>读取申请时快照；标记付款不反写。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>标记付款初始金额</h4>
+      <p>
+        <code>net = max(待付款金额 - 剩余未抵扣分成款, 0)</code><br>
+        <code>usdNet = max(待付款金额 / 冻结汇率 - 剩余未抵扣分成款, 0)</code>
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>情况</th><th>条件</th><th>实际付款金额（￥）</th><th>实际付款美金（$）</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>预付≤0</td><td>待付款金额</td><td>付款币种为美金时：待付/汇率；否则空</td></tr>
+            <tr><td>2</td><td>预付&gt;0，合同人民币</td><td>net</td><td>net/汇率</td></tr>
+            <tr><td>3</td><td>预付&gt;0，合同美金</td><td>usdNet×汇率</td><td>usdNet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="letter">
+      <h2>7. 结算函</h2>
+      <ul>
+        <li>申请付款成功时生成并冻结；付款状态及标记付款实付不改变结算函。</li>
+        <li>收入区展示明细、合计②；存在退款时展示退款区和合计④；总计为②-④。</li>
+        <li>申请快照中剩余未抵扣分成款&gt;0时，显示结算/抵扣金额与抵扣后剩余。</li>
+        <li>实际付款金额始终取申请时冻结值，不展示“支付金额（大写）”。</li>
+        <li>英文版优先使用冻结游戏英文名称；未填时回退冻结中文名称。</li>
+      </ul>
+
+      <h3>7.1 付款方映射</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>分成付款公司</th><th>公司全称</th><th>开票项目</th><th>英文下载</th></tr></thead>
+          <tbody>
+            <tr><td>4399</td><td>四三九九网络股份有限公司</td><td>生产生活服务*信息服务费</td><td>不支持</td></tr>
+            <tr><td>纯游</td><td>厦门纯游互动科技有限公司</td><td>生产生活服务*信息服务费</td><td>不支持</td></tr>
+            <tr><td>纯游（美元）</td><td>厦门纯游互动科技有限公司</td><td>不展示</td><td>支持</td></tr>
+            <tr><td>香港4399</td><td>四三九九网络有限公司</td><td>不展示</td><td>支持</td></tr>
+            <tr><td>游家时代</td><td>游家时代网络有限公司</td><td>不展示</td><td>支持</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>收款方签章信息读取厂商银行资料：收款方、开户行名称、银行账号、银行代码、盖章。</p>
+      <p>完整结算函业务说明：<a href="https://axhub.im/ax9/458b2445d672418c/#g=1" target="_blank" rel="noopener noreferrer">网页易读版规则</a>。</p>
+    </section>
+
+    <section id="statistics">
+      <h2>8. 收入汇总统计</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>维度</th><th>列</th><th>特殊口径</th></tr></thead>
+          <tbody>
+            <tr><td>游戏</td><td>时间、游戏ID/名称、支付金额、总收入、结算付款金额</td><td>按游戏聚合。</td></tr>
+            <tr><td>渠道</td><td>时间、渠道、支付金额、总收入、结算付款金额</td><td>内部按游戏盒/快爆总类；外部保留实际渠道。</td></tr>
+            <tr><td>厂商</td><td>时间、厂商ID、厂商名称、支付金额、总收入、结算付款金额</td><td>按厂商聚合。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>支付金额 = 已付游戏代理金 + 已付预付分成款 + 已付委托开发费，按币种分别展示。</li>
+        <li>总收入 = 结算收入 - 结算退款，人民币。</li>
+        <li>结算付款金额 = 已付款记录实际付款金额，按付款月份累加，人民币。</li>
+        <li>列表、筛选、查询总计和导出使用相同口径。</li>
+      </ul>
+    </section>
+
+    <section id="acceptance">
+      <h2>9. 功能测试与验收清单</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>基础资料</h3>
+          <ul class="checklist">
+            <li>银行代码选填且位于银行信息第二行。</li>
+            <li>游戏名称重名时提示并拦截，自身原名称可保存。</li>
+            <li>编辑游戏时归属厂商、付款方只读。</li>
+            <li>付款方列位于运营状态左侧，导出顺序一致。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>合同与配置</h3>
+          <ul class="checklist">
+            <li>合作内容决定三项约定金额和已付款项显示。</li>
+            <li>取消合作内容同时清空约定金额和已付金额。</li>
+            <li>合同支付币种首次保存后锁定。</li>
+            <li>发票税点映射及“其他”手输正确。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>渠道与结算</h3>
+          <ul class="checklist">
+            <li>游戏盒/快爆的代理、发行渠道及总类映射正确。</li>
+            <li>多渠道游戏ID使用英文半角逗号“,”分隔；保存后不存在首尾空格或空段。</li>
+            <li>内部收入/退款按月+游戏ID+渠道总类汇总。</li>
+            <li>外部导入同时检查历史与本批次重复。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>付款设置与申请</h3>
+          <ul class="checklist">
+            <li>有/无预付控制字段显示与计算。</li>
+            <li>银行信息、预付信息按规定顺序拦截。</li>
+            <li>汇率日期默认当天，汇率最多四位小数。</li>
+            <li>已有未付款记录不阻止再次申请。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>快照与付款</h3>
+          <ul class="checklist">
+            <li>申请成功后余额、结算状态和付款列表联动。</li>
+            <li>源资料变化不影响申请和结算函快照。</li>
+            <li>后续计算使用申请时冻结汇率。</li>
+            <li>全额抵扣允许实际付款金额为0.00。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>结算函与统计</h3>
+          <ul class="checklist">
+            <li>英文函使用冻结英文名，空值回退冻结中文名。</li>
+            <li>4399/纯游英文下载按规则拦截。</li>
+            <li>无退款时整段退款区隐藏。</li>
+            <li>统计列表、筛选、总计和导出口径一致。</li>
+          </ul>
+        </article>
+      </div>
+
+      <h3>9.1 关键状态验收</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>对象</th><th>状态</th><th>允许行为</th></tr></thead>
+          <tbody>
+            <tr><td>结算记录</td><td>未结算</td><td>执行结算。</td></tr>
+            <tr><td>结算记录</td><td>已结算、未申请</td><td>计入游戏账户可申请余额。</td></tr>
+            <tr><td>结算记录</td><td>已申请</td><td>不重复计入可申请余额。</td></tr>
+            <tr><td>付款记录</td><td>未付款</td><td>标记付款、结算函、请款凭证。</td></tr>
+            <tr><td>付款记录</td><td>已付款</td><td>详细信息、结算函、请款凭证。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="open-issues">
+      <h2>10. 开发前待确认事项</h2>
+      <div class="callout callout--warning">
+        以下事项不影响当前原型评审，但会影响正式开发接口、精度或交付范围。
+      </div>
+      <ol>
+        <li>正式角色权限、数据权限和审批权限。</li>
+        <li>财务中心接口字段、错误码、幂等、重试和月度完成状态。</li>
+        <li>外部报表格式、工作表、字段类型、最大数据量和错误文件反馈。</li>
+        <li>正式英文结算函模板、渠道英文名、付款方英文资料及法务确认。</li>
+        <li>服务端金额/汇率精度、舍入模式和税务口径。</li>
+        <li>真实附件存储、PDF生成和下载权限。</li>
+      </ol>
+
+      <h3>10.1 同目录辅助文档</h3>
+      <ul>
+        <li><a href="./prototype-review.md">原型评审记录</a></li>
+        <li><a href="./ui-review.md">UI评审记录</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>规格来源：当前可运行原型、原型批注、UI规格、需求文档及已确认会话决策。</p>
+    <p>维护规则：确认后，原型变更与本规格必须同步更新；不得另建日期版本主规格。</p>
+  </footer>
+</body>
+</html>

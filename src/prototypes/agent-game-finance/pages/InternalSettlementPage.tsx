@@ -5,10 +5,15 @@ import { FilterBar } from '../components/FilterBar';
 import { MonthRangePicker } from '../components/MonthRangePicker';
 import { StatusBadge } from '../components/StatusBadge';
 import { Toast, type ToastType } from '../components/Modal';
-import { isFormulaConfigured, INTERNAL_CHANNELS } from '../data/mock-data';
+import { isFormulaConfigured } from '../data/mock-data';
 import { useAppStore } from '../data/store';
 import { PAYMENT_APPLY_STATUS_FILTER_OPTIONS, selectOptions } from '../utils/columnFilters';
-import { checkFinanceCenterReady, fetchFinanceCenterRows } from '../utils/financeCenter';
+import {
+  checkFinanceCenterReady,
+  fetchFinanceCenterRows,
+  getInternalChannelCategory,
+  INTERNAL_CHANNEL_CATEGORIES,
+} from '../utils/financeCenter';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { getPreviousMonthKey, getRecentTwoMonthsRange, isMonthInRange, type MonthRange } from '../utils/monthRange';
@@ -78,6 +83,11 @@ export function InternalSettlementPage({ type }: Props) {
 
   const incomeLabel = type === 'internal' ? '结算收入' : '结算退款';
   const ann = type === 'internal' ? 'internal-settlement' : 'internal-refund';
+  const amountLabel = type === 'internal' ? '待结算金额' : '退款金额';
+  const displayFormula = (formulaText?: string) => {
+    const formula = displaySettlementFormula(formulaText);
+    return type === 'refund' ? formula.replace('待结算金额', '退款金额') : formula;
+  };
 
   const data = scopedSettlements.filter((s) => {
     if (s.type !== type) return false;
@@ -88,7 +98,7 @@ export function InternalSettlementPage({ type }: Props) {
       vendorId: s.vendorId,
       vendorName: getVendorName(s.vendorId),
     })) return false;
-    if (channelFilter && s.channel !== channelFilter) return false;
+    if (channelFilter && getInternalChannelCategory(s.channel) !== channelFilter) return false;
     if (paymentStatusFilter && s.paymentApplyStatus !== paymentStatusFilter) return false;
     return true;
   });
@@ -193,16 +203,16 @@ export function InternalSettlementPage({ type }: Props) {
                     type: 'select',
                     value: channelFilter,
                     onChange: setChannelFilter,
-                    options: selectOptions(INTERNAL_CHANNELS),
+                    options: selectOptions(INTERNAL_CHANNEL_CATEGORIES),
                   }}
                 />
               </span>
             ),
-            render: (r) => r.channel,
+            render: (r) => getInternalChannelCategory(r.channel),
           },
-          { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
+          { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: amountLabel, render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
           { ...COL_ALIGN_RIGHT, key: 'settleInc', title: incomeLabel, render: (r) => formatSettlementIncome(r) },
-          { key: 'formula', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
+          { key: 'formula', title: '结算公式', render: (r) => displayFormula(r.formulaText) },
           { key: 'settleTime', title: '结算时间', render: (r) => formatSettlementTime(r) },
           {
             key: 'status',

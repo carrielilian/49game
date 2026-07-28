@@ -54,16 +54,16 @@ const GAME_HISTORICAL_DEDUCTIONS: Partial<Record<string, number>> = {
 };
 
 /** 游戏付费设置 mock（付款设置 — 分成付款公司等） */
-const GAME_SHARE_PAYMENT: Partial<Record<string, Pick<Game, 'sharePaymentCompany' | 'sharePaymentCurrency' | 'sharePaymentAccount'>>> = {
-  '4001': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6222123412341234' },
-  '4003': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6214567856785678' },
-  '4005': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金', sharePaymentAccount: '6227901290129012' },
-  '4006': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金', sharePaymentAccount: '6227901290129012' },
-  '4007': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金', sharePaymentAccount: '6228345634563456' },
-  '4008': { sharePaymentCompany: '香港4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6228345634563456' },
-  '4009': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6216789078907890' },
-  '4010': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金', sharePaymentAccount: '6222234523452345' },
-  '5001': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币', sharePaymentAccount: '6229098765432109' },
+const GAME_SHARE_PAYMENT: Partial<Record<string, Pick<Game, 'sharePaymentCompany' | 'sharePaymentCurrency'>>> = {
+  '4001': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币' },
+  '4003': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币' },
+  '4005': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金' },
+  '4006': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金' },
+  '4007': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金' },
+  '4008': { sharePaymentCompany: '香港4399', sharePaymentCurrency: '人民币' },
+  '4009': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币' },
+  '4010': { sharePaymentCompany: '纯游（美元）', sharePaymentCurrency: '美金' },
+  '5001': { sharePaymentCompany: '4399', sharePaymentCurrency: '人民币' },
 };
 
 function gameWithPrepayment(g: Game): Game {
@@ -127,6 +127,9 @@ export const INITIAL_CONTRACTS: Contract[] = INITIAL_GAMES.map((g, i) => {
     contractNumber: `HT-${g.id}`,
     contractAmount: [580000, 430000, 230000, 460000, 690000, 345000, 250000, 550000, 285000, 485000, 135000, 360000, 428000, 272000, 495000, 318000][i],
     cooperationContents,
+    agencyFee: paidAgencyFee * 2,
+    prepaymentAmount: paidPrepayment * 2,
+    developmentFee: paidDevelopmentFee * 2,
     paidAgencyFee,
     paidPrepayment,
     paidDevelopmentFee,
@@ -152,10 +155,23 @@ function enrichGameListAnnotationDemo() {
   const contract4012 = INITIAL_CONTRACTS.find((c) => c.gameId === '4012');
   if (contract4012) {
     contract4012.cooperationContents = ['游戏代理金', '委托开发费'];
+    contract4012.prepaymentAmount = undefined;
     contract4012.paidPrepayment = undefined;
   }
 }
 enrichGameListAnnotationDemo();
+
+/** 付款设置「有无预付分成款」默认与合同已付款项中的预付金额保持一致。 */
+function enrichGameHasPrepayment() {
+  const contractMap = new Map(INITIAL_CONTRACTS.map((contract) => [contract.gameId, contract]));
+  for (const game of INITIAL_GAMES) {
+    const paidPrepayment = contractMap.get(game.id)?.paidPrepayment;
+    Object.assign(game, {
+      hasPrepayment: paidPrepayment != null && !Number.isNaN(paidPrepayment),
+    });
+  }
+}
+enrichGameHasPrepayment();
 
 const INTERNAL_CHANNELS = [
   '快爆付费',
@@ -165,7 +181,7 @@ const INTERNAL_CHANNELS = [
   '快爆小游戏广告',
   '49广告联盟',
 ];
-const EXTERNAL_CHANNELS = ['纯游外放', '游乐外放', '游乐IOS', '快爆游IOS', '49外放'];
+const EXTERNAL_CHANNELS = ['小米', '荣耀', '华为', '爱九游', 'vivo', 'oppo', 'B站', 'TapTap', '应用宝', 'ios'];
 
 function makeFormula(gameId: string, vendorId: string): FormulaConfig {
   const invoice = INITIAL_VENDORS.find((v) => v.id === vendorId)?.invoiceInfo ?? '';
@@ -181,7 +197,13 @@ function makeFormula(gameId: string, vendorId: string): FormulaConfig {
     externalChannelFee: 0,
     externalShare: 0.45,
     channels: [
-      ...INTERNAL_CHANNELS.map((name, i) => ({ id: `ic${i}`, name, type: 'internal' as const, enabled: i < 3, channelGameId: `${gameId}-IC${i + 1}` })),
+      ...INTERNAL_CHANNELS.map((name, i) => ({
+        id: `ic${i}`,
+        name,
+        type: 'internal' as const,
+        enabled: i < 3,
+        channelGameId: i === 0 ? `${gameId}-IC1,${gameId}-IC1-B` : `${gameId}-IC${i + 1}`,
+      })),
       ...EXTERNAL_CHANNELS.map((name, i) => ({ id: `ec${i}`, name, type: 'external' as const, enabled: i < 2, channelGameId: `${gameId}-EC${i + 1}` })),
     ],
   };
@@ -219,40 +241,40 @@ export const INITIAL_FORMULAS: FormulaConfig[] = INITIAL_GAMES.map((g) =>
 );
 
 export const INITIAL_SETTLEMENTS: SettlementRecord[] = [
-  { id: 'S001', type: 'external', incomeTime: '2026-06', gameId: '4001', channel: '纯游外放', grossRevenue: 128000, settlementAmount: 128000, settlementIncome: 57600, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-01 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1001' },
+  { id: 'S001', type: 'external', incomeTime: '2026-06', gameId: '4001', channel: '小米', grossRevenue: 128000, settlementAmount: 128000, settlementIncome: 57600, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-01 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1001' },
   { id: 'S002', type: 'internal', incomeTime: '2026-06', gameId: '4001', channel: '快爆付费', grossRevenue: 256000, settlementAmount: 243200, settlementIncome: 121600, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-07-02 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1001' },
   { id: 'S003', type: 'internal', incomeTime: '2026-06', gameId: '4003', channel: '快爆内购', grossRevenue: 89000, settlementAmount: 81559.6, settlementIncome: 40779.8, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-07-02 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1002' },
-  { id: 'S004', type: 'external', incomeTime: '2026-06', gameId: '4005', channel: '游乐IOS', grossRevenue: 450000, settlementAmount: 450000, settlementIncome: 202500, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-03 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1003' },
+  { id: 'S004', type: 'external', incomeTime: '2026-06', gameId: '4005', channel: '华为', grossRevenue: 450000, settlementAmount: 450000, settlementIncome: 202500, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-03 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1003' },
   { id: 'S005', type: 'internal', incomeTime: '2026-07', gameId: '4001', channel: '快爆付费', grossRevenue: 280000, settlementAmount: 266000, settlementIncome: 133000, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-01 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1001' },
   { id: 'S006', type: 'internal', incomeTime: '2026-07', gameId: '4007', channel: '游戏盒付费', grossRevenue: 65000, settlementAmount: 61750, settlementIncome: 30875, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-01 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1004' },
   { id: 'S007', type: 'refund', incomeTime: '2026-06', gameId: '4005', channel: '快爆内购', grossRevenue: 12000, settlementAmount: 11400, settlementIncome: 5700, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-05 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1003' },
   { id: 'S010', type: 'internal', incomeTime: '2026-06', gameId: '4002', channel: '快爆付费', grossRevenue: 168000, settlementAmount: 159600, settlementIncome: 79800, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-07-02 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1001' },
-  { id: 'S011', type: 'external', incomeTime: '2026-06', gameId: '4010', channel: '快爆游IOS', grossRevenue: 320000, settlementAmount: 320000, settlementIncome: 144000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-03 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1006' },
+  { id: 'S011', type: 'external', incomeTime: '2026-06', gameId: '4010', channel: 'ios', grossRevenue: 320000, settlementAmount: 320000, settlementIncome: 144000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-03 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1006' },
   { id: 'S012', type: 'internal', incomeTime: '2026-06', gameId: '4008', channel: '游戏盒付费', grossRevenue: 72000, settlementAmount: 68400, settlementIncome: 34200, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-07-04 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1004' },
   { id: 'S013', type: 'internal', incomeTime: '2026-06', gameId: '4009', channel: '快爆内购', grossRevenue: 54000, settlementAmount: 49485.6, settlementIncome: 24742.8, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-07-04 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1005' },
-  { id: 'S014', type: 'external', incomeTime: '2026-06', gameId: '4012', channel: '纯游外放', grossRevenue: 96000, settlementAmount: 96000, settlementIncome: 43200, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-05 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1008' },
+  { id: 'S014', type: 'external', incomeTime: '2026-06', gameId: '4012', channel: '荣耀', grossRevenue: 96000, settlementAmount: 96000, settlementIncome: 43200, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-05 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1008' },
   { id: 'S015', type: 'internal', incomeTime: '2026-07', gameId: '4002', channel: '快爆付费', grossRevenue: 192000, settlementAmount: 182400, settlementIncome: 91200, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-02 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1001' },
-  { id: 'S016', type: 'external', incomeTime: '2026-07', gameId: '4005', channel: '游乐IOS', grossRevenue: 380000, settlementAmount: 380000, settlementIncome: 171000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-02 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1003' },
+  { id: 'S016', type: 'external', incomeTime: '2026-07', gameId: '4005', channel: 'vivo', grossRevenue: 380000, settlementAmount: 380000, settlementIncome: 171000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-02 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1003' },
   { id: 'S017', type: 'internal', incomeTime: '2026-07', gameId: '4003', channel: '快爆内购', grossRevenue: 105000, settlementAmount: 96222, settlementIncome: 48111, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-08-03 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1002' },
   { id: 'S018', type: 'internal', incomeTime: '2026-07', gameId: '4009', channel: '快爆付费', grossRevenue: 48000, settlementAmount: 43987.2, settlementIncome: 21993.6, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-08-03 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1005' },
-  { id: 'S019', type: 'external', incomeTime: '2026-07', gameId: '4010', channel: '快爆游IOS', grossRevenue: 295000, settlementAmount: 295000, settlementIncome: 132750, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-04 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1006' },
+  { id: 'S019', type: 'external', incomeTime: '2026-07', gameId: '4010', channel: 'oppo', grossRevenue: 295000, settlementAmount: 295000, settlementIncome: 132750, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-04 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1006' },
   { id: 'S020', type: 'refund', incomeTime: '2026-07', gameId: '4001', channel: '快爆付费', grossRevenue: 8000, settlementAmount: 7600, settlementIncome: 3800, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-05 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1001' },
   { id: 'S021', type: 'internal', incomeTime: '2026-07', gameId: '4012', channel: '游戏盒付费', grossRevenue: 58000, settlementAmount: 55100, settlementIncome: 27550, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-05 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1008' },
-  { id: 'S009', type: 'external', incomeTime: '2026-07', gameId: '4010', channel: '快爆游IOS', grossRevenue: 88000, settlementAmount: 88000, settlementIncome: 39600, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-04 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1006' },
+  { id: 'S009', type: 'external', incomeTime: '2026-07', gameId: '4010', channel: 'B站', grossRevenue: 88000, settlementAmount: 88000, settlementIncome: 39600, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-04 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1006' },
   // 厂商收入「申请付款」验收：余额 > 0，无待付款，银行/预付齐全
   { id: 'S022', type: 'internal', incomeTime: '2026-07', gameId: '4008', channel: '游戏盒内购', grossRevenue: 1157895, settlementAmount: 1100000, settlementIncome: 550000, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1004' },
-  { id: 'S023', type: 'external', incomeTime: '2026-07', gameId: '4009', channel: '快爆游IOS', grossRevenue: 688889, settlementAmount: 688889, settlementIncome: 310000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1005' },
+  { id: 'S023', type: 'external', incomeTime: '2026-07', gameId: '4009', channel: 'TapTap', grossRevenue: 688889, settlementAmount: 688889, settlementIncome: 310000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1005' },
   { id: 'S024', type: 'internal', incomeTime: '2026-07', gameId: '4010', channel: '快爆付费', grossRevenue: 736842, settlementAmount: 700000, settlementIncome: 350000, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1006' },
-  { id: 'S025', type: 'external', incomeTime: '2026-07', gameId: '4012', channel: '纯游外放', grossRevenue: 577778, settlementAmount: 577778, settlementIncome: 260000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1008' },
+  { id: 'S025', type: 'external', incomeTime: '2026-07', gameId: '4012', channel: '应用宝', grossRevenue: 577778, settlementAmount: 577778, settlementIncome: 260000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-06 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1008' },
   // 补充覆盖：塔防英雄收入、合作终止游戏历史余额、银行不全厂商
   { id: 'S026', type: 'internal', incomeTime: '2026-07', gameId: '4004', channel: '快爆付费', grossRevenue: 142000, settlementAmount: 134900, settlementIncome: 67450, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-06 11:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1002' },
   { id: 'S027', type: 'internal', incomeTime: '2026-07', gameId: '4011', channel: '游戏盒付费', grossRevenue: 52000, settlementAmount: 49400, settlementIncome: 24700, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-06 11:30:00', paymentApplyStatus: '未申请', settled: true, vendorId: '1007' },
-  { id: 'S028', type: 'external', incomeTime: '2026-07', gameId: '4006', channel: '游乐IOS', grossRevenue: 196000, settlementAmount: 196000, settlementIncome: 88200, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-06 12:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1003' },
+  { id: 'S028', type: 'external', incomeTime: '2026-07', gameId: '4006', channel: '爱九游', grossRevenue: 196000, settlementAmount: 196000, settlementIncome: 88200, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-06 12:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '1003' },
   // 快爆业务结算样例
   { id: 'S301', type: 'internal', incomeTime: '2026-06', gameId: '5001', channel: '快爆付费', grossRevenue: 198000, settlementAmount: 188100, settlementIncome: 94050, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-07-02 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2001' },
-  { id: 'S302', type: 'external', incomeTime: '2026-06', gameId: '5001', channel: '快爆游IOS', grossRevenue: 220000, settlementAmount: 220000, settlementIncome: 99000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-03 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2001' },
+  { id: 'S302', type: 'external', incomeTime: '2026-06', gameId: '5001', channel: 'ios', grossRevenue: 220000, settlementAmount: 220000, settlementIncome: 99000, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-07-03 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2001' },
   { id: 'S303', type: 'internal', incomeTime: '2026-06', gameId: '5003', channel: '快爆内购', grossRevenue: 86000, settlementAmount: 78779.2, settlementIncome: 39389.6, formulaText: '内部：待结算金额*（1-5%-3.36%）*50%', settlementTime: '2026-07-04 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2002' },
-  { id: 'S304', type: 'external', incomeTime: '2026-07', gameId: '5002', channel: '游乐IOS', grossRevenue: 156000, settlementAmount: 156000, settlementIncome: 70200, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-02 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '2001' },
+  { id: 'S304', type: 'external', incomeTime: '2026-07', gameId: '5002', channel: '华为', grossRevenue: 156000, settlementAmount: 156000, settlementIncome: 70200, formulaText: '外部：待结算金额*（1-0%-0%）*45%', settlementTime: '2026-08-02 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '2001' },
   { id: 'S305', type: 'internal', incomeTime: '2026-07', gameId: '5004', channel: '游戏盒付费', grossRevenue: 92000, settlementAmount: 87400, settlementIncome: 43700, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-03 10:00:00', paymentApplyStatus: '未申请', settled: true, vendorId: '2003' },
   { id: 'S306', type: 'refund', incomeTime: '2026-07', gameId: '5003', channel: '快爆付费', grossRevenue: 5000, settlementAmount: 4750, settlementIncome: 2375, formulaText: '内部：待结算金额*（1-5%-0%）*50%', settlementTime: '2026-08-04 10:00:00', paymentApplyStatus: '已申请', settled: true, vendorId: '2002' },
   // 结算函退款验收：同产品连续月 / 单产品 / 多游戏
@@ -346,7 +368,7 @@ function enrichGamePayments(items: GamePaymentRequest[]): GamePaymentRequest[] {
 export const INITIAL_GAME_PAYMENTS = enrichGamePayments(RAW_GAME_PAYMENTS);
 
 export const INITIAL_GAME_BALANCES: GameBalance[] = deriveGameBalances(
-  INITIAL_SETTLEMENTS, INITIAL_GAMES, INITIAL_GAME_PAYMENTS,
+  INITIAL_SETTLEMENTS, INITIAL_GAMES, INITIAL_GAME_PAYMENTS, INITIAL_CONTRACTS,
 );
 
 export const INITIAL_GAME_LOGS: GameOperationLog[] = [

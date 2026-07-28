@@ -9,17 +9,14 @@ import { useAppStore } from '../data/store';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { getPreviousMonthKey } from '../utils/monthRange';
-import {
-  calcDeductedPrepayment,
-  calcRemainingUndeductedPrepayment,
-  sumGamePaidActualAmount,
-} from '../utils/prepayment';
+import { hasGamePrepayment } from '../utils/prepayment';
 import { formatCurrencyMoney, formatMoney, formatOptionalCurrencyMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
 import {
   getApplyGamePaymentBlock,
   getApplyGamePaymentBlockMessage,
 } from '../utils/gamePaymentApply';
-import { resolvePrepaymentCurrency, withCurrencyOnFirstSave } from '../utils/currencySnapshot';
+import { resolveContractCurrency } from '../utils/currencySnapshot';
+import { DatePicker, getTodayDateValue } from '../components/DatePicker';
 
 function formatPrepayAmountInput(value: number): string {
   return value.toFixed(2);
@@ -50,7 +47,7 @@ function validatePrepayAmount(value: string, label: string): string | undefined 
 const PAYMENT_CURRENCY_OPTIONS: ContractCurrency[] = ['人民币', '美金'];
 
 type PaymentSettingsErrors = Partial<Record<
-  'prepayment' | 'historicalDeduction' | 'sharePaymentCompany' | 'sharePaymentCurrency' | 'sharePaymentAccount',
+  'historicalDeduction' | 'sharePaymentCompany' | 'sharePaymentCurrency',
   string
 >>;
 
@@ -59,7 +56,6 @@ export function GameIncomePage() {
     businessType,
     scopedGameBalances,
     scopedGames,
-    scopedGamePayments,
     contracts,
     applyGamePayment,
     updateGame,
@@ -73,12 +69,14 @@ export function GameIncomePage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [prepayOpen, setPrepayOpen] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState('');
-  const [prepayAmount, setPrepayAmount] = useState('');
+  const [hasPrepaymentValue, setHasPrepaymentValue] = useState(false);
   const [historicalAmount, setHistoricalAmount] = useState('');
   const [sharePaymentCompany, setSharePaymentCompany] = useState('');
   const [sharePaymentCurrency, setSharePaymentCurrency] = useState<ContractCurrency | ''>('');
-  const [sharePaymentAccount, setSharePaymentAccount] = useState('');
   const [prepayErrors, setPrepayErrors] = useState<PaymentSettingsErrors>({});
+  const [exchangeRateDate, setExchangeRateDate] = useState('');
+  const [exchangeRateValue, setExchangeRateValue] = useState('');
+  const [applyErrors, setApplyErrors] = useState<{ exchangeRateDate?: string; exchangeRate?: string }>({});
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   const fmtSettlementAmount = (value: number) => formatCurrencyMoney(value, SETTLEMENT_CURRENCY);
@@ -92,16 +90,17 @@ export function GameIncomePage() {
 
   const rows = scopedGameBalances.map((b) => {
     const g = scopedGames.find((x) => x.id === b.gameId);
-    const prepaymentUnset = g?.prepayment == null || Number.isNaN(g.prepayment);
     const contract = g ? contractByGameId.get(g.id) : undefined;
-    const prepayCurrency = resolvePrepaymentCurrency(g, contract);
+    const savedPrepayment = hasGamePrepayment(g, contract) ? contract?.paidPrepayment : undefined;
+    const prepaymentUnset = savedPrepayment == null || Number.isNaN(savedPrepayment);
+    const prepayCurrency = resolveContractCurrency(contract);
     return {
       ...b,
       gameName: g ? getGameName(g.id) : b.gameId,
       vendorId: g?.vendorId ?? '',
       vendorName: g ? getVendorName(g.vendorId) : '',
       prepaymentUnset,
-      savedPrepayment: g?.prepayment,
+      savedPrepayment,
       prepayCurrency,
     };
   }).filter((r) => matchesListSearch(search, {
@@ -115,18 +114,7 @@ export function GameIncomePage() {
   const confirmAmount = selectedBalance?.balance ?? 0;
   const prepayGame = selectedGameId ? getGame(selectedGameId) : undefined;
   const prepayContract = prepayGame ? contractByGameId.get(prepayGame.id) : undefined;
-  const prepayCurrency = resolvePrepaymentCurrency(prepayGame, prepayContract);
-
-  const prepaymentUnset = isPrepaymentUnset(prepayGame?.prepayment);
-
-  const prepayPreview = useMemo(() => {
-    const prepayment = prepayGame?.prepayment ?? 0;
-    const historical = prepayGame?.historicalDeduction ?? 0;
-    const paidSum = selectedGameId ? sumGamePaidActualAmount(selectedGameId, scopedGamePayments) : 0;
-    const deducted = calcDeductedPrepayment(prepayment, paidSum, historical);
-    const remaining = calcRemainingUndeductedPrepayment(prepayment, deducted);
-    return { deducted, remaining };
-  }, [prepayGame, scopedGamePayments, selectedGameId]);
+  const prepayCurrency = resolveContractCurrency(prepayContract);
 
   const confirmContent = useMemo(() => {
     const amountText = `申请付款金额：${formatMoney(confirmAmount)}元`;
@@ -142,12 +130,12 @@ export function GameIncomePage() {
 
   const openPrepayDrawer = (gameId: string) => {
     const game = getGame(gameId);
+    const contract = contractByGameId.get(gameId);
     setSelectedGameId(gameId);
-    setPrepayAmount(formatOptionalPrepayAmountInput(game?.prepayment));
+    setHasPrepaymentValue(hasGamePrepayment(game, contract));
     setHistoricalAmount(formatOptionalPrepayAmountInput(game?.historicalDeduction));
     setSharePaymentCompany(game?.sharePaymentCompany ?? '');
     setSharePaymentCurrency(game?.sharePaymentCurrency ?? '人民币');
-    setSharePaymentAccount(game?.sharePaymentAccount ?? '');
     setPrepayErrors({});
     setPrepayOpen(true);
   };
@@ -176,30 +164,25 @@ export function GameIncomePage() {
   const savePrepay = () => {
     if (!prepayGame) return;
     const nextErrors: PaymentSettingsErrors = {};
-    const prepaymentError = validatePrepayAmount(prepayAmount, '预付分成款');
-    const historicalError = validatePrepayAmount(historicalAmount, '历史已抵扣分成款');
-    if (prepaymentError) nextErrors.prepayment = prepaymentError;
+    const historicalError = hasPrepaymentValue
+      ? validatePrepayAmount(historicalAmount, '历史已抵扣分成款')
+      : undefined;
     if (historicalError) nextErrors.historicalDeduction = historicalError;
     if (!sharePaymentCompany.trim()) nextErrors.sharePaymentCompany = '分成付款公司不能为空';
     if (!sharePaymentCurrency) nextErrors.sharePaymentCurrency = '付款币种不能为空';
-    if (!sharePaymentAccount.trim()) nextErrors.sharePaymentAccount = '付款账号不能为空';
     if (Object.keys(nextErrors).length) {
       setPrepayErrors(nextErrors);
       setToast({ message: '请完善所有信息', type: 'error' });
       return;
     }
-    const prepayment = parsePrepayAmount(prepayAmount);
-    const historicalDeduction = parsePrepayAmount(historicalAmount);
-    setPrepayAmount(formatPrepayAmountInput(prepayment));
-    setHistoricalAmount(formatPrepayAmountInput(historicalDeduction));
+    const historicalDeduction = hasPrepaymentValue ? parsePrepayAmount(historicalAmount) : undefined;
+    if (historicalDeduction != null) setHistoricalAmount(formatPrepayAmountInput(historicalDeduction));
     updateGame({
       ...prepayGame,
-      prepayment,
+      hasPrepayment: hasPrepaymentValue,
       historicalDeduction,
-      prepaymentCurrency: withCurrencyOnFirstSave(prepayGame.prepaymentCurrency, prepayContract?.currency),
       sharePaymentCompany: sharePaymentCompany as SharePaymentCompany,
       sharePaymentCurrency,
-      sharePaymentAccount: sharePaymentAccount.trim(),
     });
     setPrepayOpen(false);
     setToast({ message: '提交成功', type: 'success' });
@@ -208,17 +191,36 @@ export function GameIncomePage() {
   const handleApply = (gameId: string) => {
     const game = getGame(gameId);
     const vendor = game ? getVendor(game.vendorId) : undefined;
-    const block = getApplyGamePaymentBlock(gameId, game, vendor, scopedGamePayments);
+    const contract = contractByGameId.get(gameId);
+    const block = getApplyGamePaymentBlock(gameId, game, vendor, contract);
     if (block) {
       setToast({ message: getApplyGamePaymentBlockMessage(block), type: 'error' });
       return;
     }
     setSelectedGameId(gameId);
+    setExchangeRateDate(getTodayDateValue());
+    setExchangeRateValue('');
+    setApplyErrors({});
     setConfirmOpen(true);
   };
 
   const confirmApply = () => {
-    const ok = applyGamePayment(selectedGameId);
+    const nextErrors: { exchangeRateDate?: string; exchangeRate?: string } = {};
+    if (!exchangeRateDate) nextErrors.exchangeRateDate = '汇率取值时间不能为空';
+    const trimmedRate = exchangeRateValue.trim();
+    if (!trimmedRate) {
+      nextErrors.exchangeRate = '汇率不能为空';
+    } else if (!/^\d+\.\d{1,4}$/.test(trimmedRate) || Number(trimmedRate) <= 0) {
+      nextErrors.exchangeRate = '汇率仅允许输入正数小数，最多四位小数';
+    }
+    if (Object.keys(nextErrors).length) {
+      setApplyErrors(nextErrors);
+      setToast({ message: '请完善所有信息', type: 'error' });
+      return;
+    }
+    const exchangeRate = Number(trimmedRate);
+    setExchangeRateValue(exchangeRate.toFixed(4));
+    const ok = applyGamePayment(selectedGameId, exchangeRateDate, exchangeRate);
     setConfirmOpen(false);
     setToast({
       message: ok ? '申请付款成功，账户余额已清零' : '账户余额不足，无法申请',
@@ -293,53 +295,62 @@ export function GameIncomePage() {
             <ReadonlyField label="游戏ID / 游戏名称" value={`${prepayGame.id} / ${prepayGame.onlineName}`} />
             <FormSectionTitle>预付分成管理</FormSectionTitle>
             <div className="agf-form-item">
-              <label className="agf-form-label agf-form-label--required">预付分成款</label>
-              <div className="agf-form-field">
-                <CurrencyInput
-                  currency={prepayCurrency}
-                  value={prepayAmount}
-                  onChange={(v) => {
-                    setPrepayAmount(v);
-                    clearPrepayError('prepayment');
-                  }}
-                  onBlur={() => normalizePrepayAmount(prepayAmount, setPrepayAmount, 'prepayment', '预付分成款')}
-                />
-                <FieldError message={prepayErrors.prepayment} />
+              <label className="agf-form-label agf-form-label--required">有无预付分成款</label>
+              <div className="agf-radio-group">
+                <label className="agf-radio-item">
+                  <input
+                    type="radio"
+                    name="hasPrepayment"
+                    checked={hasPrepaymentValue}
+                    onChange={() => setHasPrepaymentValue(true)}
+                  />
+                  有
+                </label>
+                <label className="agf-radio-item">
+                  <input
+                    type="radio"
+                    name="hasPrepayment"
+                    checked={!hasPrepaymentValue}
+                    onChange={() => {
+                      setHasPrepaymentValue(false);
+                      clearPrepayError('historicalDeduction');
+                    }}
+                  />
+                  无
+                </label>
               </div>
             </div>
-            <div className="agf-form-item">
-              <label className="agf-form-label agf-form-label--required">历史已抵扣分成款</label>
-              <div className="agf-form-field">
-                <CurrencyInput
+            {hasPrepaymentValue && (
+              <>
+                <ReadonlyCurrencyField
+                  label="预付分成款"
+                  amount={prepayContract?.paidPrepayment}
                   currency={prepayCurrency}
-                  value={historicalAmount}
-                  onChange={(v) => {
-                    setHistoricalAmount(v);
-                    clearPrepayError('historicalDeduction');
-                  }}
-                  onBlur={() => normalizePrepayAmount(
-                    historicalAmount,
-                    setHistoricalAmount,
-                    'historicalDeduction',
-                    '历史已抵扣分成款',
-                  )}
+                  unset={isPrepaymentUnset(prepayContract?.paidPrepayment)}
                 />
-                <FieldHint>请填写线下已抵扣处理的预付分成款，若无则填写0</FieldHint>
-                <FieldError message={prepayErrors.historicalDeduction} />
-              </div>
-            </div>
-            <ReadonlyCurrencyField
-              label="已抵扣分成款"
-              amount={prepayPreview.deducted}
-              currency={prepayCurrency}
-              unset={prepaymentUnset}
-            />
-            <ReadonlyCurrencyField
-              label="剩余未抵扣分成款"
-              amount={prepayPreview.remaining}
-              currency={prepayCurrency}
-              unset={prepaymentUnset}
-            />
+                <div className="agf-form-item">
+                  <label className="agf-form-label agf-form-label--required">历史已抵扣分成款</label>
+                  <div className="agf-form-field">
+                    <CurrencyInput
+                      currency={prepayCurrency}
+                      value={historicalAmount}
+                      onChange={(v) => {
+                        setHistoricalAmount(v);
+                        clearPrepayError('historicalDeduction');
+                      }}
+                      onBlur={() => normalizePrepayAmount(
+                        historicalAmount,
+                        setHistoricalAmount,
+                        'historicalDeduction',
+                        '历史已抵扣分成款',
+                      )}
+                    />
+                    <FieldHint>请填写线下已抵扣处理的预付分成款，若无则填写0</FieldHint>
+                    <FieldError message={prepayErrors.historicalDeduction} />
+                  </div>
+                </div>
+              </>
+            )}
             <FormSectionTitle>付费设置</FormSectionTitle>
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">分成付款公司</label>
@@ -380,20 +391,6 @@ export function GameIncomePage() {
               </div>
               <FieldError message={prepayErrors.sharePaymentCurrency} />
             </div>
-            <div className="agf-form-item">
-              <label className="agf-form-label agf-form-label--required">付款账号</label>
-              <div className="agf-form-field">
-                <input
-                  className="agf-form-input"
-                  value={sharePaymentAccount}
-                  onChange={(e) => {
-                    setSharePaymentAccount(e.target.value);
-                    clearPrepayError('sharePaymentAccount');
-                  }}
-                />
-                <FieldError message={prepayErrors.sharePaymentAccount} />
-              </div>
-            </div>
           </>
         )}
         </div>
@@ -404,6 +401,7 @@ export function GameIncomePage() {
         onClose={() => setConfirmOpen(false)}
         plain
         compact
+        overflowVisible
         footer={(
           <>
             <button type="button" className="agf-btn agf-btn--default" onClick={() => setConfirmOpen(false)}>取消</button>
@@ -414,6 +412,45 @@ export function GameIncomePage() {
         <div className="agf-confirm-text" data-annotation-id="game-income-apply-modal">
           {confirmContent.warning && <p>{confirmContent.warning}</p>}
           <p>{confirmContent.amount}</p>
+          <div className="agf-apply-form">
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">汇率取值时间：</label>
+              <div className="agf-form-field">
+                <DatePicker
+                  value={exchangeRateDate}
+                  onChange={(value) => {
+                    setExchangeRateDate(value);
+                    setApplyErrors((prev) => ({ ...prev, exchangeRateDate: undefined }));
+                  }}
+                />
+                <FieldError message={applyErrors.exchangeRateDate} />
+              </div>
+            </div>
+            <div className="agf-form-item">
+              <label className="agf-form-label agf-form-label--required">汇率：</label>
+              <div className="agf-form-field">
+                <input
+                  inputMode="decimal"
+                  className="agf-form-input"
+                  placeholder="请输入小数，最多四位小数"
+                  value={exchangeRateValue}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (next === '' || /^\d*(\.\d{0,4})?$/.test(next)) {
+                      setExchangeRateValue(next);
+                      setApplyErrors((prev) => ({ ...prev, exchangeRate: undefined }));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (/^\d+\.\d{1,4}$/.test(exchangeRateValue) && Number(exchangeRateValue) > 0) {
+                      setExchangeRateValue(Number(exchangeRateValue).toFixed(4));
+                    }
+                  }}
+                />
+                <FieldError message={applyErrors.exchangeRate} />
+              </div>
+            </div>
+          </div>
         </div>
       </Modal>
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

@@ -12,6 +12,18 @@ export interface FinanceCenterRow {
 
 const PULL_DELAY_MS = 800;
 
+export const INTERNAL_CHANNEL_CATEGORIES = ['游戏盒', '快爆'];
+
+export function getInternalChannelCategory(channel: string): string {
+  if (channel === '游戏盒' || channel.startsWith('游戏盒') || channel === '49广告联盟') {
+    return '游戏盒';
+  }
+  if (channel === '快爆' || channel.startsWith('快爆')) {
+    return '快爆';
+  }
+  return channel;
+}
+
 export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -51,12 +63,15 @@ export function fetchFinanceCenterRows(
     if (!formula) continue;
     for (const ch of formula.channels) {
       if (ch.type !== 'internal' || !ch.enabled || !ch.channelGameId) continue;
-      rows.push({
-        channel: ch.name,
-        channelGameId: ch.channelGameId,
-        gameId: game.id,
-        amount: mockAmount(game.id, ch.channelGameId, type),
-      });
+      const channelGameIds = ch.channelGameId.split(',').map((id) => id.trim()).filter(Boolean);
+      for (const channelGameId of channelGameIds) {
+        rows.push({
+          channel: getInternalChannelCategory(ch.name),
+          channelGameId,
+          gameId: game.id,
+          amount: mockAmount(game.id, channelGameId, type),
+        });
+      }
     }
   }
   return rows;

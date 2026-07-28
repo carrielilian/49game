@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { Drawer } from './Modal';
+import { Drawer, Toast, type ToastType } from './Modal';
 import { useAppStore } from '../data/store';
 import { displaySettlementFormula, formatMoney, currencySymbol } from '../utils/settlement';
 import { buildLetterIncomeRows, buildLetterRefundRows, calcGameLetterPrepaymentDeduction, resolveLetterShowExchangeRate } from '../utils/settlementLetter';
@@ -10,6 +10,7 @@ import { resolveGameMarkPaymentDefaults, resolveLetterPayAmount } from '../utils
 import { resolveMarkPaymentContractCurrency } from '../utils/currencySnapshot';
 import { downloadMockPdf } from '../utils/mockPdf';
 import type { ContractCurrency, SettlementLetterSnapshot } from '../data/types';
+import { resolveSettlementPayerProfile } from '../utils/settlementPayerProfile';
 
 interface SettlementLetterDrawerProps {
   open: boolean;
@@ -26,23 +27,15 @@ interface SettlementLetterDrawerProps {
   paymentId?: string;
   /** 申请付款快照中的 remaining；汇率行显示条件用 */
   applyRemainingPrepayment?: number;
+  /** 申请付款时冻结的分成付款公司 */
+  paymentCompany?: string;
+  /** 申请付款时冻结的游戏中文名称 */
+  gameName?: string;
+  /** 申请付款时冻结的游戏英文名称 */
+  gameEnglishName?: string;
   /** 批注锚点 id */
   contentAnnotationId?: string;
 }
-
-const PLATFORM_NAME = '四三九九网络股份有限公司';
-const PLATFORM_INVOICE = {
-  item: '信息技术服务*信息服务费',
-  company: PLATFORM_NAME,
-  taxId: '9135020073786628XK',
-  addressPhone: '厦门市厦门火炬高新区软件园二期望海路2号楼202室 0592-3304399',
-  bankAccount: '中国建设银行股份有限公司厦门市分行营业部 35101535001059664399',
-};
-const PLATFORM_CONTACT = {
-  recipient: '朱建婷（开放平台）',
-  phone: '0592-3304399',
-  address: '厦门市思明区软件园二期望海路2号楼',
-};
 
 interface IncomeRow {
   id: string;
@@ -77,64 +70,6 @@ function formatLetterPayAmount(currency: ContractCurrency, value: number): strin
   return formatCurrency(value);
 }
 
-function amountToChineseUpper(amount: number): string {
-  const digits = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
-  const intUnits = ['', '拾', '佰', '仟'];
-  const sectionUnits = ['', '万', '亿'];
-
-  const convertSection = (num: number): string => {
-    if (num === 0) return '';
-    let result = '';
-    let zero = false;
-    for (let i = 0; num > 0; i += 1) {
-      const n = num % 10;
-      if (n === 0) {
-        zero = true;
-      } else {
-        if (zero) result = digits[0] + result;
-        result = digits[n] + intUnits[i] + result;
-        zero = false;
-      }
-      num = Math.floor(num / 10);
-    }
-    return result;
-  };
-
-  const convertInteger = (num: number): string => {
-    if (num === 0) return digits[0];
-    let result = '';
-    let sectionIndex = 0;
-    while (num > 0) {
-      const section = num % 10000;
-      if (section !== 0) {
-        const sectionText = convertSection(section);
-        result = sectionText + sectionUnits[sectionIndex] + result;
-      } else if (result && !result.startsWith(digits[0])) {
-        result = digits[0] + result;
-      }
-      num = Math.floor(num / 10000);
-      sectionIndex += 1;
-    }
-    return result.replace(/零+/g, '零').replace(/零$/g, '');
-  };
-
-  const fixed = Math.round(amount * 100);
-  const integerPart = Math.floor(fixed / 100);
-  const decimalPart = fixed % 100;
-  const jiao = Math.floor(decimalPart / 10);
-  const fen = decimalPart % 10;
-
-  let result = `${convertInteger(integerPart)}元`;
-  if (jiao === 0 && fen === 0) {
-    result += '整';
-  } else {
-    if (jiao > 0) result += `${digits[jiao]}角`;
-    if (fen > 0) result += `${digits[fen]}分`;
-    else if (jiao > 0) result += '整';
-  }
-  return result;
-}
-
 type LetterLang = 'zh' | 'en';
 
 function formatExchangeRateDisplay(value: number): string {
@@ -145,11 +80,12 @@ function buildLetterPdfLines(
   lang: LetterLang,
   vendorName: string,
   platformName: string,
+  gameName: string,
+  gameEnglishName: string,
   incomeTotal: number,
   refundTotal: number,
   netTotal: number,
   payAmount: number,
-  payAmountUpper: string,
   showPrepayment: boolean,
   prepaidDeduction: number,
   exchangeRate: number,
@@ -160,10 +96,12 @@ function buildLetterPdfLines(
 ): string[] {
   const fmtDeduction = (v: number) => formatLetterPayAmount(contractPaymentCurrency, v);
   if (lang === 'en') {
+    const englishLetterGameName = gameEnglishName.trim() || gameName;
     return [
       'Settlement Confirmation Letter (Mock)',
       `Vendor: ${vendorName}`,
       `Platform: ${platformName}`,
+      `Game: ${englishLetterGameName}`,
       `Total Income (2): ${formatMoney(incomeTotal)}`,
       `Total Refund (4): ${formatMoney(refundTotal)}`,
       `Subtotal (2)-(4): ${formatMoney(netTotal)}`,
@@ -173,7 +111,6 @@ function buildLetterPdfLines(
         `Remaining Prepaid: ${fmtDeduction(remainingUndeducted)}`,
       ] : []),
       `Actual Pay Amount: ${formatLetterPayAmount(sharePaymentCurrency, payAmount)}`,
-      `Amount in words: ${payAmountUpper}`,
     ];
   }
   return [
@@ -189,7 +126,6 @@ function buildLetterPdfLines(
       `剩余未抵扣预付分成款：${fmtDeduction(remainingUndeducted)}`,
     ] : []),
     `实际付款金额：${formatLetterPayAmount(sharePaymentCurrency, payAmount)}`,
-    `支付金额（大写）：${payAmountUpper}`,
   ];
 }
 
@@ -204,14 +140,16 @@ function downloadLetterPdf(
 }
 
 export function SettlementLetterDrawer({
-  open, onClose, vendorId, amount, settlementIds, gameId, applyTime, letterSnapshot, paymentId, applyRemainingPrepayment, contentAnnotationId,
+  open, onClose, vendorId, amount, settlementIds, gameId, applyTime, letterSnapshot, paymentId, applyRemainingPrepayment, paymentCompany, gameName, gameEnglishName, contentAnnotationId,
 }: SettlementLetterDrawerProps) {
   const { getVendor, getGame, getGameName, games, settlements, gamePayments, exchangeRates, contracts } = useAppStore();
   const vendor = getVendor(vendorId);
   const game = getGame(gameId);
   const contract = contracts.find((c) => c.gameId === gameId);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const downloadRef = useRef<HTMLDivElement>(null);
+  const payerProfile = resolveSettlementPayerProfile(paymentCompany);
 
   useEffect(() => {
     if (!downloadOpen) return;
@@ -275,7 +213,7 @@ export function SettlementLetterDrawer({
     () => (paymentId ? gamePayments.filter((p) => p.id !== paymentId) : gamePayments),
     [gamePayments, paymentId],
   );
-  const prepaymentSummary = calcGamePrepaymentSummary(game, gameId, scopedGamePayments);
+  const prepaymentSummary = calcGamePrepaymentSummary(game, contract, gameId, scopedGamePayments);
   const remainingPrepaymentForExchange = applyRemainingPrepayment ?? prepaymentSummary.remainingPrepayment;
   const showExchangeRate = letterSnapshot?.showExchangeRate ?? resolveLetterShowExchangeRate(
     liveSharePaymentCurrency,
@@ -293,6 +231,7 @@ export function SettlementLetterDrawer({
     ?? (vendorRemainingPrepayment > 0);
   const liveDeduction = calcGameLetterPrepaymentDeduction(
     game,
+    contract,
     gameId,
     gamePayments,
     incomeTotal,
@@ -326,18 +265,20 @@ export function SettlementLetterDrawer({
     vendor,
   ]);
 
-  const payAmountUpper = amountToChineseUpper(letterPayAmount);
   const vendorName = vendor?.name ?? vendorId;
+  const frozenGameName = gameName ?? game?.onlineName ?? gameId;
+  const frozenGameEnglishName = gameEnglishName ?? game?.englishName ?? '';
 
   const downloadLines = (lang: LetterLang) => buildLetterPdfLines(
     lang,
     vendorName,
-    PLATFORM_NAME,
+    payerProfile.legalName,
+    frozenGameName,
+    frozenGameEnglishName,
     incomeTotal,
     refundTotal,
     netTotal,
     letterPayAmount,
-    payAmountUpper,
     showPrepaymentDeductionRows,
     prepaidDeduction,
     exchangeRate,
@@ -354,7 +295,7 @@ export function SettlementLetterDrawer({
           <h2 className="agf-settlement-letter__title">
             <span className="agf-settlement-letter__title-name">{vendor?.name ?? vendorId}</span>
             {' 与 '}
-            <span className="agf-settlement-letter__title-name">{PLATFORM_NAME}</span>
+            <span className="agf-settlement-letter__title-name">{payerProfile.legalName}</span>
             {' 合作分成结算确认函'}
           </h2>
           <div className="agf-settlement-letter__download-wrap" ref={downloadRef}>
@@ -382,6 +323,14 @@ export function SettlementLetterDrawer({
                   type="button"
                   className="agf-settlement-letter__download-item"
                   onClick={() => {
+                    if (!payerProfile.supportsEnglishDownload) {
+                      setDownloadOpen(false);
+                      setToast({
+                        message: `${payerProfile.key}的分成付款公司不支持英文版结算函下载`,
+                        type: 'error',
+                      });
+                      return;
+                    }
                     downloadLetterPdf(vendorName, vendorId, 'en', downloadLines('en'));
                     setDownloadOpen(false);
                   }}
@@ -481,17 +430,13 @@ export function SettlementLetterDrawer({
               <td className="agf-settlement-letter__subtotal-amount">{formatLetterPayAmount(sharePaymentCurrency, letterPayAmount)}</td>
             </tr>
             <tr>
-              <th className="agf-settlement-letter__label-cell">支付金额（大写）</th>
-              <td colSpan={4} className="agf-settlement-letter__content-cell">{payAmountUpper}</td>
-            </tr>
-            <tr>
               <th className="agf-settlement-letter__label-cell">付款方开票信息</th>
               <td colSpan={4} className="agf-settlement-letter__content-cell">
-                <p>发票项目：{PLATFORM_INVOICE.item}</p>
-                <p>公司名称：{PLATFORM_INVOICE.company}</p>
-                <p>公司税号：{PLATFORM_INVOICE.taxId}</p>
-                <p>注册地址及电话：{PLATFORM_INVOICE.addressPhone}</p>
-                <p>开户行及账号：{PLATFORM_INVOICE.bankAccount}</p>
+                {payerProfile.invoice.item && <p>开票项目：{payerProfile.invoice.item}</p>}
+                <p>公司名称：{payerProfile.legalName}</p>
+                <p>公司税号：{payerProfile.invoice.taxId}</p>
+                <p>注册地址及电话：{payerProfile.invoice.addressPhone}</p>
+                <p>开户行及账号：{payerProfile.invoice.bankAccount}</p>
               </td>
             </tr>
             <tr>
@@ -504,20 +449,21 @@ export function SettlementLetterDrawer({
         <div className="agf-settlement-letter__signatures">
           <div className="agf-settlement-letter__sign-block">
             <p><span className="agf-settlement-letter__sign-label">收款方</span>{vendor?.name ?? vendorId}</p>
-            <p><span className="agf-settlement-letter__sign-label">开发者账号</span>{vendor?.email?.split('@')[0] ?? vendorId}</p>
-            <p><span className="agf-settlement-letter__sign-label">开户银行</span>{vendor?.bank}{vendor?.branch}</p>
+            <p><span className="agf-settlement-letter__sign-label">开户行名称</span>{vendor ? `${vendor.bank}${vendor.branch}` : '-'}</p>
             <p><span className="agf-settlement-letter__sign-label">银行账号</span>{vendor?.cardNumber?.replace(/\s+/g, '') ?? '-'}</p>
+            <p><span className="agf-settlement-letter__sign-label">银行代码</span>{vendor?.bankCode ?? ''}</p>
             <p className="agf-settlement-letter__stamp"><span className="agf-settlement-letter__sign-label">盖章</span></p>
           </div>
           <div className="agf-settlement-letter__sign-block">
-            <p><span className="agf-settlement-letter__sign-label">付款方</span>{PLATFORM_NAME}</p>
-            <p><span className="agf-settlement-letter__sign-label">收件人</span>{PLATFORM_CONTACT.recipient}</p>
-            <p><span className="agf-settlement-letter__sign-label">联系电话</span>{PLATFORM_CONTACT.phone}</p>
-            <p><span className="agf-settlement-letter__sign-label">通信地址</span>{PLATFORM_CONTACT.address}</p>
+            <p><span className="agf-settlement-letter__sign-label">付款方</span>{payerProfile.legalName}</p>
+            <p><span className="agf-settlement-letter__sign-label">收件人</span>{payerProfile.contact.recipient}</p>
+            <p><span className="agf-settlement-letter__sign-label">联系电话</span>{payerProfile.contact.phone}</p>
+            <p><span className="agf-settlement-letter__sign-label">{payerProfile.contact.addressLabel}</span>{payerProfile.contact.address}</p>
             <p className="agf-settlement-letter__stamp"><span className="agf-settlement-letter__sign-label">盖章</span></p>
           </div>
         </div>
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </Drawer>
   );
 }

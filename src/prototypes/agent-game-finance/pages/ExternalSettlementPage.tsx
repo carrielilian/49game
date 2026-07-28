@@ -7,7 +7,7 @@ import { MonthRangePicker } from '../components/MonthRangePicker';
 import { Modal, Toast, type ToastType } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
-import { EXTERNAL_CHANNELS } from '../data/mock-data';
+import { EXTERNAL_CHANNELS, isFormulaConfigured } from '../data/mock-data';
 import type { ImportPreviewRow } from '../data/types';
 import {
   PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
@@ -18,35 +18,54 @@ import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../u
 import { getRecentTwoMonthsRange, isMonthInRange } from '../utils/monthRange';
 import {
   buildMockImportRows,
-  calculateImportRow,
   enrichImportRowsOnParse,
+  findDuplicateImportGameIds,
 } from '../utils/externalImport';
-import { displaySettlementFormula, formatCurrencyMoney, formatSettlementIncome, formatSettlementTime, SETTLEMENT_CURRENCY } from '../utils/settlement';
+import {
+  displaySettlementFormula,
+  formatCurrencyMoney,
+  formatSettlementIncome,
+  formatSettlementTime,
+  isUnsettledSettlement,
+  SETTLEMENT_CURRENCY,
+} from '../utils/settlement';
 
 const EMPTY_IMPORT: ImportPreviewRow[] = [];
 
 const IMPORT_PREVIEW_COLUMNS: Column<ImportPreviewRow>[] = [
-  { key: 'incomeTime', title: '收入时间', render: (r) => r.incomeTime },
-  {
-    key: 'game',
-    title: '游戏ID / 游戏名称',
-    render: (r) => (r.gameId ? <DualCell main={r.gameName} sub={r.gameId} /> : r.gameName || '-'),
-  },
-  { key: 'vendorName', title: '厂商名称', render: (r) => r.vendorName || '-' },
-  { ...COL_ALIGN_RIGHT, key: 'pendingAmount', title: '待结算金额', render: (r) => formatCurrencyMoney(r.pendingAmount, SETTLEMENT_CURRENCY) },
-  { key: 'formulaText', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
+  { key: 'incomeTime', title: '收入时间', render: (row) => row.incomeTime },
+  { key: 'channel', title: '渠道', render: (row) => row.channel },
+  { key: 'gameId', title: '游戏ID', render: (row) => row.gameId },
+  { key: 'gameName', title: '游戏名称', render: (row) => row.gameName },
+  { key: 'vendorName', title: '厂商名称', render: (row) => row.vendorName },
   {
     ...COL_ALIGN_RIGHT,
-    key: 'settlementIncome',
-    title: '结算收入',
-    render: (r) => (
+    key: 'pendingAmount',
+    title: '待结算金额',
+    render: (row) => (
       <>
-        {r.settlementIncome != null ? formatCurrencyMoney(r.settlementIncome, SETTLEMENT_CURRENCY) : '-'}
-        {r.error && <div className="agf-form-error">{r.error}</div>}
+        {formatCurrencyMoney(row.pendingAmount, SETTLEMENT_CURRENCY)}
+        {row.error && <div className="agf-form-error">{row.error}</div>}
       </>
     ),
   },
 ];
+
+function buildImportTotalRow(rows: ImportPreviewRow[]): React.ReactNode {
+  const total = rows.reduce((sum, row) => sum + row.pendingAmount, 0);
+  return (
+    <tr className="agf-table__summary-row">
+      <td>总计</td>
+      <td />
+      <td />
+      <td />
+      <td />
+      <td className="agf-table__cell--right">
+        {formatCurrencyMoney(total, SETTLEMENT_CURRENCY)}
+      </td>
+    </tr>
+  );
+}
 
 export function ExternalSettlementPage() {
   const {
@@ -57,11 +76,11 @@ export function ExternalSettlementPage() {
     getGameName,
     getVendorName,
     importExternal,
-    setExternalSettlementButtons,
+    settleRecords,
   } = useAppStore();
-  const scopedGameIds = useMemo(() => new Set(scopedGames.map((g) => g.id)), [scopedGames]);
+  const scopedGameIds = useMemo(() => new Set(scopedGames.map((game) => game.id)), [scopedGames]);
   const scopedFormulas = useMemo(
-    () => formulas.filter((f) => scopedGameIds.has(f.gameId)),
+    () => formulas.filter((formula) => scopedGameIds.has(formula.gameId)),
     [formulas, scopedGameIds],
   );
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
@@ -69,185 +88,175 @@ export function ExternalSettlementPage() {
   const [channelFilter, setChannelFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
-  const [selectedChannel, setSelectedChannel] = useState('');
   const [preview, setPreview] = useState<ImportPreviewRow[]>(EMPTY_IMPORT);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const importUploaded = preview.length > 0;
-  const importSettlementReady =
-    importUploaded && preview.every((r) => r.settlementIncome != null && !r.error);
-  const canConfirmImport =
-    importUploaded && preview.every((r) => r.gameId && r.formulaText && r.formulaText !== '-' && r.settlementIncome != null && !r.error);
+  const canConfirmImport = importUploaded && preview.every((row) => !row.error);
 
-  const data = scopedSettlements.filter((s) => {
-    if (s.type !== 'external') return false;
-    if (!isMonthInRange(s.incomeTime, monthRange)) return false;
+  const data = scopedSettlements.filter((record) => {
+    if (record.type !== 'external') return false;
+    if (!isMonthInRange(record.incomeTime, monthRange)) return false;
     if (!matchesListSearch(search, {
-      gameId: s.gameId,
-      gameName: getGameName(s.gameId),
-      vendorId: s.vendorId,
-      vendorName: getVendorName(s.vendorId),
+      gameId: record.gameId,
+      gameName: getGameName(record.gameId),
+      vendorId: record.vendorId,
+      vendorName: getVendorName(record.vendorId),
     })) return false;
-    if (channelFilter && s.channel !== channelFilter) return false;
-    if (paymentStatusFilter && s.paymentApplyStatus !== paymentStatusFilter) return false;
+    if (channelFilter && record.channel !== channelFilter) return false;
+    if (paymentStatusFilter && record.paymentApplyStatus !== paymentStatusFilter) return false;
     return true;
   });
 
-  const resetImportState = () => {
-    setSelectedChannel('');
-    setPreview(EMPTY_IMPORT);
-  };
-
-  const openImport = () => {
-    resetImportState();
-    setImportOpen(true);
-  };
+  const unsettled = data.filter((record) => isUnsettledSettlement(record));
 
   const closeImport = () => {
     setImportOpen(false);
-    resetImportState();
-  };
-
-  const selectChannel = (name: string) => {
-    setSelectedChannel(name);
     setPreview(EMPTY_IMPORT);
   };
 
   const showToast = (message: string, type: ToastType) => setToast({ message, type });
-  const showErrorToast = (message: string) => showToast(message, 'error');
-
-  const handleUploadClick = () => {
-    if (!selectedChannel) {
-      showErrorToast('请先选择外部渠道类型');
-      return;
-    }
-    fileRef.current?.click();
-  };
 
   const handleFileChange = () => {
-    if (!selectedChannel) return;
-    const raw = buildMockImportRows(selectedChannel, scopedFormulas, scopedGames, scopedVendors);
-    const rows = enrichImportRowsOnParse(raw, scopedFormulas, scopedGames, scopedVendors);
-    setPreview(rows);
+    const raw = buildMockImportRows(scopedFormulas, scopedGames, scopedVendors);
+    const rows = enrichImportRowsOnParse(raw, scopedGames, scopedVendors);
+    const duplicateIds = findDuplicateImportGameIds(rows, scopedSettlements);
     if (fileRef.current) fileRef.current.value = '';
-  };
-
-  const runSettlement = () => {
-    if (preview.length === 0) {
-      showErrorToast('请先上传渠道报表');
+    if (duplicateIds.length > 0) {
+      setPreview(EMPTY_IMPORT);
+      showToast(`${duplicateIds.join('、')}数据重复上传`, 'error');
       return;
     }
-    const next = preview.map((row) => calculateImportRow(row, scopedFormulas, scopedGames, scopedVendors));
-    setPreview(next);
-    const hasError = next.some((r) => r.error || !r.calculated);
-    if (hasError) {
-      showErrorToast('部分数据无法结算，请检查标红提示');
+    setPreview(rows);
+    if (rows.some((row) => row.error)) {
+      showToast('部分数据无法导入，请检查列表提示', 'error');
       return;
     }
-    setExternalSettlementButtons({ settleCompleted: true });
-    showToast('结算成功', 'success');
+    showToast('上传成功', 'success');
   };
 
   const confirmImport = () => {
-    if (preview.length === 0) {
-      showErrorToast('请先上传渠道报表');
-      return;
-    }
-    if (!canConfirmImport) {
-      const hasUnsettled = preview.some((r) => r.settlementIncome == null && !r.error);
-      showErrorToast(hasUnsettled ? '请先完成弹窗内结算，再确认导入' : '存在无法导入的数据，请修正后重试');
-      return;
-    }
+    if (!canConfirmImport) return;
     importExternal(preview);
     closeImport();
     showToast('导入成功，已加入外部收入结算列表', 'success');
+  };
+
+  const handleSettlement = () => {
+    if (unsettled.length === 0) {
+      showToast('没有待结算数据', 'error');
+      return;
+    }
+    const missingGameIds = [...new Set(unsettled.map((record) => record.gameId))]
+      .filter((gameId) => {
+        const formula = scopedFormulas.find((item) => item.gameId === gameId);
+        return !isFormulaConfigured(formula);
+      });
+    if (missingGameIds.length > 0) {
+      const names = missingGameIds.map((gameId) => getGameName(gameId)).join('、');
+      showToast(`${names}未设置结算公式`, 'error');
+      return;
+    }
+    settleRecords(unsettled.map((record) => record.id));
+    showToast('结算成功', 'success');
   };
 
   return (
     <div className="agf-card">
       <div data-annotation-id="external-settlement-query">
         <FilterBar
-          actions={
-            <button type="button" className="agf-btn agf-btn--primary" data-annotation-id="external-settlement-import" onClick={openImport}>
-              <Upload size={16} />
-              导入并结算
-            </button>
-          }
+          actions={(
+            <>
+              <button
+                type="button"
+                className="agf-btn agf-btn--primary"
+                data-annotation-id="external-settlement-import"
+                onClick={() => {
+                  setPreview(EMPTY_IMPORT);
+                  setImportOpen(true);
+                }}
+              >
+                <Upload size={16} />
+                数据导入
+              </button>
+              <button
+                type="button"
+                className="agf-btn agf-btn--primary"
+                data-annotation-id="external-settlement-settle"
+                onClick={handleSettlement}
+                disabled={unsettled.length === 0}
+              >
+                结算
+              </button>
+            </>
+          )}
         >
           <MonthRangePicker value={monthRange} onChange={setMonthRange} />
           <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
         </FilterBar>
       </div>
       <div data-annotation-id="external-settlement-table">
-      <DataTable
-        rowKey={(r) => r.id}
-        data={data}
-        columns={[
-          { key: 'time', title: '收入时间', render: (r) => r.incomeTime },
-          { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={getGameName(r.gameId)} sub={r.gameId} /> },
-          { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
-          { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
-          {
-            key: 'channel',
-            title: '渠道',
-            header: (
-              <span data-annotation-id="external-settlement-channel-col">
-                <ColumnFilter
-                  title="渠道"
-                  filter={{
-                    type: 'select',
-                    value: channelFilter,
-                    onChange: setChannelFilter,
-                    options: selectOptions(EXTERNAL_CHANNELS),
-                  }}
-                />
-              </span>
-            ),
-            render: (r) => r.channel,
-          },
-          { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
-          { ...COL_ALIGN_RIGHT, key: 'settleInc', title: '结算收入', render: (r) => formatSettlementIncome(r) },
-          { key: 'formula', title: '结算公式', render: (r) => displaySettlementFormula(r.formulaText) },
-          { key: 'settleTime', title: '结算时间', render: (r) => formatSettlementTime(r) },
-          {
-            key: 'status',
-            title: '申请付款状态',
-            header: (
-              <span data-annotation-id="external-settlement-payment-col">
-                <ColumnFilter
-                  title="申请付款状态"
-                  filter={{
-                    type: 'select',
-                    value: paymentStatusFilter,
-                    onChange: setPaymentStatusFilter,
-                    options: PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
-                  }}
-                />
-              </span>
-            ),
-            render: (r) => <StatusBadge text={r.paymentApplyStatus} />,
-          },
-        ]}
-      />
+        <DataTable
+          rowKey={(record) => record.id}
+          data={data}
+          columns={[
+            { key: 'time', title: '收入时间', render: (record) => record.incomeTime },
+            { key: 'game', title: '游戏ID / 游戏名称', render: (record) => <DualCell main={getGameName(record.gameId)} sub={record.gameId} /> },
+            { key: 'vendorId', title: '厂商ID', render: (record) => record.vendorId },
+            { key: 'vendorName', title: '厂商名称', render: (record) => getVendorName(record.vendorId) },
+            {
+              key: 'channel',
+              title: '渠道',
+              header: (
+                <span data-annotation-id="external-settlement-channel-col">
+                  <ColumnFilter
+                    title="渠道"
+                    filter={{
+                      type: 'select',
+                      value: channelFilter,
+                      onChange: setChannelFilter,
+                      options: selectOptions(EXTERNAL_CHANNELS),
+                    }}
+                  />
+                </span>
+              ),
+              render: (record) => record.channel,
+            },
+            { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (record) => formatCurrencyMoney(record.settlementAmount, SETTLEMENT_CURRENCY) },
+            { ...COL_ALIGN_RIGHT, key: 'settleInc', title: '结算收入', render: (record) => formatSettlementIncome(record) },
+            { key: 'formula', title: '结算公式', render: (record) => displaySettlementFormula(record.formulaText) },
+            { key: 'settleTime', title: '结算时间', render: (record) => formatSettlementTime(record) },
+            {
+              key: 'status',
+              title: '申请付款状态',
+              header: (
+                <span data-annotation-id="external-settlement-payment-col">
+                  <ColumnFilter
+                    title="申请付款状态"
+                    filter={{
+                      type: 'select',
+                      value: paymentStatusFilter,
+                      onChange: setPaymentStatusFilter,
+                      options: PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
+                    }}
+                  />
+                </span>
+              ),
+              render: (record) => <StatusBadge text={record.paymentApplyStatus} />,
+            },
+          ]}
+        />
       </div>
       <Modal
-        title="导入并结算"
+        title="数据导入"
         open={importOpen}
         onClose={closeImport}
         xl
         plain
-        footer={
+        footer={(
           <>
             <button type="button" className="agf-btn agf-btn--default" onClick={closeImport}>
               取消
-            </button>
-            <button
-              type="button"
-              className="agf-btn agf-btn--primary"
-              onClick={runSettlement}
-              disabled={!importUploaded || importSettlementReady}
-            >
-              结算
             </button>
             <button
               type="button"
@@ -258,32 +267,13 @@ export function ExternalSettlementPage() {
               确认导入
             </button>
           </>
-        }
+        )}
       >
         <div data-annotation-id="external-settlement-import-modal">
-        {!importUploaded ? (
-          <>
-            <div className="agf-import-section">
-              <div className="agf-import-section__title">外部渠道类型</div>
-              <FieldHint>请选择要导入的外部渠道，选择后上传对应渠道报表</FieldHint>
-              <div className="agf-radio-group agf-import-channels">
-                {EXTERNAL_CHANNELS.map((name) => (
-                  <label key={name} className="agf-radio-item">
-                    <input
-                      type="radio"
-                      name="external-channel"
-                      checked={selectedChannel === name}
-                      onChange={() => selectChannel(name)}
-                    />
-                    <span>{name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
+          {!importUploaded ? (
             <div className="agf-import-section">
               <div className="agf-import-section__title">上传报表</div>
-              <FieldHint>表格字段：收入时间、游戏名称、厂商名称、待结算金额</FieldHint>
+              <FieldHint>表格字段：收入时间、渠道、游戏ID、游戏名称、厂商名称、待结算金额</FieldHint>
               <input
                 ref={fileRef}
                 type="file"
@@ -292,28 +282,25 @@ export function ExternalSettlementPage() {
                 onChange={handleFileChange}
               />
               <div
-                className={`agf-upload${!selectedChannel ? ' agf-upload--disabled' : ''}`}
-                onClick={handleUploadClick}
+                className="agf-upload"
+                onClick={() => fileRef.current?.click()}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleUploadClick(); }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') fileRef.current?.click();
+                }}
               >
-                {!selectedChannel
-                  ? '请先选择上方外部渠道类型'
-                  : `点击上传 ${selectedChannel} 渠道报表（模拟解析）`}
+                点击上传渠道报表（模拟解析）
               </div>
             </div>
-          </>
-        ) : (
-          <>
-            <div className="agf-import-meta">外部渠道：{selectedChannel}</div>
+          ) : (
             <DataTable
-              rowKey={(r) => r.id}
+              rowKey={(row) => row.id}
               data={preview}
               columns={IMPORT_PREVIEW_COLUMNS}
+              leadingRow={buildImportTotalRow(preview)}
             />
-          </>
-        )}
+          )}
         </div>
       </Modal>
       {toast && (

@@ -5,7 +5,6 @@ import { CurrencyInput, FieldError, FieldHint, ReadonlyField } from '../componen
 import { Drawer, Toast, type ToastType } from '../components/Modal';
 import { FilterBar } from '../components/FilterBar';
 import { StatusBadge } from '../components/StatusBadge';
-import { SupportChannelsDrawer } from '../components/SupportChannelsDrawer';
 import { VendorSearchSelect } from '../components/VendorSearchSelect';
 import { useAppStore } from '../data/store';
 import type { Contract, ContractCurrency, CooperationContent, Game, GameOperationLog, GamePayer } from '../data/types';
@@ -24,7 +23,16 @@ import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../u
 const COOPERATION_OPTIONS: CooperationContent[] = ['游戏代理金', '预付分成款', '委托开发费'];
 const PAYMENT_CURRENCY_OPTIONS: ContractCurrency[] = ['人民币', '美金'];
 
-const PAID_FIELD_META: Record<CooperationContent, { key: keyof ContractAmountFields; label: string; hint: string }> = {
+type ContractContentAmountKey = 'agencyFee' | 'prepaymentAmount' | 'developmentFee';
+type PaidAmountKey = 'paidAgencyFee' | 'paidPrepayment' | 'paidDevelopmentFee';
+
+const CONTRACT_FIELD_META: Record<CooperationContent, { key: ContractContentAmountKey; label: string; hint: string }> = {
+  游戏代理金: { key: 'agencyFee', label: '游戏代理金', hint: '请输入合同约定的游戏代理金' },
+  预付分成款: { key: 'prepaymentAmount', label: '预付分成款', hint: '请输入合同约定的预付分成款' },
+  委托开发费: { key: 'developmentFee', label: '委托开发费', hint: '请输入合同约定的委托开发费' },
+};
+
+const PAID_FIELD_META: Record<CooperationContent, { key: PaidAmountKey; label: string; hint: string }> = {
   游戏代理金: { key: 'paidAgencyFee', label: '已付游戏代理金', hint: '请输入目前已支付的游戏代理金' },
   预付分成款: { key: 'paidPrepayment', label: '已付预付分成款', hint: '请输入目前已支付的预付分成款' },
   委托开发费: { key: 'paidDevelopmentFee', label: '已付委托开发费', hint: '请输入目前已支付的委托开发费' },
@@ -32,6 +40,12 @@ const PAID_FIELD_META: Record<CooperationContent, { key: keyof ContractAmountFie
 
 type ContractAmountFields = {
   contractAmount: string;
+  agencyFee: string;
+  prepaymentAmount: string;
+  developmentFee: string;
+};
+
+type PaidAmountFields = {
   paidAgencyFee: string;
   paidPrepayment: string;
   paidDevelopmentFee: string;
@@ -39,6 +53,12 @@ type ContractAmountFields = {
 
 const EMPTY_CONTRACT_AMOUNTS: ContractAmountFields = {
   contractAmount: '',
+  agencyFee: '',
+  prepaymentAmount: '',
+  developmentFee: '',
+};
+
+const EMPTY_PAID_AMOUNTS: PaidAmountFields = {
   paidAgencyFee: '',
   paidPrepayment: '',
   paidDevelopmentFee: '',
@@ -74,7 +94,7 @@ function normalizeContractAmount(value: string): string {
 }
 
 const EMPTY_GAME: Omit<Game, 'id' | 'createdAt'> = {
-  name: '', onlineName: '', vendorId: '', manager: '', payer: undefined, license: '有', remark: '',
+  name: '', onlineName: '', englishName: '', vendorId: '', manager: '', payer: undefined, license: '有', remark: '',
   launchDate: '', operationStatus: '未上线', cooperationStatus: '合作中',
 };
 
@@ -92,7 +112,6 @@ const ADD_GAME_REQUIRED: { key: keyof GameFormData; label: string }[] = [
 const EDIT_GAME_REQUIRED: { key: keyof GameFormData; label: string }[] = [
   { key: 'onlineName', label: '游戏名称' },
   { key: 'name', label: '合同游戏名称' },
-  { key: 'payer', label: '付款方' },
   { key: 'license', label: '版号' },
   { key: 'operationStatus', label: '运营状态' },
 ];
@@ -111,6 +130,19 @@ function validateGameForm(
   return errors;
 }
 
+function validateUniqueGameName(
+  gameName: string,
+  games: Game[],
+  currentGameId?: string,
+): string | undefined {
+  const normalizedName = gameName.trim();
+  if (!normalizedName) return undefined;
+  const duplicated = games.some(
+    (game) => game.id !== currentGameId && game.onlineName.trim() === normalizedName,
+  );
+  return duplicated ? '游戏名称已存在' : undefined;
+}
+
 function renderGameLogAction(log: GameOperationLog) {
   if (log.action === '添加游戏') return '添加游戏';
   if (log.action === '合同变更' && log.detail) {
@@ -125,7 +157,6 @@ type PaidSortKey = 'paidAgencyFee' | 'paidPrepayment' | 'paidDevelopmentFee';
 const AMOUNT_CELL = 'agf-table__cell--right';
 
 const GAME_LIST_EXPORT_HEADERS = [
-  '付款方',
   '游戏ID',
   '游戏名称',
   '合同游戏名称',
@@ -134,6 +165,7 @@ const GAME_LIST_EXPORT_HEADERS = [
   '已付游戏代理金',
   '已付预付分成款',
   '已付委托开发费',
+  '付款方',
   '运营状态',
 ] as const;
 
@@ -166,7 +198,6 @@ function buildGameListSummaryRow(
       <td />
       <td />
       <td />
-      <td />
       <td className={AMOUNT_CELL}>
         {renderCurrencyTotals(sumPaidByCurrency(games, contractByGameId, 'paidAgencyFee', '游戏代理金', getContractCurrency))}
       </td>
@@ -176,6 +207,7 @@ function buildGameListSummaryRow(
       <td className={AMOUNT_CELL}>
         {renderCurrencyTotals(sumPaidByCurrency(games, contractByGameId, 'paidDevelopmentFee', '委托开发费', getContractCurrency))}
       </td>
+      <td />
       <td />
       <td />
     </tr>
@@ -194,6 +226,11 @@ function GameNameFields({ form, set, errors }: {
           <input className="agf-form-input" value={form.onlineName} onChange={(e) => set('onlineName', e.target.value)} />
           <FieldHint>游戏上线后所使用的正式名称</FieldHint>
           <FieldError message={errors.onlineName} />
+        </div>
+      </div>
+      <div className="agf-form-item"><label className="agf-form-label">游戏英文名称</label>
+        <div className="agf-form-field">
+          <input className="agf-form-input" value={form.englishName ?? ''} onChange={(e) => set('englishName', e.target.value)} />
         </div>
       </div>
       <div className="agf-form-item"><label className="agf-form-label agf-form-label--required">合同游戏名称</label>
@@ -340,14 +377,7 @@ function EditGameForm({ form, setForm, editing, getVendorName, errors, clearErro
       <ReadonlyField label="游戏ID" value={editing.id} />
       <GameNameFields form={form} set={set} errors={errors} />
       <ReadonlyField label="归属厂商" value={`${editing.vendorId} / ${getVendorName(editing.vendorId)}`} />
-      <PayerField
-        value={form.payer ?? ''}
-        error={errors.payer}
-        onChange={(value) => {
-          clearError('payer');
-          setForm({ ...form, payer: (value || undefined) as GamePayer | undefined });
-        }}
-      />
+      <ReadonlyField label="付款方" value={editing.payer ?? '-'} />
       <ManagerField form={form} set={set} errors={errors} />
       <LicenseField
         form={form}
@@ -373,17 +403,15 @@ function EditGameForm({ form, setForm, editing, getVendorName, errors, clearErro
 
 export function GameListPage() {
   const {
+    games,
     scopedGames,
     scopedVendors,
     contracts,
-    formulas,
     gameLogs,
     addGame,
     updateGame,
     updateContract,
-    updateFormula,
     getVendorName,
-    getVendor,
     getGame,
   } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
@@ -392,14 +420,16 @@ export function GameListPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [contractDrawer, setContractDrawer] = useState(false);
-  const [channelDrawer, setChannelDrawer] = useState(false);
-  const [channelGameId, setChannelGameId] = useState('');
+  const [paidDrawer, setPaidDrawer] = useState(false);
   const [logDrawer, setLogDrawer] = useState(false);
   const [editing, setEditing] = useState<Game | null>(null);
   const [form, setForm] = useState(EMPTY_GAME);
   const [contractForm, setContractForm] = useState<Contract | null>(null);
   const [contractAmountFields, setContractAmountFields] = useState<ContractAmountFields>(EMPTY_CONTRACT_AMOUNTS);
   const [contractErrors, setContractErrors] = useState<FieldErrors>({});
+  const [paidContract, setPaidContract] = useState<Contract | null>(null);
+  const [paidAmountFields, setPaidAmountFields] = useState<PaidAmountFields>(EMPTY_PAID_AMOUNTS);
+  const [paidErrors, setPaidErrors] = useState<FieldErrors>({});
   const [selectedGameId, setSelectedGameId] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
@@ -446,7 +476,6 @@ export function GameListPage() {
 
   const handleExport = () => {
     const rows = tableData.map((g) => [
-      g.payer,
       g.id,
       g.onlineName,
       g.name,
@@ -455,6 +484,7 @@ export function GameListPage() {
       getPaidCellText(g, 'paidAgencyFee', '游戏代理金'),
       getPaidCellText(g, 'paidPrepayment', '预付分成款'),
       getPaidCellText(g, 'paidDevelopmentFee', '委托开发费'),
+      g.payer,
       g.operationStatus,
     ]);
     downloadCsv(`游戏管理-${formatDateTime().slice(0, 10)}.csv`, [...GAME_LIST_EXPORT_HEADERS], rows);
@@ -469,6 +499,13 @@ export function GameListPage() {
   });
 
   const clearContractError = (key: string) => setContractErrors((prev) => {
+    if (!prev[key]) return prev;
+    const next = { ...prev };
+    delete next[key];
+    return next;
+  });
+
+  const clearPaidError = (key: string) => setPaidErrors((prev) => {
     if (!prev[key]) return prev;
     const next = { ...prev };
     delete next[key];
@@ -499,28 +536,41 @@ export function GameListPage() {
     });
     setContractAmountFields({
       contractAmount: contractAmountToField(c),
-      paidAgencyFee: c.cooperationContents?.includes('游戏代理金')
-        ? formatContractAmount(c.paidAgencyFee ?? 0) : '',
-      paidPrepayment: c.cooperationContents?.includes('预付分成款')
-        ? formatContractAmount(c.paidPrepayment ?? 0) : '',
-      paidDevelopmentFee: c.cooperationContents?.includes('委托开发费')
-        ? formatContractAmount(c.paidDevelopmentFee ?? 0) : '',
+      agencyFee: c.cooperationContents?.includes('游戏代理金')
+        ? formatContractAmount(c.agencyFee ?? 0) : '',
+      prepaymentAmount: c.cooperationContents?.includes('预付分成款')
+        ? formatContractAmount(c.prepaymentAmount ?? 0) : '',
+      developmentFee: c.cooperationContents?.includes('委托开发费')
+        ? formatContractAmount(c.developmentFee ?? 0) : '',
     });
     setContractErrors({});
     setContractDrawer(true);
   };
-  const openLogs = (gameId: string) => { setSelectedGameId(gameId); setLogDrawer(true); };
-  const openChannels = (gameId: string) => {
-    if (formulas.find((x) => x.gameId === gameId)) {
-      setChannelGameId(gameId);
-      setChannelDrawer(true);
+  const openPaidItems = (gameId: string) => {
+    const c = contracts.find((x) => x.gameId === gameId);
+    if (!c?.cooperationContents.length) {
+      setToast({ message: '请先维护合同信息', type: 'error' });
+      return;
     }
+    setPaidContract(c);
+    setPaidAmountFields({
+      paidAgencyFee: c.cooperationContents.includes('游戏代理金')
+        ? formatContractAmount(c.paidAgencyFee ?? 0) : '',
+      paidPrepayment: c.cooperationContents.includes('预付分成款')
+        ? formatContractAmount(c.paidPrepayment ?? 0) : '',
+      paidDevelopmentFee: c.cooperationContents.includes('委托开发费')
+        ? formatContractAmount(c.paidDevelopmentFee ?? 0) : '',
+    });
+    setPaidErrors({});
+    setPaidDrawer(true);
   };
-
+  const openLogs = (gameId: string) => { setSelectedGameId(gameId); setLogDrawer(true); };
   const showIncompleteToast = () => setToast({ message: '请完善所有信息', type: 'error' });
 
   const handleAdd = () => {
     const next = validateGameForm(form, ADD_GAME_REQUIRED);
+    const duplicateNameError = validateUniqueGameName(form.onlineName, games);
+    if (duplicateNameError) next.onlineName = duplicateNameError;
     if (Object.keys(next).length) { setErrors(next); showIncompleteToast(); return; }
     addGame(form);
     setAddOpen(false);
@@ -529,22 +579,29 @@ export function GameListPage() {
   const handleEdit = () => {
     if (!editing) return;
     const next = validateGameForm(form, EDIT_GAME_REQUIRED);
+    const duplicateNameError = validateUniqueGameName(form.onlineName, games, editing.id);
+    if (duplicateNameError) next.onlineName = duplicateNameError;
     if (Object.keys(next).length) { setErrors(next); showIncompleteToast(); return; }
-    updateGame({ ...editing, ...form, vendorId: editing.vendorId });
+    updateGame({ ...editing, ...form, vendorId: editing.vendorId, payer: editing.payer });
     setEditOpen(false);
     setToast({ message: '提交成功', type: 'success' });
   };
   const toggleCooperationContent = (item: CooperationContent, checked: boolean) => {
     if (!contractForm) return;
-    const meta = PAID_FIELD_META[item];
+    const contractMeta = CONTRACT_FIELD_META[item];
+    const paidMeta = PAID_FIELD_META[item];
     const nextContents = checked
       ? [...contractForm.cooperationContents, item]
       : contractForm.cooperationContents.filter((x) => x !== item);
-    setContractForm({ ...contractForm, cooperationContents: nextContents });
+    setContractForm({
+      ...contractForm,
+      cooperationContents: nextContents,
+      ...(checked ? {} : { [contractMeta.key]: undefined, [paidMeta.key]: undefined }),
+    });
     if (!checked) {
-      clearContractError(meta.key);
+      clearContractError(contractMeta.key);
       clearContractError('cooperationContents');
-      setContractAmountFields((prev) => ({ ...prev, [meta.key]: '' }));
+      setContractAmountFields((prev) => ({ ...prev, [contractMeta.key]: '' }));
     }
   };
 
@@ -561,7 +618,7 @@ export function GameListPage() {
     if (contractAmountErr) nextErrors.contractAmount = contractAmountErr;
 
     for (const item of contractForm.cooperationContents) {
-      const { key, label } = PAID_FIELD_META[item];
+      const { key, label } = CONTRACT_FIELD_META[item];
       const err = validateContractAmount(contractAmountFields[key], label);
       if (err) nextErrors[key] = err;
     }
@@ -578,12 +635,12 @@ export function GameListPage() {
 
     const normalizedAmounts = {
       contractAmount: formatContractAmount(parseContractAmount(contractAmountFields.contractAmount)),
-      paidAgencyFee: contractForm.cooperationContents.includes('游戏代理金')
-        ? formatContractAmount(parseContractAmount(contractAmountFields.paidAgencyFee)) : '',
-      paidPrepayment: contractForm.cooperationContents.includes('预付分成款')
-        ? formatContractAmount(parseContractAmount(contractAmountFields.paidPrepayment)) : '',
-      paidDevelopmentFee: contractForm.cooperationContents.includes('委托开发费')
-        ? formatContractAmount(parseContractAmount(contractAmountFields.paidDevelopmentFee)) : '',
+      agencyFee: contractForm.cooperationContents.includes('游戏代理金')
+        ? formatContractAmount(parseContractAmount(contractAmountFields.agencyFee)) : '',
+      prepaymentAmount: contractForm.cooperationContents.includes('预付分成款')
+        ? formatContractAmount(parseContractAmount(contractAmountFields.prepaymentAmount)) : '',
+      developmentFee: contractForm.cooperationContents.includes('委托开发费')
+        ? formatContractAmount(parseContractAmount(contractAmountFields.developmentFee)) : '',
     };
     setContractAmountFields((prev) => ({ ...prev, ...normalizedAmounts }));
 
@@ -593,14 +650,56 @@ export function GameListPage() {
       contractNumber: contractForm.contractNumber.trim(),
       currency: existingContract?.currency ?? contractForm.currency,
       contractAmount: parseContractAmount(normalizedAmounts.contractAmount),
+      agencyFee: contractForm.cooperationContents.includes('游戏代理金')
+        ? parseContractAmount(normalizedAmounts.agencyFee) : undefined,
+      prepaymentAmount: contractForm.cooperationContents.includes('预付分成款')
+        ? parseContractAmount(normalizedAmounts.prepaymentAmount) : undefined,
+      developmentFee: contractForm.cooperationContents.includes('委托开发费')
+        ? parseContractAmount(normalizedAmounts.developmentFee) : undefined,
       paidAgencyFee: contractForm.cooperationContents.includes('游戏代理金')
-        ? parseContractAmount(normalizedAmounts.paidAgencyFee) : undefined,
+        ? contractForm.paidAgencyFee : undefined,
       paidPrepayment: contractForm.cooperationContents.includes('预付分成款')
-        ? parseContractAmount(normalizedAmounts.paidPrepayment) : undefined,
+        ? contractForm.paidPrepayment : undefined,
       paidDevelopmentFee: contractForm.cooperationContents.includes('委托开发费')
-        ? parseContractAmount(normalizedAmounts.paidDevelopmentFee) : undefined,
+        ? contractForm.paidDevelopmentFee : undefined,
     });
     setContractDrawer(false);
+    setToast({ message: '提交成功', type: 'success' });
+  };
+
+  const savePaidItems = () => {
+    if (!paidContract) return;
+    const nextErrors: FieldErrors = {};
+    for (const item of paidContract.cooperationContents) {
+      const { key, label } = PAID_FIELD_META[item];
+      const err = validateContractAmount(paidAmountFields[key], label);
+      if (err) nextErrors[key] = err;
+    }
+    if (Object.keys(nextErrors).length) {
+      setPaidErrors(nextErrors);
+      showIncompleteToast();
+      return;
+    }
+
+    const normalizedAmounts: PaidAmountFields = {
+      paidAgencyFee: paidContract.cooperationContents.includes('游戏代理金')
+        ? formatContractAmount(parseContractAmount(paidAmountFields.paidAgencyFee)) : '',
+      paidPrepayment: paidContract.cooperationContents.includes('预付分成款')
+        ? formatContractAmount(parseContractAmount(paidAmountFields.paidPrepayment)) : '',
+      paidDevelopmentFee: paidContract.cooperationContents.includes('委托开发费')
+        ? formatContractAmount(parseContractAmount(paidAmountFields.paidDevelopmentFee)) : '',
+    };
+    setPaidAmountFields(normalizedAmounts);
+    updateContract({
+      ...paidContract,
+      paidAgencyFee: paidContract.cooperationContents.includes('游戏代理金')
+        ? parseContractAmount(normalizedAmounts.paidAgencyFee) : undefined,
+      paidPrepayment: paidContract.cooperationContents.includes('预付分成款')
+        ? parseContractAmount(normalizedAmounts.paidPrepayment) : undefined,
+      paidDevelopmentFee: paidContract.cooperationContents.includes('委托开发费')
+        ? parseContractAmount(normalizedAmounts.paidDevelopmentFee) : undefined,
+    });
+    setPaidDrawer(false);
     setToast({ message: '提交成功', type: 'success' });
   };
 
@@ -612,9 +711,8 @@ export function GameListPage() {
   const contractCurrency = contractForm?.currency;
   const savedContract = contractForm ? contractByGameId.get(contractForm.gameId) : undefined;
   const contractCurrencyLocked = Boolean(savedContract?.currency);
+  const paidGame = paidContract ? getGame(paidContract.gameId) : null;
   const logGame = selectedGameId ? getGame(selectedGameId) : null;
-  const channelGame = channelGameId ? getGame(channelGameId) : null;
-  const channelFormula = channelGameId ? formulas.find((x) => x.gameId === channelGameId) : undefined;
 
   return (
     <div className="agf-card">
@@ -648,24 +746,6 @@ export function GameListPage() {
           data={tableData}
           trailingRow={trailingRow}
           columns={[
-            {
-              key: 'payer',
-              title: '付款方',
-              header: (
-                <span data-annotation-id="game-list-payer-col">
-                  <ColumnFilter
-                    title="付款方"
-                    filter={{
-                      type: 'select',
-                      value: payerFilter,
-                      onChange: setPayerFilter,
-                      options: GAME_PAYER_FILTER_OPTIONS,
-                    }}
-                  />
-                </span>
-              ),
-              render: (r) => r.payer ?? '-',
-            },
             { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.onlineName} sub={r.id} /> },
             { key: 'contractName', title: '合同游戏名称', render: (r) => r.name },
             { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
@@ -688,6 +768,24 @@ export function GameListPage() {
               key: 'paidDevelopmentFee',
               title: '已付委托开发费',
               render: (r) => renderPaidCell(r, 'paidDevelopmentFee', '委托开发费'),
+            },
+            {
+              key: 'payer',
+              title: '付款方',
+              header: (
+                <span data-annotation-id="game-list-payer-col">
+                  <ColumnFilter
+                    title="付款方"
+                    filter={{
+                      type: 'select',
+                      value: payerFilter,
+                      onChange: setPayerFilter,
+                      options: GAME_PAYER_FILTER_OPTIONS,
+                    }}
+                  />
+                </span>
+              ),
+              render: (r) => r.payer ?? '-',
             },
             {
               key: 'op',
@@ -714,7 +812,7 @@ export function GameListPage() {
                 <div className="agf-actions">
                   <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-list-edit" onClick={() => openEdit(r)}>编辑</button>
                   <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-list-contract" onClick={() => openContract(r.id)}>合同管理</button>
-                  <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-list-channels" onClick={() => openChannels(r.id)}>支持渠道</button>
+                  <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-list-paid-items" onClick={() => openPaidItems(r.id)}>已付款项</button>
                   <button type="button" className="agf-btn agf-btn--link" data-annotation-id="game-list-logs" onClick={() => openLogs(r.id)}>操作记录</button>
                 </div>
               ),
@@ -820,7 +918,7 @@ export function GameListPage() {
               </div>
             </div>
             {contractForm.cooperationContents.map((item) => {
-              const { key, label, hint } = PAID_FIELD_META[item];
+              const { key, label, hint } = CONTRACT_FIELD_META[item];
               return (
                 <div key={item} className="agf-form-item">
                   <label className="agf-form-label agf-form-label--required">{label}</label>
@@ -864,18 +962,39 @@ export function GameListPage() {
           </div>
         )}
       </Drawer>
-      {channelGame && (
-        <SupportChannelsDrawer
-          open={channelDrawer}
-          onClose={() => setChannelDrawer(false)}
-          gameId={channelGame.id}
-          gameName={channelGame.onlineName}
-          vendorName={getVendorName(channelGame.vendorId)}
-          formula={channelFormula}
-          onSave={updateFormula}
-          formAnnotationId="game-list-channels-form"
-        />
-      )}
+      <Drawer title="已付款项" open={paidDrawer} onClose={() => setPaidDrawer(false)}
+        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setPaidDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={savePaidItems}>保存</button></>}>
+        {paidContract && paidGame && (
+          <div data-annotation-id="game-list-paid-items-form">
+            <ReadonlyField label="游戏ID / 游戏名称" value={`${paidGame.id} / ${paidGame.onlineName}`} />
+            <ReadonlyField label="合同编号" value={paidContract.contractNumber || '-'} />
+            {paidContract.cooperationContents.map((item) => {
+              const { key, label, hint } = PAID_FIELD_META[item];
+              return (
+                <div key={item} className="agf-form-item">
+                  <label className="agf-form-label agf-form-label--required">{label}</label>
+                  <div className="agf-form-field">
+                    <CurrencyInput
+                      currency={paidContract.currency}
+                      value={paidAmountFields[key]}
+                      onChange={(v) => {
+                        clearPaidError(key);
+                        setPaidAmountFields({ ...paidAmountFields, [key]: v });
+                      }}
+                      onBlur={() => setPaidAmountFields((prev) => ({
+                        ...prev,
+                        [key]: normalizeContractAmount(prev[key]),
+                      }))}
+                    />
+                    <FieldHint>{hint}</FieldHint>
+                    <FieldError message={paidErrors[key]} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Drawer>
       <Drawer title="操作记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
         <div data-annotation-id="game-list-logs-drawer">
         {logGame && (

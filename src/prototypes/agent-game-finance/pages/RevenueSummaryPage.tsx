@@ -6,7 +6,7 @@ import { MonthRangePicker } from '../components/MonthRangePicker';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { Toast, type ToastType } from '../components/Modal';
 import { useAppStore } from '../data/store';
-import { EXTERNAL_CHANNELS, INTERNAL_CHANNELS } from '../data/mock-data';
+import { EXTERNAL_CHANNELS } from '../data/mock-data';
 import type { Contract, ContractCurrency, Game, GamePaymentRequest, SettlementRecord } from '../data/types';
 import { sumContractPaymentsByCurrency } from '../utils/currencySnapshot';
 import { selectOptions } from '../utils/columnFilters';
@@ -15,6 +15,7 @@ import { downloadCsv } from '../utils/listExport';
 import { getSampleMonthRange, isMonthInRange } from '../utils/monthRange';
 import { isPaidPayment } from '../utils/payment';
 import { formatCurrencyMoney, formatDateTime, SETTLEMENT_CURRENCY } from '../utils/settlement';
+import { getInternalChannelCategory, INTERNAL_CHANNEL_CATEGORIES } from '../utils/financeCenter';
 
 type QueryDimension = 'game' | 'channel' | 'vendor';
 
@@ -187,6 +188,9 @@ function buildSummaryRows(
 
     const gameName = getGameName(s.gameId);
     const vendorName = getVendorName(s.vendorId);
+    const summaryChannel = s.type === 'external'
+      ? s.channel
+      : getInternalChannelCategory(s.channel);
     if (!matchesListSearch(search, {
       gameId: s.gameId,
       gameName,
@@ -197,7 +201,7 @@ function buildSummaryRows(
     const key = dimension === 'game'
       ? `${s.incomeTime}|${s.gameId}`
       : dimension === 'channel'
-        ? `${s.incomeTime}|${s.channel}`
+        ? `${s.incomeTime}|${summaryChannel}`
         : `${s.incomeTime}|${s.vendorId}`;
 
     let row = map.get(key);
@@ -209,7 +213,7 @@ function buildSummaryRows(
         settlementRefund: 0,
         settlementPaymentAmount: 0,
         ...(dimension === 'game' ? { gameId: s.gameId, gameName } : {}),
-        ...(dimension === 'channel' ? { channel: s.channel, paymentGameIds: new Set<string>() } : {}),
+        ...(dimension === 'channel' ? { channel: summaryChannel, paymentGameIds: new Set<string>() } : {}),
         ...(dimension === 'vendor' ? { vendorId: s.vendorId, vendorName, paymentGameIds: new Set<string>() } : {}),
       };
       map.set(key, row);
@@ -286,7 +290,10 @@ function rowToExport(row: SummaryRow, dimension: QueryDimension): string[] {
   return [row.time, row.vendorId!, row.vendorName!, payment, totalRevenue, settlementPayment];
 }
 
-const REVENUE_CHANNEL_FILTER_OPTIONS = selectOptions([...INTERNAL_CHANNELS, ...EXTERNAL_CHANNELS]);
+const REVENUE_CHANNEL_FILTER_OPTIONS = selectOptions([
+  ...INTERNAL_CHANNEL_CATEGORIES,
+  ...EXTERNAL_CHANNELS,
+]);
 
 const SETTLEMENT_PAYMENT_COLUMN = {
   ...COL_ALIGN_RIGHT,

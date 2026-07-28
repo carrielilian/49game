@@ -20,6 +20,8 @@ export interface Vendor {
   invoiceInfo: string;
   accountName: string;
   bank: string;
+  /** 银行代码（选填） */
+  bankCode?: string;
   bankLocation: string;
   branch: string;
   cardNumber: string;
@@ -29,6 +31,8 @@ export interface Game {
   id: string;
   name: string;
   onlineName: string;
+  /** 游戏英文名称（选填） */
+  englishName?: string;
   vendorId: string;
   launchDate: string;
   manager: string;
@@ -42,18 +46,18 @@ export interface Game {
   licensePayer?: string;
   /** 游戏添加时间，用于列表默认排序 */
   createdAt: string;
-  /** 游戏级预付分成款；未填视为未补充 */
+  /** @deprecated 历史原型字段；现行预付分成款读取 Contract.paidPrepayment */
   prepayment?: number;
-  /** 预付分成款保存时的支付币种快照；合同改支付币种不回写 */
+  /** @deprecated 历史原型字段；现行预付分成款币种读取 Contract.currency */
   prepaymentCurrency?: ContractCurrency;
   /** 历史已抵扣分成款（线下手动处理），默认 0 */
   historicalDeduction?: number;
+  /** 付款设置 — 是否有预付分成款 */
+  hasPrepayment?: boolean;
   /** 付费设置 — 分成付款公司 */
   sharePaymentCompany?: SharePaymentCompany;
   /** 付费设置 — 付款币种 */
   sharePaymentCurrency?: ContractCurrency;
-  /** 付费设置 — 付款账号 */
-  sharePaymentAccount?: string;
 }
 
 export type ContractCurrency = '人民币' | '美金';
@@ -67,6 +71,12 @@ export interface Contract {
   contractAmount?: number;
   /** 合作内容多选 */
   cooperationContents: CooperationContent[];
+  /** 游戏代理金（合同约定金额） */
+  agencyFee?: number;
+  /** 预付分成款（合同约定金额） */
+  prepaymentAmount?: number;
+  /** 委托开发费（合同约定金额） */
+  developmentFee?: number;
   /** 已付游戏代理金（勾选游戏代理金时） */
   paidAgencyFee?: number;
   /** 已付预付分成款（勾选预付分成款时） */
@@ -151,7 +161,7 @@ export interface SettlementLetterSnapshot {
   netTotal: number;
   /** 付款币种（付费设置 sharePaymentCurrency）；汇率行、实际付款金额 */
   paymentCurrency: ContractCurrency;
-  /** 支付币种（合同 prepaymentCurrency ?? Contract.currency）；⑤ 结算/抵扣与剩余 */
+  /** 支付币种（Contract.currency）；⑤ 结算/抵扣与剩余 */
   contractPaymentCurrency: ContractCurrency;
   showExchangeRate: boolean;
   exchangeRate?: number;
@@ -165,7 +175,9 @@ export interface SettlementLetterSnapshot {
 export interface GamePaymentApplySnapshot {
   gameId: string;
   gameName: string;
-  /** 支付币种：prepaymentCurrency ?? Contract.currency */
+  /** 申请付款时冻结的游戏英文名称；英文结算函优先使用 */
+  gameEnglishName?: string;
+  /** 支付币种：Contract.currency */
   contractPaymentCurrency: ContractCurrency;
   vendorId: string;
   vendorName: string;
@@ -174,7 +186,10 @@ export interface GamePaymentApplySnapshot {
   remainingPrepayment: number;
   sharePaymentCompany: string;
   sharePaymentCurrency: ContractCurrency;
-  sharePaymentAccount: string;
+  /** 申请付款时手工填写的汇率取值日期 */
+  exchangeRateDate: string;
+  /** 申请付款时手工填写并冻结的汇率 */
+  exchangeRate: number;
   applyTime: string;
 }
 
@@ -187,6 +202,8 @@ export interface GamePaymentRequest {
   actualAmountUsd?: number;
   status: PaymentStatus;
   applyTime: string;
+  exchangeRateDate?: string;
+  exchangeRate?: number;
   payTime?: string;
   payBank?: string;
   receiptInfo?: string;
@@ -233,15 +250,10 @@ export interface FormulaOperationLog {
 export interface ImportPreviewRow {
   id: string;
   incomeTime: string;
-  /** 上传报表「游戏名称」，匹配 onlineName */
+  channel: string;
+  gameId: string;
   gameName: string;
-  /** 上传报表「厂商名称」 */
   vendorName: string;
   pendingAmount: number;
-  channel: string;
-  gameId?: string;
-  formulaText?: string;
-  settlementIncome?: number;
-  calculated: boolean;
   error?: string;
 }

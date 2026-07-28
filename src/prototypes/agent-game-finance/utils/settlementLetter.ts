@@ -1,4 +1,4 @@
-import type { ContractCurrency, Game, GamePaymentRequest, SettlementRecord } from '../data/types';
+import type { Contract, ContractCurrency, Game, GamePaymentRequest, SettlementRecord } from '../data/types';
 import { calcGamePrepaymentSummary } from './prepayment';
 
 /** 结算函汇率行：付款币种=美金，或（支付币种=美金 且 申请付款时 remaining>0） */
@@ -189,6 +189,7 @@ export function buildLetterRefundRows(
 /** 游戏维度结算函：⑤ 基于游戏「剩余未抵扣分成款」 */
 export function calcGameLetterPrepaymentDeduction(
   game: Game | undefined,
+  contract: Contract | undefined,
   gameId: string,
   payments: GamePaymentRequest[],
   incomeTotal: number,
@@ -200,7 +201,7 @@ export function calcGameLetterPrepaymentDeduction(
   const scopedPayments = excludePaymentId
     ? payments.filter((p) => p.id !== excludePaymentId)
     : payments;
-  const { remainingPrepayment } = calcGamePrepaymentSummary(game, gameId, scopedPayments);
+  const { remainingPrepayment } = calcGamePrepaymentSummary(game, contract, gameId, scopedPayments);
   return calcLetterPrepaymentDeductionCore(
     remainingPrepayment,
     incomeTotal,
