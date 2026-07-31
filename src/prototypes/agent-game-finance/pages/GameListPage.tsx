@@ -87,6 +87,23 @@ function validateContractAmount(value: string, label: string): string | undefine
   return undefined;
 }
 
+function validatePaidAmountIncrease(
+  value: string,
+  label: string,
+  savedValue: number | undefined,
+): string | undefined {
+  const amountError = validateContractAmount(value, label);
+  if (amountError) return amountError;
+  if (
+    savedValue != null
+    && Number.isFinite(savedValue)
+    && parseContractAmount(value) <= savedValue
+  ) {
+    return '本次提交金额需大于历史金额';
+  }
+  return undefined;
+}
+
 function normalizeContractAmount(value: string): string {
   const trimmed = value.trim();
   if (!trimmed || validateContractAmount(trimmed, '金额')) return trimmed;
@@ -148,7 +165,8 @@ function renderGameLogAction(log: GameOperationLog) {
   if (log.action === '合同变更' && log.detail) {
     return <span className="agf-log-detail">{log.detail}</span>;
   }
-  if (log.status) return <StatusBadge text={log.status} />;
+  if (log.action === '运营状态' && log.status) return `变更运营状态：${log.status}`;
+  if (log.action === '合作状态' && log.status) return `变更合作状态：${log.status}`;
   return log.action;
 }
 
@@ -195,7 +213,6 @@ function buildGameListSummaryRow(
   return (
     <tr className="agf-table__summary-row" data-annotation-id="game-list-summary">
       <td>查询总计</td>
-      <td />
       <td />
       <td />
       <td className={AMOUNT_CELL}>
@@ -443,7 +460,6 @@ export function GameListPage() {
     if (!matchesListSearch(search, {
       gameId: g.id,
       gameName: g.onlineName,
-      contractName: g.name,
       vendorId: g.vendorId,
       vendorName: getVendorName(g.vendorId),
     })) return false;
@@ -672,7 +688,11 @@ export function GameListPage() {
     const nextErrors: FieldErrors = {};
     for (const item of paidContract.cooperationContents) {
       const { key, label } = PAID_FIELD_META[item];
-      const err = validateContractAmount(paidAmountFields[key], label);
+      const err = validatePaidAmountIncrease(
+        paidAmountFields[key],
+        label,
+        paidContract[key],
+      );
       if (err) nextErrors[key] = err;
     }
     if (Object.keys(nextErrors).length) {
@@ -729,7 +749,7 @@ export function GameListPage() {
             </button>
           )}
         >
-          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} showContractName />
+          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
           <button
             type="button"
             className="agf-btn agf-btn--primary"
@@ -748,8 +768,7 @@ export function GameListPage() {
           columns={[
             { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.onlineName} sub={r.id} /> },
             { key: 'contractName', title: '合同游戏名称', render: (r) => r.name },
-            { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
-            { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
+            { key: 'vendor', title: '厂商ID / 厂商名称', render: (r) => <DualCell main={getVendorName(r.vendorId)} sub={r.vendorId} /> },
             {
               ...COL_ALIGN_RIGHT,
               key: 'paidAgencyFee',

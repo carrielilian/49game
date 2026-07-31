@@ -34,7 +34,6 @@ import externalSettlementPaymentCol from '../docs/annotations/external-settlemen
 import externalSettlementQuery from '../docs/annotations/external-settlement/query-bar.md?raw';
 import externalSettlementSettle from '../docs/annotations/external-settlement/settle-button.md?raw';
 import externalSettlementPull from '../docs/annotations/external-settlement/pull-button.md?raw';
-import externalSettlementSourceCol from '../docs/annotations/external-settlement/source-column.md?raw';
 import gameIncomeApplyModal from '../docs/annotations/game-income/apply-payment-modal.md?raw';
 import gameIncomeApplyAction from '../docs/annotations/game-income/apply-payment-action.md?raw';
 import gameIncomeTable from '../docs/annotations/game-income/data-table.md?raw';
@@ -118,7 +117,6 @@ const MARKDOWN_BY_NODE_ID: Record<string, string> = {
   'income-settlement-settle': externalSettlementSettle,
   'income-settlement-table': externalSettlementTable,
   'income-settlement-channel-col': externalSettlementChannelCol,
-  'income-settlement-source-col': externalSettlementSourceCol,
   'income-settlement-payment-col': externalSettlementPaymentCol,
   'income-settlement-import-modal': externalSettlementImportModal,
   'internal-settlement-query': internalSettlementQuery,

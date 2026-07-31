@@ -24,6 +24,7 @@ import {
   isUnsettledSettlement,
   SETTLEMENT_CURRENCY,
 } from '../utils/settlement';
+import { compareSettlementAddedDesc } from '../utils/listSort';
 
 interface Props {
   type: 'internal' | 'refund';
@@ -100,7 +101,7 @@ export function InternalSettlementPage({ type }: Props) {
     if (channelFilter && getInternalChannelCategory(s.channel) !== channelFilter) return false;
     if (paymentStatusFilter && s.paymentApplyStatus !== paymentStatusFilter) return false;
     return true;
-  });
+  }).sort(compareSettlementAddedDesc);
 
   const pullDisabled = loading || pullCompleted;
   const unsettled = data.filter((record) => isUnsettledSettlement(record));
@@ -193,8 +194,7 @@ export function InternalSettlementPage({ type }: Props) {
             render: (r) => r.incomeTime,
           },
           { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={getGameName(r.gameId)} sub={r.gameId} /> },
-          { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
-          { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
+          { key: 'vendor', title: '厂商ID / 厂商名称', render: (r) => <DualCell main={getVendorName(r.vendorId)} sub={r.vendorId} /> },
           {
             key: 'channel',
             title: '渠道',

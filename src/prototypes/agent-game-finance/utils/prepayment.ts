@@ -1,16 +1,34 @@
-import type { Contract, Game, GamePaymentRequest } from '../data/types';
+import type { Contract, ContractCurrency, Game, GamePaymentRequest } from '../data/types';
 import { isPaidPayment } from './payment';
 
-/** 已抵扣分成款 = 已付款待付款金额之和 + 历史已抵扣分成款；若预付分成款 − 上述合计 ≤ 0，则取预付分成款 */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** 申请成功时直接抵扣；美金合同先用申请汇率把人民币待付折算为美金。 */
+export function calcApplyPrepaymentDeduction(
+  pendingAmount: number,
+  remainingPrepayment: number,
+  contractPaymentCurrency: ContractCurrency,
+  exchangeRate: number,
+): number {
+  if (remainingPrepayment <= 0 || pendingAmount <= 0) return 0;
+  const deductibleBase = contractPaymentCurrency === '美金'
+    ? (exchangeRate > 0 ? pendingAmount / exchangeRate : 0)
+    : pendingAmount;
+  return round2(Math.min(Math.max(deductibleBase, 0), remainingPrepayment));
+}
+
+/** 已抵扣分成款 = 历史已抵扣 + 历次付款申请直接抵扣；最大不超过预付分成款。 */
 export function calcDeductedPrepayment(
   prepayment: number,
-  paidActualSum: number,
+  appliedDeductionSum: number,
   historicalDeduction: number,
 ): number {
-  const consumed = paidActualSum + historicalDeduction;
+  const consumed = appliedDeductionSum + historicalDeduction;
   const net = prepayment - consumed;
-  if (net <= 0) return Math.round(prepayment * 100) / 100;
-  return Math.round(consumed * 100) / 100;
+  if (net <= 0) return round2(prepayment);
+  return round2(consumed);
 }
 
 /** 剩余未抵扣分成款 */
@@ -33,10 +51,30 @@ export function getGameHistoricalDeduction(game?: Game): number {
   return game?.historicalDeduction ?? 0;
 }
 
-export function sumGamePaidActualAmount(gameId: string, payments: GamePaymentRequest[]): number {
+function getAppliedPrepaymentDeduction(payment: GamePaymentRequest): number {
+  const explicit = payment.prepaymentDeductionAmount
+    ?? payment.applySnapshot?.prepaymentDeductionAmount;
+  if (explicit != null && Number.isFinite(explicit)) return explicit;
+  // 兼容缺少显式抵扣字段、但已有申请快照的旧数据。
+  if (payment.applySnapshot && isPaidPayment(payment.status)) {
+    return calcApplyPrepaymentDeduction(
+      payment.pendingAmount,
+      payment.applySnapshot.remainingPrepayment,
+      payment.applySnapshot.contractPaymentCurrency,
+      payment.applySnapshot.exchangeRate,
+    );
+  }
+  // 更早的旧已付款数据没有申请快照，只能沿用人民币待付金额作为兼容值。
+  return isPaidPayment(payment.status) ? payment.pendingAmount : 0;
+}
+
+export function sumGameAppliedPrepaymentDeduction(
+  gameId: string,
+  payments: GamePaymentRequest[],
+): number {
   return payments
-    .filter((p) => p.gameId === gameId && isPaidPayment(p.status))
-    .reduce((sum, p) => sum + p.pendingAmount, 0);
+    .filter((payment) => payment.gameId === gameId)
+    .reduce((sum, payment) => sum + getAppliedPrepaymentDeduction(payment), 0);
 }
 
 export function calcGamePrepaymentSummary(
@@ -47,10 +85,16 @@ export function calcGamePrepaymentSummary(
 ) {
   const prepayment = getGamePrepayment(game, contract);
   const historicalDeduction = getGameHistoricalDeduction(game);
-  const paidActualSum = sumGamePaidActualAmount(gameId, payments);
-  const deductedPrepayment = calcDeductedPrepayment(prepayment, paidActualSum, historicalDeduction);
+  const appliedDeductionSum = sumGameAppliedPrepaymentDeduction(gameId, payments);
+  const deductedPrepayment = calcDeductedPrepayment(prepayment, appliedDeductionSum, historicalDeduction);
   const remainingPrepayment = calcRemainingUndeductedPrepayment(prepayment, deductedPrepayment);
-  return { prepayment, historicalDeduction, paidActualSum, deductedPrepayment, remainingPrepayment };
+  return {
+    prepayment,
+    historicalDeduction,
+    appliedDeductionSum,
+    deductedPrepayment,
+    remainingPrepayment,
+  };
 }
 
 export function isGamePrepaymentMissing(game?: Game, contract?: Contract): boolean {

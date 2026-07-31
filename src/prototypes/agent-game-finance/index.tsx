@@ -38,7 +38,7 @@ const ROUTE = defineHashPageRoute([
   { id: 'formula-list', title: '结算配置管理' },
   { id: 'income-settlement', title: '收入结算' },
   { id: 'refund-settlement', title: '退款结算' },
-  { id: 'game-income', title: '游戏收入管理' },
+  { id: 'game-income', title: '游戏请款管理' },
   { id: 'game-payment-list', title: '游戏付款管理' },
   { id: 'stats-summary', title: '收入汇总统计' },
 ], { defaultPageId: 'vendor-list' });
@@ -57,7 +57,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { id: 'formula-list', label: '结算配置管理' },
       { id: 'income-settlement', label: '收入结算' },
       { id: 'refund-settlement', label: '退款结算' },
-      { id: 'game-income', label: '游戏收入管理' },
+      { id: 'game-income', label: '游戏请款管理' },
       { id: 'game-payment-list', label: '游戏付款管理' },
     ],
   },
@@ -78,7 +78,7 @@ const PAGE_META: Record<string, { group: string; title: string }> = {
   'external-settlement': { group: '财务分成管理', title: '收入结算' },
   'internal-settlement': { group: '财务分成管理', title: '收入结算' },
   'internal-refund': { group: '财务分成管理', title: '退款结算' },
-  'game-income': { group: '财务分成管理', title: '游戏收入管理' },
+  'game-income': { group: '财务分成管理', title: '游戏请款管理' },
   'game-payment-list': { group: '财务分成管理', title: '游戏付款管理' },
   'stats-summary': { group: '数据统计', title: '收入汇总统计' },
 };

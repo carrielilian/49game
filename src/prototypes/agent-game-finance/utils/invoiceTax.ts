@@ -23,7 +23,12 @@ export function formatTaxPercent(rate: number): string {
 }
 
 /** 跟随发票且可映射时返回税率，否则保留当前值 */
-export function resolveFollowInvoiceTax(invoiceInfo: string, current: number): number {
+export function resolveFollowInvoiceTax(
+  invoiceInfo: string,
+  current: number,
+  customTaxPoint?: number,
+): number {
   const mapped = taxRateFromInvoice(invoiceInfo);
-  return mapped === null ? current : mapped;
+  if (mapped !== null) return mapped;
+  return Number.isFinite(customTaxPoint) ? customTaxPoint! : current;
 }

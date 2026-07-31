@@ -12,10 +12,10 @@ import { SupportChannelsDrawer } from '../components/SupportChannelsDrawer';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import {
   formatTaxPercent,
-  isOtherInvoice,
   resolveFollowInvoiceTax,
   taxRateFromInvoice,
 } from '../utils/invoiceTax';
+import { compareGameAddedDesc } from '../utils/listSort';
 
 type FieldErrors = Record<string, string>;
 
@@ -27,18 +27,28 @@ function effectiveFormulaDisplay(f: FormulaConfig | undefined): string {
   ].join('\n');
 }
 
-function needsTaxInput(invoiceInfo: string): boolean {
-  return isOtherInvoice(invoiceInfo) || taxRateFromInvoice(invoiceInfo) === null;
+function resolvedInvoiceTax(invoiceInfo: string, vendorTaxPoint?: number): number | null {
+  const mapped = taxRateFromInvoice(invoiceInfo);
+  if (mapped !== null) return mapped;
+  return Number.isFinite(vendorTaxPoint) ? vendorTaxPoint! : null;
 }
 
-function validateFormulaForm(f: FormulaConfig, invoiceInfo: string): FieldErrors {
+function needsTaxInput(invoiceInfo: string, vendorTaxPoint?: number): boolean {
+  return resolvedInvoiceTax(invoiceInfo, vendorTaxPoint) === null;
+}
+
+function validateFormulaForm(
+  f: FormulaConfig,
+  invoiceInfo: string,
+  vendorTaxPoint?: number,
+): FieldErrors {
   const errors: FieldErrors = {};
-  if (needsTaxInput(invoiceInfo) && !Number.isFinite(f.internalTax)) {
+  if (needsTaxInput(invoiceInfo, vendorTaxPoint) && !Number.isFinite(f.internalTax)) {
     errors.internalTax = '扣税点不能为空';
   }
   if (!Number.isFinite(f.internalChannelFee)) errors.internalChannelFee = '渠道费不能为空';
   if (!Number.isFinite(f.internalShare)) errors.internalShare = '分成不能为空';
-  if (needsTaxInput(invoiceInfo) && !Number.isFinite(f.externalTax)) {
+  if (needsTaxInput(invoiceInfo, vendorTaxPoint) && !Number.isFinite(f.externalTax)) {
     errors.externalTax = '扣税点不能为空';
   }
   if (!Number.isFinite(f.externalChannelFee)) errors.externalChannelFee = '渠道费不能为空';
@@ -49,16 +59,18 @@ function validateFormulaForm(f: FormulaConfig, invoiceInfo: string): FieldErrors
 function TaxRateField({
   tax,
   invoiceInfo,
+  vendorTaxPoint,
   error,
   onTaxChange,
 }: {
   tax: number;
   invoiceInfo: string;
+  vendorTaxPoint?: number;
   error?: string;
   onTaxChange: (tax: number) => void;
 }) {
-  const mapped = taxRateFromInvoice(invoiceInfo);
-  const needInput = needsTaxInput(invoiceInfo);
+  const mapped = resolvedInvoiceTax(invoiceInfo, vendorTaxPoint);
+  const needInput = needsTaxInput(invoiceInfo, vendorTaxPoint);
 
   return (
     <>
@@ -111,7 +123,7 @@ export function FormulaListPage() {
     gameName: g.onlineName,
     vendorId: g.vendorId,
     vendorName: getVendorName(g.vendorId),
-  }));
+  })).sort(compareGameAddedDesc);
 
   const clearError = (key: string) => setErrors((prev) => {
     if (!prev[key]) return prev;
@@ -124,15 +136,24 @@ export function FormulaListPage() {
     const f = formulas.find((x) => x.gameId === gameId);
     const game = getGame(gameId);
     if (!f || !game) return;
-    const invoice = getVendor(game.vendorId)?.invoiceInfo ?? '';
-    setEffectiveFormula(effectiveFormulaDisplay(f));
+    const vendor = getVendor(game.vendorId);
+    const invoice = vendor?.invoiceInfo ?? '';
     const next = {
       ...f,
       internalTaxMode: '跟随发票' as const,
-      internalTax: resolveFollowInvoiceTax(invoice, Number.isFinite(f.internalTax) ? f.internalTax : 0),
+      internalTax: resolveFollowInvoiceTax(
+        invoice,
+        Number.isFinite(f.internalTax) ? f.internalTax : 0,
+        vendor?.taxPoint,
+      ),
       externalTaxMode: '跟随发票' as const,
-      externalTax: resolveFollowInvoiceTax(invoice, Number.isFinite(f.externalTax) ? f.externalTax : 0),
+      externalTax: resolveFollowInvoiceTax(
+        invoice,
+        Number.isFinite(f.externalTax) ? f.externalTax : 0,
+        vendor?.taxPoint,
+      ),
     };
+    setEffectiveFormula(effectiveFormulaDisplay(next));
     setErrors({});
     setEditing(next);
     setFormulaDrawer(true);
@@ -146,21 +167,24 @@ export function FormulaListPage() {
   const saveFormula = () => {
     if (!editing) return;
     const game = getGame(editing.gameId);
-    const invoice = game ? (getVendor(game.vendorId)?.invoiceInfo ?? '') : '';
+    const vendor = game ? getVendor(game.vendorId) : undefined;
+    const invoice = vendor?.invoiceInfo ?? '';
     const normalizedEditing = {
       ...editing,
       internalTaxMode: '跟随发票' as const,
       internalTax: resolveFollowInvoiceTax(
         invoice,
         Number.isFinite(editing.internalTax) ? editing.internalTax : 0,
+        vendor?.taxPoint,
       ),
       externalTaxMode: '跟随发票' as const,
       externalTax: resolveFollowInvoiceTax(
         invoice,
         Number.isFinite(editing.externalTax) ? editing.externalTax : 0,
+        vendor?.taxPoint,
       ),
     };
-    const nextErrors = validateFormulaForm(normalizedEditing, invoice);
+    const nextErrors = validateFormulaForm(normalizedEditing, invoice, vendor?.taxPoint);
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       setToast({ message: '请完善所有信息', type: 'error' });
@@ -171,13 +195,16 @@ export function FormulaListPage() {
     setToast({ message: '提交成功', type: 'success' });
   };
 
-  const logs = formulaLogs.filter((l) => l.gameId === selectedGameId);
+  const logs = formulaLogs
+    .filter((l) => l.gameId === selectedGameId)
+    .sort((a, b) => b.time.localeCompare(a.time));
   const editingGame = editing ? getGame(editing.gameId) : null;
   const channelGame = channelGameId ? getGame(channelGameId) : null;
   const channelFormula = channelGameId
     ? formulas.find((formula) => formula.gameId === channelGameId)
     : undefined;
   const invoiceInfo = editingGame ? (getVendor(editingGame.vendorId)?.invoiceInfo ?? '') : '';
+  const invoiceTaxPoint = editingGame ? getVendor(editingGame.vendorId)?.taxPoint : undefined;
 
   return (
     <div className="agf-card">
@@ -192,23 +219,33 @@ export function FormulaListPage() {
         data={rows}
         columns={[
           { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.onlineName} sub={r.id} /> },
-          { key: 'vendorId', title: '厂商ID', render: (r) => r.vendorId },
-          { key: 'vendorName', title: '厂商名称', render: (r) => getVendorName(r.vendorId) },
+          { key: 'vendor', title: '厂商ID / 厂商名称', render: (r) => <DualCell main={getVendorName(r.vendorId)} sub={r.vendorId} /> },
           { key: 'formula', title: '结算公式', header: <span data-annotation-id="formula-list-formula-col">结算公式</span>, render: (r) => {
             const f = formulas.find((x) => x.gameId === r.id);
             if (!isFormulaConfigured(f)) return '-';
+            const vendor = getVendor(r.vendorId);
+            const internalTax = resolveFollowInvoiceTax(
+              vendor?.invoiceInfo ?? '',
+              f!.internalTax,
+              vendor?.taxPoint,
+            );
+            const externalTax = resolveFollowInvoiceTax(
+              vendor?.invoiceInfo ?? '',
+              f!.externalTax,
+              vendor?.taxPoint,
+            );
             return (
               <span>
-                <span className="agf-cell-main">{formatFormulaText(f!.internalTax, f!.internalChannelFee, f!.internalShare, '自有渠道')}</span>
-                <span className="agf-cell-main">{formatFormulaText(f!.externalTax, f!.externalChannelFee, f!.externalShare, '外部渠道')}</span>
+                <span className="agf-cell-main">{formatFormulaText(internalTax, f!.internalChannelFee, f!.internalShare, '自有渠道')}</span>
+                <span className="agf-cell-main">{formatFormulaText(externalTax, f!.externalChannelFee, f!.externalShare, '外部渠道')}</span>
               </span>
             );
           } },
           { key: 'ops', title: '操作', render: (r) => (
             <div className="agf-actions">
               <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-formula" onClick={() => openFormula(r.id)}>结算公式</button>
-              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-internal-channels" onClick={() => openChannels(r.id)}>渠道映射</button>
-              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-logs" onClick={() => openLogs(r.id)}>操作记录</button>
+              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-internal-channels" onClick={() => openChannels(r.id)}>数据拉取</button>
+              <button type="button" className="agf-btn agf-btn--link" data-annotation-id="formula-list-logs" onClick={() => openLogs(r.id)}>公式记录</button>
             </div>
           ) },
         ]}
@@ -224,10 +261,11 @@ export function FormulaListPage() {
               <ReadonlyField label="厂商名称" value={getVendorName(editingGame.vendorId)} />
               <ReadonlyField label="结算公式" value={effectiveFormula} multiline />
             </div>
-            <FormSectionTitle>自有渠道结算公式</FormSectionTitle>
+            <FormSectionTitle>自有渠道</FormSectionTitle>
             <TaxRateField
               tax={editing.internalTax}
               invoiceInfo={invoiceInfo}
+              vendorTaxPoint={invoiceTaxPoint}
               error={errors.internalTax}
               onTaxChange={(tax) => { clearError('internalTax'); setEditing({ ...editing, internalTax: tax }); }}
             />
@@ -245,10 +283,11 @@ export function FormulaListPage() {
               error={errors.internalShare}
               onChange={(v) => { clearError('internalShare'); setEditing({ ...editing, internalShare: v }); }}
             />
-            <FormSectionTitle>外部渠道结算公式</FormSectionTitle>
+            <FormSectionTitle>外部渠道</FormSectionTitle>
             <TaxRateField
               tax={editing.externalTax}
               invoiceInfo={invoiceInfo}
+              vendorTaxPoint={invoiceTaxPoint}
               error={errors.externalTax}
               onTaxChange={(tax) => { clearError('externalTax'); setEditing({ ...editing, externalTax: tax }); }}
             />
@@ -282,7 +321,7 @@ export function FormulaListPage() {
           formAnnotationId="formula-list-internal-channels-form"
         />
       )}
-      <Drawer title="操作记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
+      <Drawer title="公式记录" open={logDrawer} onClose={() => setLogDrawer(false)}>
         <div data-annotation-id="formula-list-logs-drawer">
         {(() => {
           const logGame = getGame(selectedGameId);

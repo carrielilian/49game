@@ -24,6 +24,7 @@ import {
 } from '../utils/financeCenter';
 import {
   buildMockImportRows,
+  collectImportValidationErrors,
   enrichImportRowsOnParse,
   findDuplicateImportGameIds,
 } from '../utils/externalImport';
@@ -32,10 +33,10 @@ import {
   formatCurrencyMoney,
   formatSettlementIncome,
   formatSettlementTime,
-  getSettlementDataSource,
   isUnsettledSettlement,
   SETTLEMENT_CURRENCY,
 } from '../utils/settlement';
+import { compareSettlementAddedDesc } from '../utils/listSort';
 
 const EMPTY_IMPORT: ImportPreviewRow[] = [];
 
@@ -74,8 +75,6 @@ function buildImportTotalRow(rows: ImportPreviewRow[]): React.ReactNode {
   );
 }
 
-const DATA_SOURCE_OPTIONS = ['系统拉取', '文件导入'];
-
 export function IncomeSettlementPage() {
   const {
     businessType,
@@ -99,13 +98,14 @@ export function IncomeSettlementPage() {
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [monthRange, setMonthRange] = useState(getRecentTwoMonthsRange);
   const [channelFilter, setChannelFilter] = useState('');
-  const [dataSourceFilter, setDataSourceFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewRow[]>(EMPTY_IMPORT);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const [pulling, setPulling] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const demoImportAttemptRef = useRef(0);
   const importUploaded = preview.length > 0;
   const canConfirmImport = importUploaded && preview.every((row) => !row.error);
 
@@ -123,16 +123,17 @@ export function IncomeSettlementPage() {
       ? getInternalChannelCategory(record.channel)
       : record.channel;
     if (channelFilter && displayChannel !== channelFilter) return false;
-    if (dataSourceFilter && getSettlementDataSource(record) !== dataSourceFilter) return false;
     if (paymentStatusFilter && record.paymentApplyStatus !== paymentStatusFilter) return false;
     return true;
-  });
+  }).sort(compareSettlementAddedDesc);
 
   const unsettled = data.filter((record) => isUnsettledSettlement(record));
 
   const closeImport = () => {
     setImportOpen(false);
     setPreview(EMPTY_IMPORT);
+    setImportErrors([]);
+    demoImportAttemptRef.current = 0;
   };
 
   const showToast = (message: string, type: ToastType) => setToast({ message, type });
@@ -168,20 +169,47 @@ export function IncomeSettlementPage() {
   };
 
   const handleFileChange = () => {
-    const raw = buildMockImportRows(scopedFormulas, scopedGames, scopedVendors);
-    const rows = enrichImportRowsOnParse(raw, scopedGames, scopedVendors);
+    const file = fileRef.current?.files?.[0];
+    setPreview(EMPTY_IMPORT);
+    setImportErrors([]);
+    if (!file) return;
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (!extension || !['xlsx', 'xls', 'csv'].includes(extension)) {
+      setImportErrors(['文件格式不正确']);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setImportErrors(['文件大小不能超过5MB']);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    if (demoImportAttemptRef.current === 0) {
+      demoImportAttemptRef.current = 1;
+      setImportErrors([
+        '9998、9999游戏ID不存在',
+        '未知渠道A、未知渠道B渠道不存在',
+        '待结算金额格式错误',
+      ]);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    const raw = buildMockImportRows(scopedGames, scopedVendors);
+    const rows = enrichImportRowsOnParse(raw, scopedGames);
+    const rowErrors = collectImportValidationErrors(rows);
+    if (rowErrors.length > 0) {
+      setImportErrors(rowErrors);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
     const duplicateIds = findDuplicateImportGameIds(rows, scopedSettlements);
     if (fileRef.current) fileRef.current.value = '';
     if (duplicateIds.length > 0) {
       setPreview(EMPTY_IMPORT);
-      showToast(`${duplicateIds.join('、')}数据重复上传`, 'error');
+      setImportErrors([`${duplicateIds.join('、')}数据存在重复内容`]);
       return;
     }
     setPreview(rows);
-    if (rows.some((row) => row.error)) {
-      showToast('部分数据无法导入，请检查列表提示', 'error');
-      return;
-    }
     showToast('上传成功', 'success');
   };
 
@@ -235,6 +263,8 @@ export function IncomeSettlementPage() {
                 data-annotation-id="external-settlement-import"
                 onClick={() => {
                   setPreview(EMPTY_IMPORT);
+                  setImportErrors([]);
+                  demoImportAttemptRef.current = 0;
                   setImportOpen(true);
                 }}
               >
@@ -264,8 +294,7 @@ export function IncomeSettlementPage() {
           columns={[
             { key: 'time', title: '收入时间', render: (record) => record.incomeTime },
             { key: 'game', title: '游戏ID / 游戏名称', render: (record) => <DualCell main={getGameName(record.gameId)} sub={record.gameId} /> },
-            { key: 'vendorId', title: '厂商ID', render: (record) => record.vendorId },
-            { key: 'vendorName', title: '厂商名称', render: (record) => getVendorName(record.vendorId) },
+            { key: 'vendor', title: '厂商ID / 厂商名称', render: (record) => <DualCell main={getVendorName(record.vendorId)} sub={record.vendorId} /> },
             {
               key: 'channel',
               title: '渠道',
@@ -285,24 +314,6 @@ export function IncomeSettlementPage() {
               render: (record) => record.type === 'internal'
                 ? getInternalChannelCategory(record.channel)
                 : record.channel,
-            },
-            {
-              key: 'dataSource',
-              title: '数据来源',
-              header: (
-                <span data-annotation-id="internal-settlement-query">
-                  <ColumnFilter
-                    title="数据来源"
-                    filter={{
-                      type: 'select',
-                      value: dataSourceFilter,
-                      onChange: setDataSourceFilter,
-                      options: selectOptions(DATA_SOURCE_OPTIONS),
-                    }}
-                  />
-                </span>
-              ),
-              render: (record) => <StatusBadge text={getSettlementDataSource(record)} />,
             },
             { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (record) => formatCurrencyMoney(record.settlementAmount, SETTLEMENT_CURRENCY) },
             { ...COL_ALIGN_RIGHT, key: 'settleInc', title: '结算收入', render: (record) => formatSettlementIncome(record) },
@@ -374,6 +385,13 @@ export function IncomeSettlementPage() {
               >
                 点击上传渠道报表（模拟解析）
               </div>
+              {importErrors.length > 0 && (
+                <div className="agf-import-errors" role="alert">
+                  {importErrors.map((message) => (
+                    <div key={message} className="agf-form-error">{message}</div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <DataTable

@@ -1252,6 +1252,7 @@ button.agf-month-range__input--open:focus {
 .agf-import-section { margin-bottom: 20px; }
 .agf-import-section__title { font-size: 14px; font-weight: 700; color: var(--color-text); margin-bottom: 6px; }
 .agf-import-hint { margin-bottom: 10px; }
+.agf-import-errors { margin-top: 10px; }
 .agf-import-channels { flex-wrap: wrap; padding-left: 4px; }
 .agf-import-meta { font-size: 14px; color: var(--color-text); margin-bottom: 12px; padding-left: 0; }
 .agf-modal__body .agf-table-panel { --agf-gutter: 0; }

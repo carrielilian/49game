@@ -21,6 +21,8 @@ interface SettlementLetterDrawerProps {
   gameId: string;
   /** 付款记录申请时间：结算函汇率与【标记付款】同源（取申请月上月末汇率） */
   applyTime?: string;
+  /** 申请付款时冻结的汇率取值时间；兼容旧结算函快照 */
+  exchangeRateDate?: string;
   /** 已付款记录的快照；有则不再实时计算 */
   letterSnapshot?: SettlementLetterSnapshot;
   /** 付款记录 id：已付款打开结算函时排除本笔，使 remaining 为付款前余额 */
@@ -76,6 +78,18 @@ function formatExchangeRateDisplay(value: number): string {
   return formatExchangeRate(value);
 }
 
+function formatExchangeRateDateDisplay(value?: string, lang: LetterLang = 'zh'): string {
+  const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return value?.trim() ?? '';
+  const [, year, month, day] = match;
+  return lang === 'zh' ? `${year}年${month}月${day}日` : `${year}-${month}-${day}`;
+}
+
+function formatExchangeRateLabel(value?: string): string {
+  const dateText = formatExchangeRateDateDisplay(value);
+  return dateText ? `汇率（汇率取值时间${dateText}）：` : '汇率：';
+}
+
 function buildLetterPdfLines(
   lang: LetterLang,
   vendorName: string,
@@ -88,6 +102,7 @@ function buildLetterPdfLines(
   payAmount: number,
   showPrepayment: boolean,
   prepaidDeduction: number,
+  exchangeRateDate: string,
   exchangeRate: number,
   showExchangeRate: boolean,
   remainingUndeducted: number,
@@ -105,7 +120,9 @@ function buildLetterPdfLines(
       `Total Income (2): ${formatMoney(incomeTotal)}`,
       `Total Refund (4): ${formatMoney(refundTotal)}`,
       `Subtotal (2)-(4): ${formatMoney(netTotal)}`,
-      ...(showExchangeRate ? [`Exchange Rate: ${formatExchangeRateDisplay(exchangeRate)}`] : []),
+      ...(showExchangeRate ? [
+        `Exchange Rate${exchangeRateDate ? ` (Selected on ${formatExchangeRateDateDisplay(exchangeRateDate, 'en')})` : ''}: ${formatExchangeRateDisplay(exchangeRate)}`,
+      ] : []),
       ...(showPrepayment ? [
         `Settlement/Deduction Amount: ${fmtDeduction(prepaidDeduction)}`,
         `Remaining Prepaid: ${fmtDeduction(remainingUndeducted)}`,
@@ -120,7 +137,7 @@ function buildLetterPdfLines(
     `合计②：${formatMoney(incomeTotal)} 元`,
     `合计④：${formatMoney(refundTotal)} 元`,
     `总计②-④：${formatMoney(netTotal)} 元`,
-    ...(showExchangeRate ? [`汇率：${formatExchangeRateDisplay(exchangeRate)}`] : []),
+    ...(showExchangeRate ? [`${formatExchangeRateLabel(exchangeRateDate)}${formatExchangeRateDisplay(exchangeRate)}`] : []),
     ...(showPrepayment ? [
       `结算/抵扣金额：${fmtDeduction(prepaidDeduction)}`,
       `剩余未抵扣预付分成款：${fmtDeduction(remainingUndeducted)}`,
@@ -140,7 +157,7 @@ function downloadLetterPdf(
 }
 
 export function SettlementLetterDrawer({
-  open, onClose, vendorId, amount, settlementIds, gameId, applyTime, letterSnapshot, paymentId, applyRemainingPrepayment, paymentCompany, gameName, gameEnglishName, contentAnnotationId,
+  open, onClose, vendorId, amount, settlementIds, gameId, applyTime, exchangeRateDate: frozenExchangeRateDate, letterSnapshot, paymentId, applyRemainingPrepayment, paymentCompany, gameName, gameEnglishName, contentAnnotationId,
 }: SettlementLetterDrawerProps) {
   const { getVendor, getGame, getGameName, games, settlements, gamePayments, exchangeRates, contracts } = useAppStore();
   const vendor = getVendor(vendorId);
@@ -225,6 +242,10 @@ export function SettlementLetterDrawer({
     [applyTime, exchangeRates],
   );
   const exchangeRate = letterSnapshot?.exchangeRate ?? liveExchangeRate;
+  const exchangeRateDate = letterSnapshot?.exchangeRateDate
+    ?? frozenExchangeRateDate
+    ?? applyTime?.slice(0, 10)
+    ?? '';
 
   const vendorRemainingPrepayment = prepaymentSummary.remainingPrepayment;
   const showPrepaymentDeductionRows = letterSnapshot?.showPrepaymentDeductionRows
@@ -281,6 +302,7 @@ export function SettlementLetterDrawer({
     letterPayAmount,
     showPrepaymentDeductionRows,
     prepaidDeduction,
+    exchangeRateDate,
     exchangeRate,
     showExchangeRate,
     remainingUndeducted,
@@ -409,7 +431,7 @@ export function SettlementLetterDrawer({
           <tbody>
             {showExchangeRate && (
               <tr>
-                <td colSpan={4} className="agf-settlement-letter__subtotal-label">汇率：</td>
+                <td colSpan={4} className="agf-settlement-letter__subtotal-label">{formatExchangeRateLabel(exchangeRateDate)}</td>
                 <td className="agf-settlement-letter__subtotal-amount">{formatExchangeRateDisplay(exchangeRate)}</td>
               </tr>
             )}

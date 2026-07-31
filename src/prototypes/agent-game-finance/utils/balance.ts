@@ -5,7 +5,7 @@ import {
   calcRemainingUndeductedPrepayment,
   getGameHistoricalDeduction,
   getGamePrepayment,
-  sumGamePaidActualAmount,
+  sumGameAppliedPrepaymentDeduction,
 } from './prepayment';
 
 /** 申请付款状态为「未申请」（未纳入付款申请）的已结算记录 */
@@ -63,4 +63,10 @@ export function deriveGameBalances(
   });
 }
 
-export { calcDeductedPrepayment, calcRemainingUndeductedPrepayment, getGamePrepayment, getGameHistoricalDeduction, sumGamePaidActualAmount };
+export {
+  calcDeductedPrepayment,
+  calcRemainingUndeductedPrepayment,
+  getGamePrepayment,
+  getGameHistoricalDeduction,
+  sumGameAppliedPrepaymentDeduction,
+};

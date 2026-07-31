@@ -48,6 +48,14 @@ export interface BuildSettlementLetterSnapshotInput {
   letterPayAmountOverride?: number;
   /** 申请付款时手工填写的汇率；提供后不再按申请时间查汇率表 */
   exchangeRateOverride?: number;
+  /** 申请付款时手工选择的汇率取值日期 */
+  exchangeRateDateOverride?: string;
+  /** 申请付款时已经计算并冻结的申请前剩余预付分成款 */
+  remainingPrepaymentOverride?: number;
+  /** 申请付款时已经计算并冻结的本次预付抵扣金额 */
+  prepaymentDeductionOverride?: number;
+  /** 申请付款时已经计算并冻结的抵扣后剩余预付分成款 */
+  remainingPrepaymentAfterApplyOverride?: number;
 }
 
 function buildLetterRows(input: BuildSettlementLetterSnapshotInput): {
@@ -113,13 +121,15 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
     ? gamePayments.filter((p) => p.id !== paymentId)
     : gamePayments;
   const prepaymentSummary = calcGamePrepaymentSummary(game, contract, gameId, scopedGamePayments);
+  const remainingPrepayment = input.remainingPrepaymentOverride
+    ?? prepaymentSummary.remainingPrepayment;
   const showExchangeRate = resolveLetterShowExchangeRate(
     paymentCurrency,
     contractPaymentCurrency,
-    prepaymentSummary.remainingPrepayment,
+    remainingPrepayment,
   );
-  const showPrepaymentDeductionRows = prepaymentSummary.remainingPrepayment > 0;
-  const { deduction: prepaidDeduction, remainingUndeducted, payAmount: formulaPayAmount } =
+  const showPrepaymentDeductionRows = remainingPrepayment > 0;
+  const calculatedDeduction =
     calcGameLetterPrepaymentDeduction(
       game,
       contract,
@@ -131,6 +141,11 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
       exchangeRate,
       paymentId,
     );
+  const prepaidDeduction = input.prepaymentDeductionOverride
+    ?? calculatedDeduction.deduction;
+  const remainingUndeducted = input.remainingPrepaymentAfterApplyOverride
+    ?? calculatedDeduction.remainingUndeducted;
+  const formulaPayAmount = calculatedDeduction.payAmount;
 
   let letterPayAmount = formulaPayAmount;
   if (letterPayAmountOverride !== undefined) {
@@ -141,7 +156,7 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
       game,
       vendor,
       contract,
-      prepaymentSummary.remainingPrepayment,
+      remainingPrepayment,
       exchangeRate,
     );
     letterPayAmount = resolveLetterPayAmount(defaults, paymentCurrency);
@@ -156,6 +171,7 @@ export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapsh
     paymentCurrency,
     contractPaymentCurrency,
     showExchangeRate,
+    exchangeRateDate: showExchangeRate ? input.exchangeRateDateOverride : undefined,
     exchangeRate: showExchangeRate ? exchangeRate : undefined,
     showPrepaymentDeductionRows,
     prepaidDeduction: showPrepaymentDeductionRows ? prepaidDeduction : undefined,

@@ -33,6 +33,15 @@ const CHANNEL_CATEGORIES_BY_BUSINESS: Record<BusinessType, {
   },
 };
 
+const CHANNEL_DISPLAY_NAMES: Record<string, string> = {
+  游戏盒付费: '手游付费',
+  游戏盒内购: '手游内购',
+  '49广告联盟': '手游广告',
+  快爆付费: '手游付费',
+  快爆内购: '手游内购',
+  快爆小游戏广告: '小游戏广告',
+};
+
 function normalizeChannelGameIds(value: string | undefined): string {
   return (value ?? '').split(',').map((id) => id.trim()).filter(Boolean).join(',');
 }
@@ -136,7 +145,7 @@ export function SupportChannelsDrawer({
                 onChange={(e) => updateChannel(i, { enabled: e.target.checked })}
               />
             </label>
-            <span className="agf-channel-row__name">{ch.name}</span>
+            <span className="agf-channel-row__name">{CHANNEL_DISPLAY_NAMES[ch.name] ?? ch.name}</span>
             <div className="agf-channel-row__field">
               <input
                 className="agf-form-input"
@@ -159,7 +168,7 @@ export function SupportChannelsDrawer({
   return (
     <>
       <Drawer
-        title="渠道映射"
+        title="数据拉取"
         open={open}
         onClose={onClose}
         large

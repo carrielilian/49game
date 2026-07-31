@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Vendor } from '../data/types';
+import { DecimalPercentInput } from './FormFields';
 
 type VendorFormData = Omit<Vendor, 'id'>;
 
@@ -13,8 +14,6 @@ interface VendorFormProps {
   clearError?: (key: keyof VendorFormData) => void;
 }
 
-const BANK_OPTIONS = ['中国工商银行', '招商银行', '建设银行', '农业银行', '中国银行', '交通银行', '浦发银行', '民生银行'];
-const LOCATION_OPTIONS = ['北京市', '上海市', '广东省', '浙江省', '四川省', '湖北省', '江苏省'];
 const INVOICE_OPTIONS = ['增值税专用发票（6%）', '增值税专用发票（3%）', '增值税专用发票（1%）', '普通发票', '其他'];
 
 export const VENDOR_REQUIRED: { key: keyof VendorFormData; label: string }[] = [
@@ -31,6 +30,9 @@ export function validateVendorForm(form: VendorFormData): VendorFieldErrors {
   const errors: VendorFieldErrors = {};
   for (const { key, label } of VENDOR_REQUIRED) {
     if (!String(form[key] ?? '').trim()) errors[key] = `${label}不能为空`;
+  }
+  if (form.invoiceInfo === '其他' && !Number.isFinite(form.taxPoint)) {
+    errors.taxPoint = '扣税点不能为空';
   }
   return errors;
 }
@@ -98,6 +100,15 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
     clearError?.(key);
     setForm((prev) => ({ ...prev, [key]: value }));
   };
+  const setInvoiceInfo = (value: string) => {
+    clearError?.('invoiceInfo');
+    if (value !== '其他') clearError?.('taxPoint');
+    setForm((prev) => ({
+      ...prev,
+      invoiceInfo: value,
+      taxPoint: value === '其他' ? prev.taxPoint : undefined,
+    }));
+  };
 
   return (
     <div>
@@ -122,12 +133,25 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
               <td><GridInput value={form.email} onChange={set('email')} error={errors.email} /></td>
             </tr>
             <tr>
-              <th colSpan={3}><GridLabel>单位地址</GridLabel></th>
+              <th colSpan={form.invoiceInfo === '其他' ? 2 : 3}><GridLabel>单位地址</GridLabel></th>
               <th colSpan={2}><GridLabel required>发票信息</GridLabel></th>
+              {form.invoiceInfo === '其他' && <th><GridLabel required>扣税点</GridLabel></th>}
             </tr>
             <tr>
-              <td colSpan={3}><GridInput value={form.address} onChange={set('address')} error={errors.address} /></td>
-              <td colSpan={2}><GridSelect value={form.invoiceInfo} onChange={set('invoiceInfo')} options={INVOICE_OPTIONS} error={errors.invoiceInfo} /></td>
+              <td colSpan={form.invoiceInfo === '其他' ? 2 : 3}><GridInput value={form.address} onChange={set('address')} error={errors.address} /></td>
+              <td colSpan={2}><GridSelect value={form.invoiceInfo} onChange={setInvoiceInfo} options={INVOICE_OPTIONS} error={errors.invoiceInfo} /></td>
+              {form.invoiceInfo === '其他' && (
+                <td>
+                  <DecimalPercentInput
+                    value={form.taxPoint ?? Number.NaN}
+                    onChange={(value) => {
+                      clearError?.('taxPoint');
+                      setForm((prev) => ({ ...prev, taxPoint: value }));
+                    }}
+                    error={errors.taxPoint}
+                  />
+                </td>
+              )}
             </tr>
           </tbody>
         </table>
@@ -146,8 +170,8 @@ export function VendorForm({ form, setForm, vendorId, errors = {}, clearError }:
           <tbody>
             <tr>
               <td><GridInput value={form.accountName} onChange={set('accountName')} error={errors.accountName} /></td>
-              <td><GridSelect value={form.bank} onChange={set('bank')} options={BANK_OPTIONS} error={errors.bank} /></td>
-              <td><GridSelect value={form.bankLocation} onChange={set('bankLocation')} options={LOCATION_OPTIONS} error={errors.bankLocation} /></td>
+              <td><GridInput value={form.bank} onChange={set('bank')} error={errors.bank} /></td>
+              <td><GridInput value={form.bankLocation} onChange={set('bankLocation')} error={errors.bankLocation} /></td>
             </tr>
             <tr>
               <th><GridLabel required>支行名称</GridLabel></th>
@@ -173,6 +197,7 @@ export const EMPTY_VENDOR_FORM: VendorFormData = {
   email: '',
   address: '',
   invoiceInfo: '',
+  taxPoint: undefined,
   accountName: '',
   bank: '',
   bankCode: '',

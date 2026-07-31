@@ -6,13 +6,13 @@ export const BUSINESS_TYPE_OPTIONS: { value: BusinessType; label: string }[] = [
 ];
 
 export const VENDOR_ID_BASE: Record<BusinessType, number> = {
-  '4399': 1001,
-  '快爆': 2001,
+  '4399': 4001,
+  '快爆': 8001,
 };
 
 export const GAME_ID_BASE: Record<BusinessType, number> = {
-  '4399': 4001,
-  '快爆': 5001,
+  '4399': 100001,
+  '快爆': 300001,
 };
 
 export function vendorIdsInBusiness(vendors: Vendor[], businessType: BusinessType): Set<string> {

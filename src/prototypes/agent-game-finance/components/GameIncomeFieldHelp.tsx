@@ -5,8 +5,8 @@ import { Modal } from './Modal';
 export const GAME_INCOME_FIELD_HINTS = [
   '账户总收入 = 累计收入 - 累计退款',
   '账户余额 = 【收入结算】中「申请付款状态」为「未申请」的「结算收入」之和 − 【退款结算】中「申请付款状态」为「未申请」的「结算退款」之和（按游戏维度汇总）',
-  '预付分成款 = 游戏收入管理「付款设置」中维护的预付分成款',
-  '已抵扣分成款 = 已付款待付款金额之和 + 历史已抵扣分成款；若预付分成款 − 上述合计 ≤ 0，则取预付分成款（公式中的预付分成款、历史已抵扣分成款均为保存后的数值）',
+  '预付分成款 = 游戏请款管理「付款设置」中维护的预付分成款',
+  '已抵扣分成款 = 历史已抵扣分成款 + 历次付款申请成功时直接抵扣的预付分成款；最大不超过预付分成款',
   '剩余未抵扣分成款 = 预付分成款 − 已抵扣分成款（≤0 时为 0）；公式中的预付分成款为保存后的数值',
   '累计收入 = 【收入结算】全部已结算记录的「结算收入」之和（按游戏维度）',
   '累计退款 = 【退款结算】全部已结算记录的「结算退款」之和（按游戏维度）',
@@ -22,13 +22,13 @@ export function GameIncomeFieldHelp() {
         className="agf-help-btn"
         data-annotation-id="game-income-field-help"
         onClick={() => setOpen(true)}
-        aria-label="游戏收入管理字段说明"
+        aria-label="游戏请款管理字段说明"
         title="字段说明"
       >
         <CircleHelp size={16} aria-hidden />
       </button>
       <Modal
-        title="游戏收入管理字段说明"
+        title="游戏请款管理字段说明"
         open={open}
         onClose={() => setOpen(false)}
         plain

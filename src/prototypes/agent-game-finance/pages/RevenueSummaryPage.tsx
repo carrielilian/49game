@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { COL_ALIGN_RIGHT, DataTable, DualCell, renderCurrencyTotals } from '../components/DataTable';
 import { ColumnFilter } from '../components/ColumnFilter';
 import { FilterBar } from '../components/FilterBar';
-import { MonthRangePicker } from '../components/MonthRangePicker';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { Toast, type ToastType } from '../components/Modal';
 import { useAppStore } from '../data/store';
@@ -12,16 +11,17 @@ import { sumContractPaymentsByCurrency } from '../utils/currencySnapshot';
 import { selectOptions } from '../utils/columnFilters';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { downloadCsv } from '../utils/listExport';
-import { getSampleMonthRange, isMonthInRange } from '../utils/monthRange';
 import { isPaidPayment } from '../utils/payment';
 import { formatCurrencyMoney, formatDateTime, SETTLEMENT_CURRENCY } from '../utils/settlement';
 import { getInternalChannelCategory, INTERNAL_CHANNEL_CATEGORIES } from '../utils/financeCenter';
+import { settlementAddedAt } from '../utils/listSort';
 
 type QueryDimension = 'game' | 'channel' | 'vendor';
 
 interface SummaryRow {
   id: string;
-  time: string;
+  /** 汇总项所包含数据中，最近一次进入系统的时间。 */
+  addedAt: string;
   gameId?: string;
   gameName?: string;
   vendorId?: string;
@@ -32,7 +32,7 @@ interface SummaryRow {
   settlementIncome: number;
   settlementRefund: number;
   settlementPaymentAmount: number;
-  /** 渠道/厂商维度汇总支付金额时关联的游戏 */
+  /** 渠道/厂商维度汇总指标时关联的游戏 */
   paymentGameIds?: Set<string>;
 }
 
@@ -42,6 +42,10 @@ function attachPaymentAmount(
   contractMap: Map<string, Contract>,
 ): SummaryRow[] {
   return rows.map((row) => {
+    if (dimension === 'channel') {
+      const { paymentGameIds: _omit, ...rest } = row;
+      return { ...rest, paymentByCurrency: {} };
+    }
     const gameIds = dimension === 'game'
       ? (row.gameId ? [row.gameId] : [])
       : Array.from(row.paymentGameIds ?? []);
@@ -51,27 +55,22 @@ function attachPaymentAmount(
   });
 }
 
-function getPayMonth(payTime?: string): string | null {
-  if (!payTime || payTime.length < 7) return null;
-  return payTime.slice(0, 7);
-}
-
 function attachSettlementPaymentAmount(
   rows: Array<Omit<SummaryRow, 'paymentByCurrency'> & { paymentGameIds?: Set<string> }>,
   dimension: QueryDimension,
   gamePayments: GamePaymentRequest[],
-  monthRange: { start: string; end: string },
   search: ListSearchQuery,
   getGame: (id: string) => Game | undefined,
   getGameName: (id: string) => string,
   getVendorName: (id: string) => string,
 ): Array<Omit<SummaryRow, 'paymentByCurrency'> & { paymentGameIds?: Set<string> }> {
+  if (dimension === 'channel') {
+    return rows.map((row) => ({ ...row, settlementPaymentAmount: 0 }));
+  }
   return rows.map((row) => {
     let settlementPaymentAmount = 0;
     for (const payment of gamePayments) {
       if (!isPaidPayment(payment.status) || payment.actualAmount == null) continue;
-      const payMonth = getPayMonth(payment.payTime);
-      if (!payMonth || payMonth !== row.time || !isMonthInRange(payMonth, monthRange)) continue;
 
       const game = getGame(payment.gameId);
       if (!game) continue;
@@ -136,7 +135,6 @@ function buildSummaryLeadingRow(dimension: QueryDimension, totals: SummaryTotals
     return (
       <tr className="agf-table__summary-row" data-annotation-id="stats-summary-summary-row">
         <td>查询总计</td>
-        <td />
         <td className={AMOUNT_CELL}>{paymentCell}</td>
         <td className={AMOUNT_CELL}>{revenueCell}</td>
         <td className={AMOUNT_CELL}>{settlementCell}</td>
@@ -147,18 +145,15 @@ function buildSummaryLeadingRow(dimension: QueryDimension, totals: SummaryTotals
     return (
       <tr className="agf-table__summary-row" data-annotation-id="stats-summary-summary-row">
         <td>查询总计</td>
-        <td />
-        <td className={AMOUNT_CELL}>{paymentCell}</td>
+        <td className={AMOUNT_CELL}>-</td>
         <td className={AMOUNT_CELL}>{revenueCell}</td>
-        <td className={AMOUNT_CELL}>{settlementCell}</td>
+        <td className={AMOUNT_CELL}>-</td>
       </tr>
     );
   }
   return (
     <tr className="agf-table__summary-row" data-annotation-id="stats-summary-summary-row">
       <td>查询总计</td>
-      <td />
-      <td />
       <td className={AMOUNT_CELL}>{paymentCell}</td>
       <td className={AMOUNT_CELL}>{revenueCell}</td>
       <td className={AMOUNT_CELL}>{settlementCell}</td>
@@ -169,14 +164,13 @@ function buildSummaryLeadingRow(dimension: QueryDimension, totals: SummaryTotals
 const PAYMENT_COLUMN = {
   ...COL_ALIGN_RIGHT,
   key: 'paymentAmount',
-  title: '支付金额',
+  title: '合同已付款金额',
   render: (r: SummaryRow) => formatPaymentAmount(r.paymentByCurrency),
 };
 
 function buildSummaryRows(
   settlements: SettlementRecord[],
   dimension: QueryDimension,
-  monthRange: { start: string; end: string },
   search: ListSearchQuery,
   getVendorName: (id: string) => string,
   getGameName: (id: string) => string,
@@ -184,7 +178,7 @@ function buildSummaryRows(
   const map = new Map<string, Omit<SummaryRow, 'paymentByCurrency'> & { paymentGameIds?: Set<string> }>();
 
   for (const s of settlements) {
-    if (!s.settled || !isMonthInRange(s.incomeTime, monthRange)) continue;
+    if (!s.settled) continue;
 
     const gameName = getGameName(s.gameId);
     const vendorName = getVendorName(s.vendorId);
@@ -199,16 +193,16 @@ function buildSummaryRows(
     })) continue;
 
     const key = dimension === 'game'
-      ? `${s.incomeTime}|${s.gameId}`
+      ? s.gameId
       : dimension === 'channel'
-        ? `${s.incomeTime}|${summaryChannel}`
-        : `${s.incomeTime}|${s.vendorId}`;
+        ? summaryChannel
+        : s.vendorId;
 
     let row = map.get(key);
     if (!row) {
       row = {
         id: key,
-        time: s.incomeTime,
+        addedAt: settlementAddedAt(s),
         settlementIncome: 0,
         settlementRefund: 0,
         settlementPaymentAmount: 0,
@@ -218,6 +212,7 @@ function buildSummaryRows(
       };
       map.set(key, row);
     }
+    if (settlementAddedAt(s) > row.addedAt) row.addedAt = settlementAddedAt(s);
 
     if (dimension !== 'game') {
       if (!row.paymentGameIds) row.paymentGameIds = new Set<string>();
@@ -236,13 +231,7 @@ function buildSummaryRows(
       ...row,
       totalRevenue: row.settlementIncome - row.settlementRefund,
     }))
-    .sort((a, b) => {
-      const byTime = b.time.localeCompare(a.time);
-      if (byTime !== 0) return byTime;
-      const keyA = a.gameId ?? a.channel ?? a.vendorId ?? '';
-      const keyB = b.gameId ?? b.channel ?? b.vendorId ?? '';
-      return keyA.localeCompare(keyB);
-    });
+    .sort((a, b) => b.addedAt.localeCompare(a.addedAt) || b.id.localeCompare(a.id));
 }
 
 const DIMENSION_OPTIONS: { value: QueryDimension; label: string }[] = [
@@ -269,12 +258,12 @@ function formatPaymentAmountExport(paymentByCurrency: Partial<Record<ContractCur
 
 function getExportHeaders(dimension: QueryDimension): string[] {
   if (dimension === 'game') {
-    return ['时间', '游戏ID / 游戏名称', '支付金额', '总收入', '结算付款金额'];
+    return ['游戏ID / 游戏名称', '合同已付款金额', '总收入', '累计实际付款金额'];
   }
   if (dimension === 'channel') {
-    return ['时间', '渠道', '支付金额', '总收入', '结算付款金额'];
+    return ['渠道', '合同已付款金额', '总收入', '累计实际付款金额'];
   }
-  return ['时间', '厂商ID', '厂商名称', '支付金额', '总收入', '结算付款金额'];
+  return ['厂商ID', '厂商名称', '合同已付款金额', '总收入', '累计实际付款金额'];
 }
 
 function rowToExport(row: SummaryRow, dimension: QueryDimension): string[] {
@@ -282,12 +271,12 @@ function rowToExport(row: SummaryRow, dimension: QueryDimension): string[] {
   const totalRevenue = formatCurrencyMoney(row.totalRevenue, SETTLEMENT_CURRENCY);
   const settlementPayment = formatCurrencyMoney(row.settlementPaymentAmount, SETTLEMENT_CURRENCY);
   if (dimension === 'game') {
-    return [row.time, `${row.gameId!} / ${row.gameName!}`, payment, totalRevenue, settlementPayment];
+    return [`${row.gameId!} / ${row.gameName!}`, payment, totalRevenue, settlementPayment];
   }
   if (dimension === 'channel') {
-    return [row.time, row.channel!, payment, totalRevenue, settlementPayment];
+    return [row.channel!, '-', totalRevenue, '-'];
   }
-  return [row.time, row.vendorId!, row.vendorName!, payment, totalRevenue, settlementPayment];
+  return [row.vendorId!, row.vendorName!, payment, totalRevenue, settlementPayment];
 }
 
 const REVENUE_CHANNEL_FILTER_OPTIONS = selectOptions([
@@ -298,14 +287,13 @@ const REVENUE_CHANNEL_FILTER_OPTIONS = selectOptions([
 const SETTLEMENT_PAYMENT_COLUMN = {
   ...COL_ALIGN_RIGHT,
   key: 'settlementPaymentAmount',
-  title: '结算付款金额',
+  title: '累计实际付款金额',
   render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.settlementPaymentAmount),
 };
 
 export function RevenueSummaryPage() {
-  const { scopedSettlements, scopedGamePayments, contracts, getVendorName, getGameName, getGame, getVendor } = useAppStore();
+  const { scopedSettlements, scopedGamePayments, contracts, getVendorName, getGameName, getGame } = useAppStore();
   const [dimension, setDimension] = useState<QueryDimension>('game');
-  const [monthRange, setMonthRange] = useState(getSampleMonthRange);
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [channelFilter, setChannelFilter] = useState('');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
@@ -323,7 +311,6 @@ export function RevenueSummaryPage() {
     const base = buildSummaryRows(
       scopedSettlements,
       dimension,
-      monthRange,
       search,
       getVendorName,
       getGameName,
@@ -332,14 +319,13 @@ export function RevenueSummaryPage() {
       base,
       dimension,
       scopedGamePayments,
-      monthRange,
       search,
       getGame,
       getGameName,
       getVendorName,
     );
     return attachPaymentAmount(withSettlementPayment, dimension, contractMap);
-  }, [scopedSettlements, scopedGamePayments, dimension, monthRange, search, getVendorName, getGameName, contractMap, getGame, getVendor]);
+  }, [scopedSettlements, scopedGamePayments, dimension, search, getVendorName, getGameName, contractMap, getGame]);
 
   const rows = useMemo(() => {
     if (dimension !== 'channel' || !channelFilter) return allRows;
@@ -351,7 +337,6 @@ export function RevenueSummaryPage() {
 
   const columns = dimension === 'game'
     ? [
-        { key: 'time', title: '时间', render: (r: SummaryRow) => r.time },
         { key: 'game', title: '游戏ID / 游戏名称', render: (r: SummaryRow) => <DualCell main={r.gameName!} sub={r.gameId!} /> },
         PAYMENT_COLUMN,
         { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
@@ -359,7 +344,6 @@ export function RevenueSummaryPage() {
       ]
     : dimension === 'channel'
       ? [
-          { key: 'time', title: '时间', render: (r: SummaryRow) => r.time },
           {
             key: 'channel',
             title: '渠道',
@@ -378,14 +362,12 @@ export function RevenueSummaryPage() {
             ),
             render: (r: SummaryRow) => r.channel,
           },
-          PAYMENT_COLUMN,
+          { ...PAYMENT_COLUMN, render: () => '-' },
           { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
-          SETTLEMENT_PAYMENT_COLUMN,
+          { ...SETTLEMENT_PAYMENT_COLUMN, render: () => '-' },
         ]
       : [
-          { key: 'time', title: '时间', render: (r: SummaryRow) => r.time },
-          { key: 'vendorId', title: '厂商ID', render: (r: SummaryRow) => r.vendorId },
-          { key: 'vendorName', title: '厂商名称', render: (r: SummaryRow) => r.vendorName },
+          { key: 'vendor', title: '厂商ID / 厂商名称', render: (r: SummaryRow) => <DualCell main={r.vendorName!} sub={r.vendorId!} /> },
           PAYMENT_COLUMN,
           { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
           SETTLEMENT_PAYMENT_COLUMN,
@@ -416,7 +398,6 @@ export function RevenueSummaryPage() {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-          <MonthRangePicker value={monthRange} onChange={setMonthRange} />
           <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
           <button
             type="button"

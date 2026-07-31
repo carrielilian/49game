@@ -79,6 +79,16 @@ export function getSettlementChannelOwnership(
     : 'external';
 }
 
+/** 退款无论渠道归属均使用外部渠道结算公式；收入仍按实际渠道归属选择公式。 */
+export function getSettlementFormulaOwnership(
+  record: SettlementRecord,
+  vendor: Vendor | undefined,
+): ChannelOwnership {
+  return record.type === 'refund'
+    ? 'external'
+    : getSettlementChannelOwnership(record, vendor);
+}
+
 export function isFormulaConfiguredForOwnership(
   formula: FormulaConfig | undefined,
   ownership: ChannelOwnership,
@@ -112,7 +122,7 @@ export function getSettlementFormulaText(
   const configuredTax = isOwn ? formula!.internalTax : formula!.externalTax;
   const taxMode = isOwn ? formula!.internalTaxMode : formula!.externalTaxMode;
   const tax = taxMode === '跟随发票' && vendor
-    ? resolveFollowInvoiceTax(vendor.invoiceInfo, configuredTax)
+    ? resolveFollowInvoiceTax(vendor.invoiceInfo, configuredTax, vendor.taxPoint)
     : configuredTax;
   const text = formatFormulaText(
     tax,
@@ -140,16 +150,16 @@ export function calcRecordSettlementIncome(
   formula: FormulaConfig | undefined,
   vendor: Vendor | undefined,
 ): number {
-  const ownership = getSettlementChannelOwnership(record, vendor);
+  const ownership = getSettlementFormulaOwnership(record, vendor);
   if (!isFormulaConfiguredForOwnership(formula, ownership)) return record.settlementIncome;
   if (ownership === 'external') {
     const tax = formula.externalTaxMode === '跟随发票' && vendor
-      ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.externalTax)
+      ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.externalTax, vendor.taxPoint)
       : formula.externalTax;
     return calcSettlement(record.settlementAmount, tax, formula.externalChannelFee, formula.externalShare);
   }
   const tax = formula.internalTaxMode === '跟随发票' && vendor
-    ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.internalTax)
+    ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.internalTax, vendor.taxPoint)
     : formula.internalTax;
   return calcSettlement(record.settlementAmount, tax, formula.internalChannelFee, formula.internalShare);
 }

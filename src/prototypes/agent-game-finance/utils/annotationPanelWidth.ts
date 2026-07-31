@@ -4,7 +4,7 @@ const ANNOTATION_HOST_ID = '__axhub_annotation_host__';
 const STYLE_ID = 'agf-annotation-panel-width';
 const PANEL_SELECTOR = '[data-axhub-annotation-panel-target="true"]';
 
-export const ANNOTATION_PANEL_WIDTH = 560;
+export const ANNOTATION_PANEL_WIDTH = 660;
 
 function patchPanelElements(root: ParentNode, width: number): void {
   root.querySelectorAll(PANEL_SELECTOR).forEach((node) => {

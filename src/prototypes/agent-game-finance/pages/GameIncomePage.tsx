@@ -17,6 +17,7 @@ import {
 } from '../utils/gamePaymentApply';
 import { resolveContractCurrency } from '../utils/currencySnapshot';
 import { DatePicker, getTodayDateValue } from '../components/DatePicker';
+import { compareGameAddedDesc } from '../utils/listSort';
 
 function formatPrepayAmountInput(value: number): string {
   return value.toFixed(2);
@@ -87,9 +88,13 @@ export function GameIncomePage() {
     () => new Map(contracts.map((c) => [c.gameId, c])),
     [contracts],
   );
+  const gameById = useMemo(
+    () => new Map(scopedGames.map((game) => [game.id, game])),
+    [scopedGames],
+  );
 
   const rows = scopedGameBalances.map((b) => {
-    const g = scopedGames.find((x) => x.id === b.gameId);
+    const g = gameById.get(b.gameId);
     const contract = g ? contractByGameId.get(g.id) : undefined;
     const savedPrepayment = hasGamePrepayment(g, contract) ? contract?.paidPrepayment : undefined;
     const prepaymentUnset = savedPrepayment == null || Number.isNaN(savedPrepayment);
@@ -108,7 +113,10 @@ export function GameIncomePage() {
     gameName: r.gameName,
     vendorId: r.vendorId,
     vendorName: r.vendorName,
-  }));
+  })).sort((a, b) => compareGameAddedDesc(
+    { id: a.gameId, createdAt: gameById.get(a.gameId)?.createdAt ?? '' },
+    { id: b.gameId, createdAt: gameById.get(b.gameId)?.createdAt ?? '' },
+  ));
 
   const selectedBalance = scopedGameBalances.find((b) => b.gameId === selectedGameId);
   const confirmAmount = selectedBalance?.balance ?? 0;
@@ -130,12 +138,12 @@ export function GameIncomePage() {
 
   const openPrepayDrawer = (gameId: string) => {
     const game = getGame(gameId);
-    const contract = contractByGameId.get(gameId);
     setSelectedGameId(gameId);
-    setHasPrepaymentValue(hasGamePrepayment(game, contract));
+    // 未维护时仅在页面默认显示“无”；打开抽屉不回写数据，保存后才持久化选择。
+    setHasPrepaymentValue(game?.hasPrepayment === true);
     setHistoricalAmount(formatOptionalPrepayAmountInput(game?.historicalDeduction));
     setSharePaymentCompany(game?.sharePaymentCompany ?? '');
-    setSharePaymentCurrency(game?.sharePaymentCurrency ?? '人民币');
+    setSharePaymentCurrency(game?.sharePaymentCurrency ?? '');
     setPrepayErrors({});
     setPrepayOpen(true);
   };
@@ -192,7 +200,7 @@ export function GameIncomePage() {
     const game = getGame(gameId);
     const vendor = game ? getVendor(game.vendorId) : undefined;
     const contract = contractByGameId.get(gameId);
-    const block = getApplyGamePaymentBlock(gameId, game, vendor, contract);
+    const block = getApplyGamePaymentBlock(game, vendor, contract);
     if (block) {
       setToast({ message: getApplyGamePaymentBlockMessage(block), type: 'error' });
       return;
@@ -232,7 +240,7 @@ export function GameIncomePage() {
     <div className="agf-card">
       <div data-annotation-id="game-income-query">
         <FilterBar>
-          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} hideVendorId />
+          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
         </FilterBar>
       </div>
       <div data-annotation-id="game-income-table">
@@ -241,7 +249,7 @@ export function GameIncomePage() {
         data={rows}
         columns={[
           { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={r.gameName} sub={r.gameId} /> },
-          { key: 'vendorName', title: '厂商名称', render: (r) => r.vendorName },
+          { key: 'vendor', title: '厂商ID / 厂商名称', render: (r) => <DualCell main={r.vendorName} sub={r.vendorId} /> },
           { ...COL_ALIGN_RIGHT, key: 'balance', title: '账户余额', render: (r) => fmtSettlementAmount(r.balance) },
           { ...COL_ALIGN_RIGHT, key: 'accountTotal', title: '账户总收入', render: (r) => fmtSettlementAmount(r.accountTotalIncome) },
           {
@@ -293,7 +301,7 @@ export function GameIncomePage() {
         {prepayGame && (
           <>
             <ReadonlyField label="游戏ID / 游戏名称" value={`${prepayGame.id} / ${prepayGame.onlineName}`} />
-            <FormSectionTitle>预付分成管理</FormSectionTitle>
+            <FormSectionTitle>预付分成信息</FormSectionTitle>
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">有无预付分成款</label>
               <div className="agf-radio-group">
@@ -351,7 +359,7 @@ export function GameIncomePage() {
                 </div>
               </>
             )}
-            <FormSectionTitle>付费设置</FormSectionTitle>
+            <FormSectionTitle>付款信息</FormSectionTitle>
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">分成付款公司</label>
               <div className="agf-form-field">

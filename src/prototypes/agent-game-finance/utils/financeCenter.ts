@@ -50,6 +50,11 @@ function mockAmount(gameId: string, channelGameId: string, type: 'internal' | 'r
   return base + (hash % 70000);
 }
 
+/** 原型 mock：模拟财务中心已按其结算公式计算完成的发行渠道退款金额。 */
+function mockFinanceCenterSettledRefund(rawRefundAmount: number): number {
+  return Math.round(rawRefundAmount * 0.5 * 100) / 100;
+}
+
 /**
  * 按「渠道 + 渠道游戏ID」从财务中心拉取待结算/待退款数据（原型 mock）。
  * 仅包含已上线游戏、渠道映射中已勾选的自有渠道及外部关联平台。
@@ -74,11 +79,16 @@ export function fetchFinanceCenterRows(
       const channel = getInternalChannelCategory(ch.name);
       const isOwnChannel = channel === getSelfChannelCategory(businessType);
       for (const channelGameId of channelGameIds) {
+        const rawAmount = mockAmount(game.id, channelGameId, type);
         rows.push({
           channel,
           channelGameId,
           gameId: game.id,
-          amount: mockAmount(game.id, channelGameId, type),
+          // 退款发行渠道从财务中心读取“退款金额 × 财务中心结算公式”的结果；
+          // 自有渠道退款仍读取原始退款金额。进入本系统后两者都会再套外部渠道结算公式。
+          amount: type === 'refund' && !isOwnChannel
+            ? mockFinanceCenterSettledRefund(rawAmount)
+            : rawAmount,
           channelOwnership: isOwnChannel ? 'own' : 'external',
           settlementRole: isOwnChannel ? 'agency' : 'distribution',
         });

@@ -6,13 +6,9 @@ interface ListSearchFieldsProps {
   mode: ListSearchMode;
   value: ListSearchQuery;
   onChange: (value: ListSearchQuery) => void;
-  /** 游戏管理：额外展示「合同游戏名称」搜索 */
-  showContractName?: boolean;
-  /** 与厂商相关搜索同显时，隐藏「厂商ID」输入（如游戏收入管理页） */
-  hideVendorId?: boolean;
 }
 
-export function ListSearchFields({ mode, value, onChange, showContractName, hideVendorId }: ListSearchFieldsProps) {
+export function ListSearchFields({ mode, value, onChange }: ListSearchFieldsProps) {
   const patch = (key: keyof ListSearchQuery, next: string) => onChange({ ...value, [key]: next });
 
   return (
@@ -25,31 +21,13 @@ export function ListSearchFields({ mode, value, onChange, showContractName, hide
           onChange={(e) => patch('game', e.target.value)}
         />
       )}
-      {showContractName && (
+      {(mode === 'vendor' || mode === 'gameAndVendor') && (
         <input
           className="agf-input"
-          placeholder={SEARCH_FIELD_PLACEHOLDER.contractName}
-          value={value.contractName ?? ''}
-          onChange={(e) => patch('contractName', e.target.value)}
+          placeholder={SEARCH_FIELD_PLACEHOLDER.vendor}
+          value={value.vendor ?? ''}
+          onChange={(e) => patch('vendor', e.target.value)}
         />
-      )}
-      {(mode === 'vendor' || mode === 'gameAndVendor') && (
-        <>
-          {!hideVendorId && (
-            <input
-              className="agf-input"
-              placeholder={SEARCH_FIELD_PLACEHOLDER.vendorId}
-              value={value.vendorId ?? ''}
-              onChange={(e) => patch('vendorId', e.target.value)}
-            />
-          )}
-          <input
-            className="agf-input"
-            placeholder={SEARCH_FIELD_PLACEHOLDER.vendorName}
-            value={value.vendorName ?? ''}
-            onChange={(e) => patch('vendorName', e.target.value)}
-          />
-        </>
       )}
     </>
   );

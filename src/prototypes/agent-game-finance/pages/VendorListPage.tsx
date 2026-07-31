@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ColumnFilter } from '../components/ColumnFilter';
-import { DataTable } from '../components/DataTable';
+import { DataTable, DualCell } from '../components/DataTable';
 import { FilterBar } from '../components/FilterBar';
 import { Drawer, Toast, type ToastType } from '../components/Modal';
 import {
@@ -15,6 +15,7 @@ import type { Vendor } from '../data/types';
 import { INVOICE_INFO_FILTER_OPTIONS } from '../utils/columnFilters';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
+import { compareVendorAddedDesc } from '../utils/listSort';
 
 export function VendorListPage() {
   const { scopedVendors, addVendor, updateVendor } = useAppStore();
@@ -31,7 +32,7 @@ export function VendorListPage() {
     if (!matchesListSearch(search, { vendorId: v.id, vendorName: v.name })) return false;
     if (invoiceFilter && v.invoiceInfo !== invoiceFilter) return false;
     return true;
-  });
+  }).sort(compareVendorAddedDesc);
 
   const clearError = (key: keyof typeof EMPTY_VENDOR_FORM) => setErrors((prev) => {
     if (!prev[key]) return prev;
@@ -89,8 +90,7 @@ export function VendorListPage() {
           rowKey={(r) => r.id}
           data={filtered}
           columns={[
-            { key: 'id', title: '厂商ID', render: (r) => r.id },
-            { key: 'name', title: '厂商名称', render: (r) => r.name },
+            { key: 'vendor', title: '厂商ID / 厂商名称', render: (r) => <DualCell main={r.name} sub={r.id} /> },
             {
               key: 'invoice',
               title: '发票信息',

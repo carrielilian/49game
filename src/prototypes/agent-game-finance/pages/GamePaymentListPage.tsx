@@ -17,6 +17,7 @@ import { calcGamePrepaymentSummary } from '../utils/prepayment';
 import { resolveGameMarkPaymentDefaults, resolveGameMarkPaymentDefaultsFromSnapshot } from '../utils/gamePaymentMarkDefaults';
 import { formatVendorReceiptInfo } from '../utils/gamePaymentApplySnapshot';
 import { getExchangeRateByApplyTime } from '../utils/exchangeRate';
+import { comparePaymentAddedDesc } from '../utils/listSort';
 import {
   formatOptionalAmountInput,
   formatCnyPaymentDisplay,
@@ -109,7 +110,7 @@ export function GamePaymentListPage() {
     })) return false;
     if (statusFilter && p.status !== statusFilter) return false;
     return true;
-  });
+  }).sort(comparePaymentAddedDesc);
 
   const loadPaymentFiles = (p: GamePaymentRequest) => ({
     settlement: parseSavedFiles(p.settlementLetter),
@@ -267,13 +268,12 @@ export function GamePaymentListPage() {
         data={data}
         columns={[
           { key: 'game', title: '游戏ID / 游戏名称', render: (r) => <DualCell main={getGameName(r.gameId)} sub={r.gameId} /> },
-          { key: 'vendorId', title: '厂商ID', render: (r) => getGame(r.gameId)?.vendorId ?? '' },
-          { key: 'vendorName', title: '厂商名称', render: (r) => {
+          { key: 'vendor', title: '厂商ID / 厂商名称', render: (r) => {
             const vendorId = getGame(r.gameId)?.vendorId;
-            return vendorId ? getVendorName(vendorId) : '';
+            return vendorId ? <DualCell main={getVendorName(vendorId)} sub={vendorId} /> : '';
           } },
           { ...COL_ALIGN_RIGHT, key: 'pending', title: '待付款金额', render: (r) => fmtPaymentAmount(r.pendingAmount) },
-          { ...COL_ALIGN_RIGHT, key: 'actual', title: '实际付款金额', render: (r) => r.actualAmount ? fmtPaymentAmount(r.actualAmount) : '-' },
+          { ...COL_ALIGN_RIGHT, key: 'actual', title: '实际付款金额', render: (r) => formatCnyPaymentDisplay(r.actualAmount) },
           { ...COL_ALIGN_RIGHT, key: 'actualUsd', title: '实际付款美金', render: (r) => formatUsdAmountDisplay(r.actualAmountUsd) },
           {
             key: 'status',
@@ -435,6 +435,7 @@ export function GamePaymentListPage() {
           amount={current.pendingAmount}
           settlementIds={current.settlementIds}
           applyTime={current.applyTime}
+          exchangeRateDate={current.applySnapshot?.exchangeRateDate ?? current.exchangeRateDate}
           paymentId={current.id}
           applyRemainingPrepayment={current.applySnapshot?.remainingPrepayment}
           paymentCompany={current.applySnapshot?.sharePaymentCompany ?? current.payBank ?? currentGame?.sharePaymentCompany}

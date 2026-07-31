@@ -9,7 +9,11 @@ import type {
   Vendor,
 } from '../data/types';
 import { resolveMarkPaymentContractCurrency } from './currencySnapshot';
-import { calcGamePrepaymentSummary } from './prepayment';
+import {
+  calcApplyPrepaymentDeduction,
+  calcGamePrepaymentSummary,
+  calcRemainingUndeductedPrepayment,
+} from './prepayment';
 import { buildSettlementLetterSnapshot } from './settlementLetterSnapshot';
 import { getExchangeRateByApplyTime } from './exchangeRate';
 
@@ -67,17 +71,31 @@ export function buildGamePaymentApplySnapshot(
   const lockedExchangeRate =
     exchangeRate ?? getExchangeRateByApplyTime(applyTime, exchangeRates) ?? 7.21;
   const lockedExchangeRateDate = exchangeRateDate ?? applyTime.slice(0, 10);
+  const contractPaymentCurrency = resolveMarkPaymentContractCurrency(game, contract);
+  const prepaymentDeductionAmount = calcApplyPrepaymentDeduction(
+    pendingAmount,
+    prepaymentSummary.remainingPrepayment,
+    contractPaymentCurrency,
+    lockedExchangeRate,
+  );
+  const remainingPrepaymentAfterApply = calcRemainingUndeductedPrepayment(
+    prepaymentSummary.remainingPrepayment,
+    prepaymentDeductionAmount,
+  );
 
   const applySnapshot: GamePaymentApplySnapshot = {
     gameId,
     gameName: getGameName(gameId),
     gameEnglishName: game.englishName?.trim() ?? '',
-    contractPaymentCurrency: resolveMarkPaymentContractCurrency(game, contract),
+    contractPaymentCurrency,
     vendorId: vendor.id,
     vendorName: vendor.name,
     receiptInfo: formatVendorReceiptInfo(vendor),
     prepayment: prepaymentSummary.prepayment,
+    deductedPrepaymentBeforeApply: prepaymentSummary.deductedPrepayment,
+    prepaymentDeductionAmount,
     remainingPrepayment: prepaymentSummary.remainingPrepayment,
+    remainingPrepaymentAfterApply,
     sharePaymentCompany: game.sharePaymentCompany ?? '',
     sharePaymentCurrency: game.sharePaymentCurrency ?? '人民币',
     exchangeRateDate: lockedExchangeRateDate,
@@ -99,7 +117,11 @@ export function buildGamePaymentApplySnapshot(
     exchangeRates,
     games,
     getGameName,
+    exchangeRateDateOverride: lockedExchangeRateDate,
     exchangeRateOverride: lockedExchangeRate,
+    remainingPrepaymentOverride: prepaymentSummary.remainingPrepayment,
+    prepaymentDeductionOverride: prepaymentDeductionAmount,
+    remainingPrepaymentAfterApplyOverride: remainingPrepaymentAfterApply,
   });
 
   return { applySnapshot, letterSnapshot };

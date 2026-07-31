@@ -15,6 +15,8 @@ export type SettlementRole = 'agency' | 'distribution' | 'thirdParty';
 
 export interface Vendor {
   id: string;
+  /** 厂商添加时间，用于列表按最新添加优先展示；历史数据可缺省并回退到ID。 */
+  createdAt?: string;
   businessType: BusinessType;
   name: string;
   contact: string;
@@ -22,6 +24,8 @@ export interface Vendor {
   email: string;
   address: string;
   invoiceInfo: string;
+  /** 发票信息为“其他”时维护的扣税点，小数存储（0.06 = 6%） */
+  taxPoint?: number;
   accountName: string;
   bank: string;
   /** 银行代码（选填） */
@@ -117,6 +121,8 @@ export interface FormulaConfig {
 
 export interface SettlementRecord {
   id: string;
+  /** 数据写入结算列表的时间，用于所有结算列表按最新添加优先展示。 */
+  createdAt?: string;
   type: SettlementType;
   incomeTime: string;
   gameId: string;
@@ -156,7 +162,7 @@ export interface GameBalance {
   totalRefund: number;
 }
 
-/** 标记已付款时冻结的结算函展示数据，之后不再随汇率/预付等外部数据变化 */
+/** 申请付款成功时冻结的结算函展示数据，之后不再随汇率/预付等外部数据变化 */
 export interface SettlementLetterSnapshot {
   incomeRows: Array<{
     id: string;
@@ -182,6 +188,8 @@ export interface SettlementLetterSnapshot {
   /** 支付币种（Contract.currency）；⑤ 结算/抵扣与剩余 */
   contractPaymentCurrency: ContractCurrency;
   showExchangeRate: boolean;
+  /** 申请付款时手工选择并冻结的汇率取值日期 */
+  exchangeRateDate?: string;
   exchangeRate?: number;
   showPrepaymentDeductionRows: boolean;
   prepaidDeduction?: number;
@@ -201,7 +209,14 @@ export interface GamePaymentApplySnapshot {
   vendorName: string;
   receiptInfo: string;
   prepayment: number;
+  /** 申请付款前累计已抵扣分成款（合同支付币种） */
+  deductedPrepaymentBeforeApply: number;
+  /** 本次申请成功时直接抵扣的预付分成款（合同支付币种） */
+  prepaymentDeductionAmount: number;
+  /** 申请付款前剩余未抵扣分成款（兼容既有结算函字段语义） */
   remainingPrepayment: number;
+  /** 本次直接抵扣后的剩余未抵扣分成款 */
+  remainingPrepaymentAfterApply: number;
   sharePaymentCompany: string;
   sharePaymentCurrency: ContractCurrency;
   /** 申请付款时手工填写的汇率取值日期 */
@@ -215,6 +230,8 @@ export interface GamePaymentRequest {
   id: string;
   gameId: string;
   pendingAmount: number;
+  /** 申请成功时直接抵扣的预付分成款，币种为合同支付币种 */
+  prepaymentDeductionAmount?: number;
   actualAmount?: number;
   /** 实际付款美金（选填） */
   actualAmountUsd?: number;

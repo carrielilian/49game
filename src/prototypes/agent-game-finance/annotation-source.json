@@ -370,7 +370,7 @@
       {
         "id": "formula-list-internal-channels",
         "index": 5,
-        "title": "渠道映射",
+        "title": "数据拉取",
         "pageId": "formula-list",
         "locator": {
           "selectors": [
@@ -379,7 +379,7 @@
           "fingerprint": "button|formula-list-internal-channels",
           "path": []
         },
-        "aiPrompt": "说明渠道映射入口。",
+        "aiPrompt": "说明数据拉取入口。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -490,7 +490,7 @@
       {
         "id": "formula-list-internal-channels-form",
         "index": 8,
-        "title": "渠道映射表单",
+        "title": "数据拉取表单",
         "pageId": "formula-list",
         "locator": {
           "selectors": [
@@ -499,7 +499,7 @@
           "fingerprint": "div|formula-list-internal-channels-form",
           "path": []
         },
-        "aiPrompt": "说明渠道映射表单。",
+        "aiPrompt": "说明数据拉取表单。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#D97706",
@@ -610,7 +610,7 @@
       {
         "id": "formula-list-logs",
         "index": 6,
-        "title": "操作记录",
+        "title": "公式记录",
         "pageId": "formula-list",
         "locator": {
           "selectors": [
@@ -619,7 +619,7 @@
           "fingerprint": "button|formula-list-logs",
           "path": []
         },
-        "aiPrompt": "说明操作记录入口。",
+        "aiPrompt": "说明公式记录入口。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -650,7 +650,7 @@
       {
         "id": "formula-list-logs-drawer",
         "index": 9,
-        "title": "操作记录抽屉",
+        "title": "公式记录抽屉",
         "pageId": "formula-list",
         "locator": {
           "selectors": [
@@ -659,7 +659,7 @@
           "fingerprint": "div|formula-list-logs-drawer",
           "path": []
         },
-        "aiPrompt": "说明操作记录抽屉。",
+        "aiPrompt": "说明公式记录抽屉。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -719,7 +719,7 @@
           "fingerprint": "button|external-settlement-settle",
           "path": []
         },
-        "aiPrompt": "说明外部收入主列表结算。",
+        "aiPrompt": "说明统一收入主列表结算。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -730,7 +730,7 @@
       {
         "id": "income-settlement-table",
         "index": 4,
-        "title": "外部收入列表",
+        "title": "收入结算列表",
         "pageId": "income-settlement",
         "locator": {
           "selectors": [
@@ -739,7 +739,7 @@
           "fingerprint": "div|external-settlement-table",
           "path": []
         },
-        "aiPrompt": "说明外部收入结算列表。",
+        "aiPrompt": "说明统一收入结算列表。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -808,26 +808,6 @@
         "updatedAt": 1784515200000
       },
       {
-        "id": "income-settlement-source-col",
-        "index": 1,
-        "title": "查询栏",
-        "pageId": "income-settlement",
-        "locator": {
-          "selectors": [
-            "[data-annotation-id=\"internal-settlement-query\"]"
-          ],
-          "fingerprint": "div|internal-settlement-query",
-          "path": []
-        },
-        "aiPrompt": "说明内部收入结算查询栏。",
-        "annotationText": "",
-        "hasMarkdown": true,
-        "color": "#2563EB",
-        "images": [],
-        "createdAt": 1784515200000,
-        "updatedAt": 1784515200000
-      },
-      {
         "id": "income-settlement-pull",
         "index": 2,
         "title": "数据拉取",
@@ -839,7 +819,7 @@
           "fingerprint": "button|internal-settlement-pull",
           "path": []
         },
-        "aiPrompt": "说明内部收入数据拉取。",
+        "aiPrompt": "说明收入数据拉取。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -859,7 +839,7 @@
           "fingerprint": "button|internal-settlement-settle",
           "path": []
         },
-        "aiPrompt": "说明内部收入结算按钮。",
+        "aiPrompt": "说明系统拉取收入的结算按钮。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -870,7 +850,7 @@
       {
         "id": "internal-settlement-table",
         "index": 4,
-        "title": "内部收入列表",
+        "title": "系统拉取收入列表",
         "pageId": "internal-settlement",
         "locator": {
           "selectors": [
@@ -879,7 +859,7 @@
           "fingerprint": "div|internal-settlement-table",
           "path": []
         },
-        "aiPrompt": "说明内部收入结算列表。",
+        "aiPrompt": "说明系统拉取收入列表。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -899,7 +879,7 @@
           "fingerprint": "span|internal-settlement-channel-col",
           "path": []
         },
-        "aiPrompt": "说明内部收入渠道列筛选。",
+        "aiPrompt": "说明系统拉取收入渠道列筛选。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#059669",
@@ -919,7 +899,7 @@
           "fingerprint": "span|internal-settlement-payment-col",
           "path": []
         },
-        "aiPrompt": "说明内部收入申请付款状态列。",
+        "aiPrompt": "说明系统拉取收入申请付款状态列。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#059669",
@@ -939,7 +919,7 @@
           "fingerprint": "div|internal-refund-query",
           "path": []
         },
-        "aiPrompt": "说明内部退款结算查询栏。",
+        "aiPrompt": "说明退款结算查询栏。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -959,7 +939,7 @@
           "fingerprint": "button|internal-refund-pull",
           "path": []
         },
-        "aiPrompt": "说明内部退款数据拉取。",
+        "aiPrompt": "说明退款数据拉取。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -979,7 +959,7 @@
           "fingerprint": "button|internal-refund-settle",
           "path": []
         },
-        "aiPrompt": "说明内部退款结算按钮。",
+        "aiPrompt": "说明退款结算按钮。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -990,7 +970,7 @@
       {
         "id": "refund-settlement-table",
         "index": 4,
-        "title": "内部退款列表",
+        "title": "退款结算列表",
         "pageId": "refund-settlement",
         "locator": {
           "selectors": [
@@ -999,7 +979,7 @@
           "fingerprint": "div|internal-refund-table",
           "path": []
         },
-        "aiPrompt": "说明内部退款结算列表。",
+        "aiPrompt": "说明退款结算列表。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -1019,7 +999,7 @@
           "fingerprint": "span|internal-refund-channel-col",
           "path": []
         },
-        "aiPrompt": "说明内部退款渠道列筛选。",
+        "aiPrompt": "说明退款结算渠道列筛选。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#059669",
@@ -1039,7 +1019,7 @@
           "fingerprint": "span|internal-refund-payment-col",
           "path": []
         },
-        "aiPrompt": "说明内部退款申请付款状态列。",
+        "aiPrompt": "说明退款结算申请付款状态列。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#059669",
@@ -1059,7 +1039,7 @@
           "fingerprint": "div|game-income-query",
           "path": []
         },
-        "aiPrompt": "说明游戏收入管理查询栏。",
+        "aiPrompt": "说明游戏请款管理查询栏。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#2563EB",
@@ -1566,7 +1546,7 @@
               {
                 "type": "route",
                 "id": "route-game-income",
-                "title": "游戏收入管理",
+                "title": "游戏请款管理",
                 "route": "game-income"
               },
               {
