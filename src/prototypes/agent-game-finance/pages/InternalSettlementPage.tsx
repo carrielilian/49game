@@ -215,7 +215,7 @@ export function InternalSettlementPage({ type }: Props) {
           },
           { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: amountLabel, render: (r) => formatCurrencyMoney(r.settlementAmount, SETTLEMENT_CURRENCY) },
           { ...COL_ALIGN_RIGHT, key: 'settleInc', title: incomeLabel, render: (r) => formatSettlementIncome(r) },
-          { key: 'formula', title: '结算公式', render: (r) => displayFormula(r.formulaText) },
+          { key: 'formula', title: '结算公式', render: (r) => isUnsettledSettlement(r) ? '-' : displayFormula(r.formulaText) },
           { key: 'settleTime', title: '结算时间', render: (r) => formatSettlementTime(r) },
           {
             key: 'status',

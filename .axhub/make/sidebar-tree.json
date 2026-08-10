@@ -1,7 +1,13 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-21T05:58:35.054Z",
+  "updatedAt": "2026-08-05T02:14:01.494Z",
   "prototypes": [
+    {
+      "id": "folder-1785727301948-69o4he",
+      "kind": "folder",
+      "title": "IDC",
+      "children": []
+    },
     {
       "id": "item:prototypes:agent-game-finance",
       "kind": "item",

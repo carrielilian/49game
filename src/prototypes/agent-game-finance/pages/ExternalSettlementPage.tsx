@@ -26,7 +26,7 @@ import {
   buildMockImportRows,
   collectImportValidationErrors,
   enrichImportRowsOnParse,
-  findDuplicateImportGameIds,
+  findDuplicateImportRowNumbers,
 } from '../utils/externalImport';
 import {
   displaySettlementFormula,
@@ -175,21 +175,22 @@ export function IncomeSettlementPage() {
     if (!file) return;
     const extension = file.name.split('.').pop()?.toLowerCase();
     if (!extension || !['xlsx', 'xls', 'csv'].includes(extension)) {
-      setImportErrors(['文件格式不正确']);
+      setImportErrors(['格式错误，仅支持 xlsx、xls、csv']);
       if (fileRef.current) fileRef.current.value = '';
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setImportErrors(['文件大小不能超过5MB']);
+      setImportErrors(['文件大小不得超过5MB']);
       if (fileRef.current) fileRef.current.value = '';
       return;
     }
     if (demoImportAttemptRef.current === 0) {
       demoImportAttemptRef.current = 1;
       setImportErrors([
-        '9998、9999游戏ID不存在',
-        '未知渠道A、未知渠道B渠道不存在',
-        '待结算金额格式错误',
+        '第2、5行收入时间错误',
+        '第2、4行游戏ID不存在',
+        '第3行渠道不存在',
+        '第4行待结算金额格式错误',
       ]);
       if (fileRef.current) fileRef.current.value = '';
       return;
@@ -202,11 +203,11 @@ export function IncomeSettlementPage() {
       if (fileRef.current) fileRef.current.value = '';
       return;
     }
-    const duplicateIds = findDuplicateImportGameIds(rows, scopedSettlements);
+    const duplicateRows = findDuplicateImportRowNumbers(rows, scopedSettlements);
     if (fileRef.current) fileRef.current.value = '';
-    if (duplicateIds.length > 0) {
+    if (duplicateRows.length > 0) {
       setPreview(EMPTY_IMPORT);
-      setImportErrors([`${duplicateIds.join('、')}数据存在重复内容`]);
+      setImportErrors([`第${duplicateRows.join('、')}行数据存在重复内容`]);
       return;
     }
     setPreview(rows);
@@ -317,7 +318,7 @@ export function IncomeSettlementPage() {
             },
             { ...COL_ALIGN_RIGHT, key: 'settleAmt', title: '待结算金额', render: (record) => formatCurrencyMoney(record.settlementAmount, SETTLEMENT_CURRENCY) },
             { ...COL_ALIGN_RIGHT, key: 'settleInc', title: '结算收入', render: (record) => formatSettlementIncome(record) },
-            { key: 'formula', title: '结算公式', render: (record) => displaySettlementFormula(record.formulaText) },
+            { key: 'formula', title: '结算公式', render: (record) => isUnsettledSettlement(record) ? '-' : displaySettlementFormula(record.formulaText) },
             { key: 'settleTime', title: '结算时间', render: (record) => formatSettlementTime(record) },
             {
               key: 'status',

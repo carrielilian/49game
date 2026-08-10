@@ -38,13 +38,24 @@ export function calcRemainingUndeductedPrepayment(prepayment: number, deducted: 
   return 0;
 }
 
-export function hasGamePrepayment(game?: Game, contract?: Contract): boolean {
-  return game?.hasPrepayment ?? (contract?.paidPrepayment != null && !Number.isNaN(contract.paidPrepayment));
+export function isPaidPrepaymentMaintained(contract?: Contract): boolean {
+  return contract?.paidPrepayment != null && !Number.isNaN(contract.paidPrepayment);
 }
 
-export function getGamePrepayment(game?: Game, contract?: Contract): number {
-  if (!hasGamePrepayment(game, contract)) return 0;
+export function getGamePrepayment(_game?: Game, contract?: Contract): number {
+  if (!isPaidPrepaymentMaintained(contract)) return 0;
   return contract?.paidPrepayment ?? 0;
+}
+
+/** 历史已抵扣分成款不能大于已付预付分成款；未维护已付金额时按 0 校验。 */
+export function isHistoricalDeductionWithinPaidPrepayment(
+  historicalDeduction: number,
+  contract?: Contract,
+): boolean {
+  const paidPrepayment = isPaidPrepaymentMaintained(contract)
+    ? contract?.paidPrepayment ?? 0
+    : 0;
+  return historicalDeduction <= paidPrepayment;
 }
 
 export function getGameHistoricalDeduction(game?: Game): number {
@@ -97,7 +108,7 @@ export function calcGamePrepaymentSummary(
   };
 }
 
-export function isGamePrepaymentMissing(game?: Game, contract?: Contract): boolean {
-  if (!hasGamePrepayment(game, contract)) return false;
-  return contract?.paidPrepayment == null || Number.isNaN(contract.paidPrepayment);
+export function isGamePrepaymentMissing(contract?: Contract): boolean {
+  const contractIncludesPrepayment = contract?.cooperationContents.includes('预付分成款') ?? false;
+  return contractIncludesPrepayment && !isPaidPrepaymentMaintained(contract);
 }

@@ -54,6 +54,14 @@ export function formatFormulaText(
   return `${channelLabel}：待结算金额*（1-${formatRatePercent(channelFee)}-${formatRatePercent(tax)}）*${formatRatePercent(share)}`;
 }
 
+export function formatRefundFormulaText(
+  tax: number,
+  share: number,
+  channelLabel: string,
+): string {
+  return `${channelLabel}：退款金额*（1-${formatRatePercent(tax)}）*${formatRatePercent(share)}`;
+}
+
 /** 列表「结算公式」列：去掉「外部：/内部：/外部渠道：」等前缀，仅展示公式表达式 */
 export function displaySettlementFormula(text?: string): string {
   if (!text) return '-';
@@ -124,13 +132,19 @@ export function getSettlementFormulaText(
   const tax = taxMode === '跟随发票' && vendor
     ? resolveFollowInvoiceTax(vendor.invoiceInfo, configuredTax, vendor.taxPoint)
     : configuredTax;
-  const text = formatFormulaText(
+  if (amountLabel === '退款金额') {
+    return formatRefundFormulaText(
+      tax,
+      isOwn ? formula!.internalShare : formula!.externalShare,
+      isOwn ? '自有渠道' : '外部渠道',
+    );
+  }
+  return formatFormulaText(
     tax,
     isOwn ? formula!.internalChannelFee : formula!.externalChannelFee,
     isOwn ? formula!.internalShare : formula!.externalShare,
     isOwn ? '自有渠道' : '外部渠道',
   );
-  return amountLabel === '退款金额' ? text.replace('待结算金额', amountLabel) : text;
 }
 
 export function isUnsettledSettlement(s: SettlementRecord): boolean {
@@ -156,7 +170,12 @@ export function calcRecordSettlementIncome(
     const tax = formula.externalTaxMode === '跟随发票' && vendor
       ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.externalTax, vendor.taxPoint)
       : formula.externalTax;
-    return calcSettlement(record.settlementAmount, tax, formula.externalChannelFee, formula.externalShare);
+    return calcSettlement(
+      record.settlementAmount,
+      tax,
+      record.type === 'refund' ? 0 : formula.externalChannelFee,
+      formula.externalShare,
+    );
   }
   const tax = formula.internalTaxMode === '跟随发票' && vendor
     ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.internalTax, vendor.taxPoint)

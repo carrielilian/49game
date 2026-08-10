@@ -43,6 +43,7 @@ const GAME_HISTORICAL_DEDUCTIONS: Partial<Record<string, number>> = {
   '100003': 0,
   '100005': 10000, // 美金合同：120000 - 历史10000 - 本次2776.29 = 107223.71
   '100006': 95000, // 美金合同：申请前仅剩5000
+  '100007': 0,
   '100009': 0,
   '100010': 0,
   '300001': 0,
@@ -164,7 +165,7 @@ function enrichPaymentScenarioContracts() {
     contract100007.prepaymentAmount = undefined;
     contract100007.paidPrepayment = undefined;
   }
-  // 明确选择“有预付分成款”但尚未维护已付预付，用于申请付款拦截场景。
+  // 合同约定预付分成款但尚未维护已付金额，用于申请付款第三项拦截场景。
   const contract100009 = INITIAL_CONTRACTS.find((c) => c.gameId === '100009');
   if (contract100009) {
     contract100009.prepaymentAmount = 90000;
@@ -172,20 +173,6 @@ function enrichPaymentScenarioContracts() {
   }
 }
 enrichPaymentScenarioContracts();
-
-/** 付款设置「有无预付分成款」默认与合同已付款项中的预付金额保持一致。 */
-function enrichGameHasPrepayment() {
-  const contractMap = new Map(INITIAL_CONTRACTS.map((contract) => [contract.gameId, contract]));
-  for (const game of INITIAL_GAMES) {
-    const paidPrepayment = contractMap.get(game.id)?.paidPrepayment;
-    Object.assign(game, {
-      hasPrepayment: game.id === '100009'
-        ? true
-        : paidPrepayment != null && !Number.isNaN(paidPrepayment),
-    });
-  }
-}
-enrichGameHasPrepayment();
 
 const INTERNAL_CHANNELS = [
   '快爆付费',
@@ -498,14 +485,20 @@ function validateMockDataClosure() {
 
   const contractByGameId = new Map(INITIAL_CONTRACTS.map((contract) => [contract.gameId, contract]));
   for (const game of INITIAL_GAMES) {
-    const hasCompany = Boolean(game.sharePaymentCompany);
-    const hasCurrency = Boolean(game.sharePaymentCurrency);
-    if (hasCompany !== hasCurrency) throw new Error(`Mock付款设置不完整：${game.id}`);
-    const hasSavedPaymentSettings = hasCompany && hasCurrency;
-    const hasPrepayment = game.hasPrepayment
-      ?? (contractByGameId.get(game.id)?.paidPrepayment != null);
-    if (hasSavedPaymentSettings && hasPrepayment && !Number.isFinite(game.historicalDeduction)) {
-      throw new Error(`Mock历史已抵扣未保存：${game.id}`);
+    const paymentSettingsFlags = [
+      Boolean(game.sharePaymentCompany),
+      Boolean(game.sharePaymentCurrency),
+      Number.isFinite(game.historicalDeduction),
+    ];
+    const savedPaymentSettingsCount = paymentSettingsFlags.filter(Boolean).length;
+    if (savedPaymentSettingsCount !== 0 && savedPaymentSettingsCount !== paymentSettingsFlags.length) {
+      throw new Error(`Mock付款设置不完整：${game.id}`);
+    }
+    if (Number.isFinite(game.historicalDeduction)) {
+      const paidPrepayment = contractByGameId.get(game.id)?.paidPrepayment ?? 0;
+      if ((game.historicalDeduction ?? 0) > paidPrepayment) {
+        throw new Error(`Mock历史已抵扣大于已付预付分成款：${game.id}`);
+      }
     }
   }
   for (const payment of INITIAL_GAME_PAYMENTS) {

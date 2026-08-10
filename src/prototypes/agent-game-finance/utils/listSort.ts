@@ -28,6 +28,9 @@ export function settlementAddedAt(record: SettlementRecord): string {
 }
 
 export function compareSettlementAddedDesc(a: SettlementRecord, b: SettlementRecord): number {
+  // 新拉取/导入数据都会写入 createdAt；它们必须排在缺少写入时间的历史演示数据之前，
+  // 避免历史数据的结算时间晚于当前时间时反而压住新数据。
+  if (Boolean(a.createdAt) !== Boolean(b.createdAt)) return a.createdAt ? -1 : 1;
   return compareTextDesc(settlementAddedAt(a), settlementAddedAt(b))
     || compareTextDesc(a.id, b.id);
 }

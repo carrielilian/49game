@@ -9,7 +9,10 @@ import { useAppStore } from '../data/store';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { getPreviousMonthKey } from '../utils/monthRange';
-import { hasGamePrepayment } from '../utils/prepayment';
+import {
+  isHistoricalDeductionWithinPaidPrepayment,
+  isPaidPrepaymentMaintained,
+} from '../utils/prepayment';
 import { formatCurrencyMoney, formatMoney, formatOptionalCurrencyMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
 import {
   getApplyGamePaymentBlock,
@@ -70,7 +73,6 @@ export function GameIncomePage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [prepayOpen, setPrepayOpen] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState('');
-  const [hasPrepaymentValue, setHasPrepaymentValue] = useState(false);
   const [historicalAmount, setHistoricalAmount] = useState('');
   const [sharePaymentCompany, setSharePaymentCompany] = useState('');
   const [sharePaymentCurrency, setSharePaymentCurrency] = useState<ContractCurrency | ''>('');
@@ -96,7 +98,7 @@ export function GameIncomePage() {
   const rows = scopedGameBalances.map((b) => {
     const g = gameById.get(b.gameId);
     const contract = g ? contractByGameId.get(g.id) : undefined;
-    const savedPrepayment = hasGamePrepayment(g, contract) ? contract?.paidPrepayment : undefined;
+    const savedPrepayment = isPaidPrepaymentMaintained(contract) ? contract?.paidPrepayment : undefined;
     const prepaymentUnset = savedPrepayment == null || Number.isNaN(savedPrepayment);
     const prepayCurrency = resolveContractCurrency(contract);
     return {
@@ -139,8 +141,6 @@ export function GameIncomePage() {
   const openPrepayDrawer = (gameId: string) => {
     const game = getGame(gameId);
     setSelectedGameId(gameId);
-    // 未维护时仅在页面默认显示“无”；打开抽屉不回写数据，保存后才持久化选择。
-    setHasPrepaymentValue(game?.hasPrepayment === true);
     setHistoricalAmount(formatOptionalPrepayAmountInput(game?.historicalDeduction));
     setSharePaymentCompany(game?.sharePaymentCompany ?? '');
     setSharePaymentCurrency(game?.sharePaymentCurrency ?? '');
@@ -172,10 +172,15 @@ export function GameIncomePage() {
   const savePrepay = () => {
     if (!prepayGame) return;
     const nextErrors: PaymentSettingsErrors = {};
-    const historicalError = hasPrepaymentValue
-      ? validatePrepayAmount(historicalAmount, '历史已抵扣分成款')
-      : undefined;
+    const historicalError = validatePrepayAmount(historicalAmount, '历史已抵扣分成款');
     if (historicalError) nextErrors.historicalDeduction = historicalError;
+    const historicalDeduction = historicalError ? undefined : parsePrepayAmount(historicalAmount);
+    if (
+      historicalDeduction != null
+      && !isHistoricalDeductionWithinPaidPrepayment(historicalDeduction, prepayContract)
+    ) {
+      nextErrors.historicalDeduction = '历史已抵扣分成款不能大于已付预付分成款';
+    }
     if (!sharePaymentCompany.trim()) nextErrors.sharePaymentCompany = '分成付款公司不能为空';
     if (!sharePaymentCurrency) nextErrors.sharePaymentCurrency = '付款币种不能为空';
     if (Object.keys(nextErrors).length) {
@@ -183,11 +188,9 @@ export function GameIncomePage() {
       setToast({ message: '请完善所有信息', type: 'error' });
       return;
     }
-    const historicalDeduction = hasPrepaymentValue ? parsePrepayAmount(historicalAmount) : undefined;
     if (historicalDeduction != null) setHistoricalAmount(formatPrepayAmountInput(historicalDeduction));
     updateGame({
       ...prepayGame,
-      hasPrepayment: hasPrepaymentValue,
       historicalDeduction,
       sharePaymentCompany: sharePaymentCompany as SharePaymentCompany,
       sharePaymentCurrency,
@@ -302,63 +305,33 @@ export function GameIncomePage() {
           <>
             <ReadonlyField label="游戏ID / 游戏名称" value={`${prepayGame.id} / ${prepayGame.onlineName}`} />
             <FormSectionTitle>预付分成信息</FormSectionTitle>
+            <ReadonlyCurrencyField
+              label="已付预付分成款"
+              amount={prepayContract?.paidPrepayment}
+              currency={prepayCurrency}
+              unset={isPrepaymentUnset(prepayContract?.paidPrepayment)}
+            />
             <div className="agf-form-item">
-              <label className="agf-form-label agf-form-label--required">有无预付分成款</label>
-              <div className="agf-radio-group">
-                <label className="agf-radio-item">
-                  <input
-                    type="radio"
-                    name="hasPrepayment"
-                    checked={hasPrepaymentValue}
-                    onChange={() => setHasPrepaymentValue(true)}
-                  />
-                  有
-                </label>
-                <label className="agf-radio-item">
-                  <input
-                    type="radio"
-                    name="hasPrepayment"
-                    checked={!hasPrepaymentValue}
-                    onChange={() => {
-                      setHasPrepaymentValue(false);
-                      clearPrepayError('historicalDeduction');
-                    }}
-                  />
-                  无
-                </label>
+              <label className="agf-form-label agf-form-label--required">历史已抵扣分成款</label>
+              <div className="agf-form-field">
+                <CurrencyInput
+                  currency={prepayCurrency}
+                  value={historicalAmount}
+                  onChange={(v) => {
+                    setHistoricalAmount(v);
+                    clearPrepayError('historicalDeduction');
+                  }}
+                  onBlur={() => normalizePrepayAmount(
+                    historicalAmount,
+                    setHistoricalAmount,
+                    'historicalDeduction',
+                    '历史已抵扣分成款',
+                  )}
+                />
+                <FieldHint>请填写线下已抵扣处理的预付分成款，若无则填写0；不能大于已付预付分成款</FieldHint>
+                <FieldError message={prepayErrors.historicalDeduction} />
               </div>
             </div>
-            {hasPrepaymentValue && (
-              <>
-                <ReadonlyCurrencyField
-                  label="预付分成款"
-                  amount={prepayContract?.paidPrepayment}
-                  currency={prepayCurrency}
-                  unset={isPrepaymentUnset(prepayContract?.paidPrepayment)}
-                />
-                <div className="agf-form-item">
-                  <label className="agf-form-label agf-form-label--required">历史已抵扣分成款</label>
-                  <div className="agf-form-field">
-                    <CurrencyInput
-                      currency={prepayCurrency}
-                      value={historicalAmount}
-                      onChange={(v) => {
-                        setHistoricalAmount(v);
-                        clearPrepayError('historicalDeduction');
-                      }}
-                      onBlur={() => normalizePrepayAmount(
-                        historicalAmount,
-                        setHistoricalAmount,
-                        'historicalDeduction',
-                        '历史已抵扣分成款',
-                      )}
-                    />
-                    <FieldHint>请填写线下已抵扣处理的预付分成款，若无则填写0</FieldHint>
-                    <FieldError message={prepayErrors.historicalDeduction} />
-                  </div>
-                </div>
-              </>
-            )}
             <FormSectionTitle>付款信息</FormSectionTitle>
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">分成付款公司</label>

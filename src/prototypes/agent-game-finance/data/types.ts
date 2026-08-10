@@ -60,8 +60,6 @@ export interface Game {
   prepaymentCurrency?: ContractCurrency;
   /** 历史已抵扣分成款（线下手动处理），默认 0 */
   historicalDeduction?: number;
-  /** 付款设置 — 是否有预付分成款 */
-  hasPrepayment?: boolean;
   /** 付费设置 — 分成付款公司 */
   sharePaymentCompany?: SharePaymentCompany;
   /** 付费设置 — 付款币种 */
@@ -284,6 +282,8 @@ export interface FormulaOperationLog {
 
 export interface ImportPreviewRow {
   id: string;
+  /** 上传文件中的实际行号；首行为表头，因此第一条数据从第2行开始。 */
+  sourceRow?: number;
   incomeTime: string;
   channel: string;
   gameId: string;
@@ -291,4 +291,5 @@ export interface ImportPreviewRow {
   vendorName: string;
   pendingAmount: number;
   error?: string;
+  errors?: string[];
 }

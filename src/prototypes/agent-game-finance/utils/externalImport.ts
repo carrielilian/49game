@@ -10,6 +10,23 @@ import { genId, getSettlementFormulaText } from './settlement';
 
 const INCOME_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+const IMPORT_ERROR_ORDER = [
+  '收入时间错误',
+  '游戏ID不存在',
+  '渠道不存在',
+  '待结算金额格式错误',
+] as const;
+
+function getCurrentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatErrorRows(rows: number[], message: string): string {
+  const sortedRows = Array.from(new Set(rows)).sort((left, right) => left - right);
+  return `第${sortedRows.join('、')}行${message}`;
+}
+
 export function resolveGameFromImportRow(
   games: Game[],
   gameId: string,
@@ -40,6 +57,7 @@ export function buildMockImportRows(
 
   return candidates.map(({ game, vendor }, index) => ({
     id: genId('IP'),
+    sourceRow: index + 2,
     incomeTime: '2026-07',
     channel: EXTERNAL_CHANNELS[index % EXTERNAL_CHANNELS.length],
     gameId: game.id,
@@ -52,76 +70,83 @@ export function buildMockImportRows(
 export function enrichImportRowsOnParse(
   rows: ImportPreviewRow[],
   games: Game[],
+  currentMonth = getCurrentMonthKey(),
 ): ImportPreviewRow[] {
-  return rows.map((row) => {
-    if (!INCOME_MONTH_PATTERN.test(row.incomeTime.trim())) {
-      return { ...row, error: '收入时间格式错误' };
+  return rows.map((row, index) => {
+    const sourceRow = row.sourceRow ?? index + 2;
+    const errors: string[] = [];
+    const incomeTime = row.incomeTime.trim();
+    const channel = row.channel.trim();
+
+    if (!INCOME_MONTH_PATTERN.test(incomeTime) || incomeTime >= currentMonth) {
+      errors.push('收入时间错误');
     }
-    if (!EXTERNAL_CHANNELS.includes(row.channel)) {
-      return { ...row, error: `${row.channel.trim() || '空值'}渠道不存在` };
+    if (!EXTERNAL_CHANNELS.includes(channel)) {
+      errors.push('渠道不存在');
     }
     const game = resolveGameFromImportRow(games, row.gameId);
     if (!game) {
-      return { ...row, error: `${row.gameId.trim() || '空值'}游戏ID不存在` };
+      errors.push('游戏ID不存在');
     }
     const amountHasInvalidPrecision =
       Math.abs(row.pendingAmount * 100 - Math.round(row.pendingAmount * 100)) > 1e-8;
-    if (!Number.isFinite(row.pendingAmount) || row.pendingAmount <= 0 || amountHasInvalidPrecision) {
-      return { ...row, error: '待结算金额格式错误' };
+    if (!Number.isFinite(row.pendingAmount) || amountHasInvalidPrecision) {
+      errors.push('待结算金额格式错误');
     }
     return {
       ...row,
-      gameId: game.id,
-      error: undefined,
+      sourceRow,
+      incomeTime,
+      channel,
+      gameId: game?.id ?? row.gameId.trim(),
+      error: errors[0],
+      errors,
     };
   });
 }
 
 export function collectImportValidationErrors(rows: ImportPreviewRow[]): string[] {
-  const gameIds = new Set<string>();
-  const channels = new Set<string>();
-  const otherErrors = new Set<string>();
+  const errorRows = new Map<string, number[]>();
 
-  rows.forEach((row) => {
-    const error = row.error;
-    if (!error) return;
-    if (error.endsWith('游戏ID不存在')) {
-      gameIds.add(error.slice(0, -'游戏ID不存在'.length));
-      return;
-    }
-    if (error.endsWith('渠道不存在')) {
-      channels.add(error.slice(0, -'渠道不存在'.length));
-      return;
-    }
-    otherErrors.add(error);
+  rows.forEach((row, index) => {
+    const sourceRow = row.sourceRow ?? index + 2;
+    const errors = row.errors ?? (row.error ? [row.error] : []);
+    errors.forEach((error) => {
+      errorRows.set(error, [...(errorRows.get(error) ?? []), sourceRow]);
+    });
   });
 
-  return [
-    ...(gameIds.size > 0 ? [`${Array.from(gameIds).join('、')}游戏ID不存在`] : []),
-    ...(channels.size > 0 ? [`${Array.from(channels).join('、')}渠道不存在`] : []),
-    ...otherErrors,
-  ];
+  return IMPORT_ERROR_ORDER.flatMap((error) => {
+    const rowsForError = errorRows.get(error);
+    return rowsForError?.length ? [formatErrorRows(rowsForError, error)] : [];
+  });
 }
 
-export function findDuplicateImportGameIds(
+export function findDuplicateImportRowNumbers(
   rows: ImportPreviewRow[],
   settlements: SettlementRecord[],
-): string[] {
+): number[] {
   const existingKeys = new Set(
     settlements
-      .filter((record) => record.type === 'external')
       .map((record) => `${record.incomeTime}|${record.channel}|${record.gameId}`),
   );
-  const uploadedKeys = new Set<string>();
-  const duplicateIds = new Set<string>();
+  const uploadedRowsByKey = new Map<string, number[]>();
+  const duplicateRows = new Set<number>();
 
-  for (const row of rows) {
+  rows.forEach((row, index) => {
     const key = `${row.incomeTime}|${row.channel}|${row.gameId}`;
-    if (existingKeys.has(key) || uploadedKeys.has(key)) {
-      duplicateIds.add(row.gameId);
+    const sourceRow = row.sourceRow ?? index + 2;
+    uploadedRowsByKey.set(key, [...(uploadedRowsByKey.get(key) ?? []), sourceRow]);
+    if (existingKeys.has(key)) {
+      duplicateRows.add(sourceRow);
     }
-    uploadedKeys.add(key);
-  }
+  });
 
-  return Array.from(duplicateIds);
+  uploadedRowsByKey.forEach((sourceRows) => {
+    if (sourceRows.length > 1) {
+      sourceRows.forEach((sourceRow) => duplicateRows.add(sourceRow));
+    }
+  });
+
+  return Array.from(duplicateRows).sort((left, right) => left - right);
 }

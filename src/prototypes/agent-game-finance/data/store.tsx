@@ -53,7 +53,6 @@ import {
   isUnsettledSettlement,
 } from '../utils/settlement';
 import { buildGamePaymentApplySnapshot } from '../utils/gamePaymentApplySnapshot';
-import { getExternalFormulaText } from '../utils/externalImport';
 
 function nextNumericId(items: { id: string }[], base: number): string {
   const max = items.reduce((m, item) => Math.max(m, Number.parseInt(item.id, 10) || 0), base - 1);
@@ -267,13 +266,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const importExternal = useCallback((rows: ImportPreviewRow[]) => {
     const newRecords: SettlementRecord[] = rows.map((r) => {
       const game = games.find((g) => g.id === r.gameId);
-      const formula = formulas.find((f) => f.gameId === r.gameId);
       const vendor = vendors.find((v) => v.id === game?.vendorId);
       return {
         id: genId('S'), createdAt: formatDateTime(), type: 'external' as SettlementType, incomeTime: r.incomeTime, gameId: r.gameId,
         channel: r.channel, grossRevenue: r.pendingAmount, settlementAmount: r.pendingAmount,
         settlementIncome: 0,
-        formulaText: getExternalFormulaText(formula, vendor),
+        formulaText: '-',
         paymentApplyStatus: '未申请' as const,
         settled: false, vendorId: game?.vendorId ?? '',
         dataSource: '文件导入',
@@ -285,19 +283,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     });
     setSettlements((prev) => [...newRecords, ...prev]);
-  }, [games, formulas, vendors]);
+  }, [games, vendors]);
 
   const pullInternal = useCallback((type: 'internal' | 'refund', rows: FinanceCenterRow[], monthKey: string) => {
     const newRecords: SettlementRecord[] = rows.map((row) => {
       const game = games.find((g) => g.id === row.gameId);
-      const f = formulas.find((x) => x.gameId === row.gameId);
       const vendor = vendors.find((v) => v.id === game?.vendorId);
-      const formulaText = getSettlementFormulaText(
-        f,
-        vendor,
-        type === 'refund' ? 'external' : row.channelOwnership,
-        type === 'refund' ? '退款金额' : '待结算金额',
-      );
       return {
         id: genId('S'),
         createdAt: formatDateTime(),
@@ -308,7 +299,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         grossRevenue: row.amount,
         settlementAmount: row.amount,
         settlementIncome: 0,
-        formulaText,
+        formulaText: '-',
         paymentApplyStatus: '未申请' as const,
         settled: false,
         vendorId: game?.vendorId ?? '',

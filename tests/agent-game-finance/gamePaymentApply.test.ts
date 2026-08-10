@@ -36,7 +36,6 @@ const game: Game = {
   operationStatus: '已上线',
   cooperationStatus: '合作中',
   createdAt: '2026-01-01T00:00:00',
-  hasPrepayment: false,
 };
 
 const contract: Contract = {
@@ -48,16 +47,20 @@ const contract: Contract = {
 };
 
 describe('getApplyGamePaymentBlock', () => {
-  it('第三项校验拦截未填写付款币种', () => {
-    const block = getApplyGamePaymentBlock(game.id, game, vendor, contract);
-    expect(block).toEqual({ type: 'paymentCurrency' });
-    expect(block && getApplyGamePaymentBlockMessage(block)).toBe('未填写付款币种');
+  it('第二项校验拦截付款设置任一信息未填写', () => {
+    const block = getApplyGamePaymentBlock(game, vendor, contract);
+    expect(block).toEqual({ type: 'paymentSettings' });
+    expect(block && getApplyGamePaymentBlockMessage(block)).toBe('请先配置【付款设置】，完善付款信息');
   });
 
-  it('付款币种已填写时通过前置校验', () => {
+  it('付款设置三项均填写且合同不涉及预付时通过前置校验', () => {
     const block = getApplyGamePaymentBlock(
-      game.id,
-      { ...game, sharePaymentCurrency: '人民币' },
+      {
+        ...game,
+        sharePaymentCompany: '4399',
+        sharePaymentCurrency: '人民币',
+        historicalDeduction: 0,
+      },
       vendor,
       contract,
     );
@@ -66,7 +69,6 @@ describe('getApplyGamePaymentBlock', () => {
 
   it('银行信息校验优先于付款币种', () => {
     const block = getApplyGamePaymentBlock(
-      game.id,
       game,
       { ...vendor, cardNumber: '' },
       contract,
@@ -74,14 +76,27 @@ describe('getApplyGamePaymentBlock', () => {
     expect(block).toEqual({ type: 'bank' });
   });
 
-  it('预付分成款校验优先于付款币种', () => {
+  it('付款设置完整后，第三项校验拦截合同已勾选但已付预付未维护', () => {
     const block = getApplyGamePaymentBlock(
-      game.id,
-      { ...game, hasPrepayment: true },
+      {
+        ...game,
+        sharePaymentCompany: '4399',
+        sharePaymentCurrency: '人民币',
+        historicalDeduction: 0,
+      },
       vendor,
       { ...contract, cooperationContents: ['预付分成款'] },
     );
-    expect(block).toEqual({ type: 'prepayment', gameName: game.onlineName });
+    expect(block).toEqual({ type: 'prepayment' });
     expect(block && getApplyGamePaymentBlockMessage(block)).toBe('未补充预付分成款信息');
+  });
+
+  it('银行信息校验优先于付款设置和预付分成款', () => {
+    const block = getApplyGamePaymentBlock(
+      game,
+      { ...vendor, cardNumber: '' },
+      { ...contract, cooperationContents: ['预付分成款'] },
+    );
+    expect(block).toEqual({ type: 'bank' });
   });
 });
