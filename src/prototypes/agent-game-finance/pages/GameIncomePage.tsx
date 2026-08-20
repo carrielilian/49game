@@ -8,7 +8,6 @@ import { Drawer, Modal, Toast, type ToastType } from '../components/Modal';
 import { useAppStore } from '../data/store';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
-import { getPreviousMonthKey } from '../utils/monthRange';
 import {
   isHistoricalDeductionWithinPaidPrepayment,
   isPaidPrepaymentMaintained,
@@ -57,7 +56,6 @@ type PaymentSettingsErrors = Partial<Record<
 
 export function GameIncomePage() {
   const {
-    businessType,
     scopedGameBalances,
     scopedGames,
     contracts,
@@ -67,7 +65,6 @@ export function GameIncomePage() {
     getVendor,
     getGameName,
     getVendorName,
-    internalSettlementButtons,
   } = useAppStore();
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -126,17 +123,7 @@ export function GameIncomePage() {
   const prepayContract = prepayGame ? contractByGameId.get(prepayGame.id) : undefined;
   const prepayCurrency = resolveContractCurrency(prepayContract);
 
-  const confirmContent = useMemo(() => {
-    const amountText = `申请付款金额：${formatMoney(confirmAmount)}元`;
-    const internalChannelSettled =
-      internalSettlementButtons[businessType].internal.settleCompleted
-      && internalSettlementButtons[businessType].refund.settleCompleted;
-    if (internalChannelSettled) return { warning: null as string | null, amount: amountText };
-    return {
-      warning: `${getPreviousMonthKey()}收入或退款还未结算，是否继续申请付款？`,
-      amount: amountText,
-    };
-  }, [confirmAmount, businessType, internalSettlementButtons]);
+  const confirmAmountText = `申请付款金额：${formatMoney(confirmAmount)}元`;
 
   const openPrepayDrawer = (gameId: string) => {
     const game = getGame(gameId);
@@ -221,8 +208,8 @@ export function GameIncomePage() {
     const trimmedRate = exchangeRateValue.trim();
     if (!trimmedRate) {
       nextErrors.exchangeRate = '汇率不能为空';
-    } else if (!/^\d+\.\d{1,4}$/.test(trimmedRate) || Number(trimmedRate) <= 0) {
-      nextErrors.exchangeRate = '汇率仅允许输入正数小数，最多四位小数';
+    } else if (!/^\d+(\.\d{1,4})?$/.test(trimmedRate) || Number(trimmedRate) <= 0) {
+      nextErrors.exchangeRate = '汇率仅允许输入正数，最多四位小数';
     }
     if (Object.keys(nextErrors).length) {
       setApplyErrors(nextErrors);
@@ -296,7 +283,7 @@ export function GameIncomePage() {
         footer={(
           <>
             <button type="button" className="agf-btn agf-btn--default" onClick={() => setPrepayOpen(false)}>取消</button>
-            <button type="button" className="agf-btn agf-btn--primary" onClick={savePrepay}>保存</button>
+            <button type="button" className="agf-btn agf-btn--primary" onClick={savePrepay}>确定</button>
           </>
         )}
       >
@@ -391,8 +378,7 @@ export function GameIncomePage() {
         )}
       >
         <div className="agf-confirm-text" data-annotation-id="game-income-apply-modal">
-          {confirmContent.warning && <p>{confirmContent.warning}</p>}
-          <p>{confirmContent.amount}</p>
+          <p>{confirmAmountText}</p>
           <div className="agf-apply-form">
             <div className="agf-form-item">
               <label className="agf-form-label agf-form-label--required">汇率取值时间：</label>
@@ -423,7 +409,7 @@ export function GameIncomePage() {
                     }
                   }}
                   onBlur={() => {
-                    if (/^\d+\.\d{1,4}$/.test(exchangeRateValue) && Number(exchangeRateValue) > 0) {
+                    if (/^\d+(\.\d{1,4})?$/.test(exchangeRateValue) && Number(exchangeRateValue) > 0) {
                       setExchangeRateValue(Number(exchangeRateValue).toFixed(4));
                     }
                   }}

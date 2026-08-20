@@ -135,7 +135,7 @@ export function VendorListPage() {
         </div>
       </Drawer>
       <Drawer title="编辑厂商" open={editOpen} onClose={() => setEditOpen(false)} width={1175}
-        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>保存</button></>}>
+        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>确定</button></>}>
         <div data-annotation-id="vendor-list-edit-form">
           <VendorForm form={form} setForm={setForm} vendorId={editing?.id} errors={errors} clearError={clearError} />
         </div>

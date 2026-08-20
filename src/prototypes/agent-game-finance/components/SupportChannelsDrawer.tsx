@@ -175,7 +175,7 @@ export function SupportChannelsDrawer({
         footer={(
           <>
             <button type="button" className="agf-btn agf-btn--default" onClick={onClose}>取消</button>
-            <button type="button" className="agf-btn agf-btn--primary" onClick={saveChannels}>保存</button>
+            <button type="button" className="agf-btn agf-btn--primary" onClick={saveChannels}>确定</button>
           </>
         )}
       >

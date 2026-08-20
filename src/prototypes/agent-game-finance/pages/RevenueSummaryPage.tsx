@@ -1,19 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { COL_ALIGN_RIGHT, DataTable, DualCell, renderCurrencyTotals } from '../components/DataTable';
-import { ColumnFilter } from '../components/ColumnFilter';
 import { FilterBar } from '../components/FilterBar';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { Toast, type ToastType } from '../components/Modal';
 import { useAppStore } from '../data/store';
-import { EXTERNAL_CHANNELS } from '../data/mock-data';
 import type { Contract, ContractCurrency, Game, GamePaymentRequest, SettlementRecord } from '../data/types';
 import { sumContractPaymentsByCurrency } from '../utils/currencySnapshot';
-import { selectOptions } from '../utils/columnFilters';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import { downloadCsv } from '../utils/listExport';
 import { isPaidPayment } from '../utils/payment';
 import { formatCurrencyMoney, formatDateTime, SETTLEMENT_CURRENCY } from '../utils/settlement';
-import { getInternalChannelCategory, INTERNAL_CHANNEL_CATEGORIES } from '../utils/financeCenter';
+import { getInternalChannelCategory } from '../utils/financeCenter';
 import { settlementAddedAt } from '../utils/listSort';
 
 type QueryDimension = 'game' | 'channel' | 'vendor';
@@ -279,11 +276,6 @@ function rowToExport(row: SummaryRow, dimension: QueryDimension): string[] {
   return [row.vendorId!, row.vendorName!, payment, totalRevenue, settlementPayment];
 }
 
-const REVENUE_CHANNEL_FILTER_OPTIONS = selectOptions([
-  ...INTERNAL_CHANNEL_CATEGORIES,
-  ...EXTERNAL_CHANNELS,
-]);
-
 const SETTLEMENT_PAYMENT_COLUMN = {
   ...COL_ALIGN_RIGHT,
   key: 'settlementPaymentAmount',
@@ -295,12 +287,7 @@ export function RevenueSummaryPage() {
   const { scopedSettlements, scopedGamePayments, contracts, getVendorName, getGameName, getGame } = useAppStore();
   const [dimension, setDimension] = useState<QueryDimension>('game');
   const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
-  const [channelFilter, setChannelFilter] = useState('');
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
-
-  useEffect(() => {
-    setChannelFilter('');
-  }, [dimension]);
 
   const contractMap = useMemo(
     () => new Map(contracts.map((c) => [c.gameId, c])),
@@ -327,10 +314,7 @@ export function RevenueSummaryPage() {
     return attachPaymentAmount(withSettlementPayment, dimension, contractMap);
   }, [scopedSettlements, scopedGamePayments, dimension, search, getVendorName, getGameName, contractMap, getGame]);
 
-  const rows = useMemo(() => {
-    if (dimension !== 'channel' || !channelFilter) return allRows;
-    return allRows.filter((row) => row.channel === channelFilter);
-  }, [allRows, dimension, channelFilter]);
+  const rows = allRows;
 
   const summaryTotals = useMemo(() => computeSummaryTotals(rows), [rows]);
   const leadingRow = rows.length > 0 ? buildSummaryLeadingRow(dimension, summaryTotals) : undefined;
@@ -347,19 +331,7 @@ export function RevenueSummaryPage() {
           {
             key: 'channel',
             title: '渠道',
-            header: (
-              <span data-annotation-id="stats-summary-channel-col">
-                <ColumnFilter
-                  title="渠道"
-                  filter={{
-                    type: 'select',
-                    value: channelFilter,
-                    onChange: setChannelFilter,
-                    options: REVENUE_CHANNEL_FILTER_OPTIONS,
-                  }}
-                />
-              </span>
-            ),
+            header: <span data-annotation-id="stats-summary-channel-col">渠道</span>,
             render: (r: SummaryRow) => r.channel,
           },
           { ...PAYMENT_COLUMN, render: () => '-' },

@@ -392,7 +392,7 @@ export function GamePaymentListPage() {
         footer={
           <>
             <button type="button" className="agf-btn agf-btn--default" onClick={() => setVoucherOpen(false)}>取消</button>
-            <button type="button" className="agf-btn agf-btn--primary" onClick={submitVoucher}>提交</button>
+            <button type="button" className="agf-btn agf-btn--primary" onClick={submitVoucher}>确定</button>
           </>
         }>
         <div data-annotation-id="game-payment-list-voucher-drawer">

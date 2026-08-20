@@ -8,7 +8,7 @@ import { Modal, Toast, type ToastType } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAppStore } from '../data/store';
 import { EXTERNAL_CHANNELS } from '../data/mock-data';
-import type { ImportPreviewRow } from '../data/types';
+import type { ImportPreviewRow, SettlementRecord } from '../data/types';
 import {
   PAYMENT_APPLY_STATUS_FILTER_OPTIONS,
   selectOptions,
@@ -75,6 +75,27 @@ function buildImportTotalRow(rows: ImportPreviewRow[]): React.ReactNode {
   );
 }
 
+function buildSettlementSummaryRow(rows: SettlementRecord[]): React.ReactNode {
+  const settlementAmountTotal = rows.reduce((sum, row) => sum + row.settlementAmount, 0);
+  const settlementIncomeTotal = rows.reduce(
+    (sum, row) => sum + (isUnsettledSettlement(row) ? 0 : row.settlementIncome),
+    0,
+  );
+  return (
+    <tr className="agf-table__summary-row">
+      <td>查询总计</td>
+      <td />
+      <td />
+      <td />
+      <td className="agf-table__cell--right">{formatCurrencyMoney(settlementAmountTotal, SETTLEMENT_CURRENCY)}</td>
+      <td className="agf-table__cell--right">{formatCurrencyMoney(settlementIncomeTotal, SETTLEMENT_CURRENCY)}</td>
+      <td />
+      <td />
+      <td />
+    </tr>
+  );
+}
+
 export function IncomeSettlementPage() {
   const {
     businessType,
@@ -127,7 +148,10 @@ export function IncomeSettlementPage() {
     return true;
   }).sort(compareSettlementAddedDesc);
 
-  const unsettled = data.filter((record) => isUnsettledSettlement(record));
+  // 查询条件只控制列表展示；结算始终处理当前业务类型下的全部未结算收入。
+  const unsettled = scopedSettlements.filter((record) =>
+    (record.type === 'external' || record.type === 'internal')
+    && isUnsettledSettlement(record));
 
   const closeImport = () => {
     setImportOpen(false);
@@ -155,6 +179,10 @@ export function IncomeSettlementPage() {
         incomeMonthKey,
         businessType,
       );
+      if (rows.length === 0) {
+        showToast('暂无可拉取数据', 'error');
+        return;
+      }
       pullInternal('internal', rows, incomeMonthKey);
       setMonthRange(getRecentTwoMonthsRange());
       setInternalSettlementButtons('internal', {
@@ -292,6 +320,7 @@ export function IncomeSettlementPage() {
         <DataTable
           rowKey={(record) => record.id}
           data={data}
+          leadingRow={buildSettlementSummaryRow(data)}
           columns={[
             { key: 'time', title: '收入时间', render: (record) => record.incomeTime },
             { key: 'game', title: '游戏ID / 游戏名称', render: (record) => <DualCell main={getGameName(record.gameId)} sub={record.gameId} /> },

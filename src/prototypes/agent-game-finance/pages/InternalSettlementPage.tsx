@@ -6,6 +6,7 @@ import { MonthRangePicker } from '../components/MonthRangePicker';
 import { StatusBadge } from '../components/StatusBadge';
 import { Toast, type ToastType } from '../components/Modal';
 import { useAppStore } from '../data/store';
+import type { SettlementRecord } from '../data/types';
 import { PAYMENT_APPLY_STATUS_FILTER_OPTIONS, selectOptions } from '../utils/columnFilters';
 import {
   checkFinanceCenterReady,
@@ -28,6 +29,27 @@ import { compareSettlementAddedDesc } from '../utils/listSort';
 
 interface Props {
   type: 'internal' | 'refund';
+}
+
+function buildSettlementSummaryRow(rows: SettlementRecord[]): React.ReactNode {
+  const settlementAmountTotal = rows.reduce((sum, row) => sum + row.settlementAmount, 0);
+  const settlementIncomeTotal = rows.reduce(
+    (sum, row) => sum + (isUnsettledSettlement(row) ? 0 : row.settlementIncome),
+    0,
+  );
+  return (
+    <tr className="agf-table__summary-row">
+      <td>查询总计</td>
+      <td />
+      <td />
+      <td />
+      <td className="agf-table__cell--right">{formatCurrencyMoney(settlementAmountTotal, SETTLEMENT_CURRENCY)}</td>
+      <td className="agf-table__cell--right">{formatCurrencyMoney(settlementIncomeTotal, SETTLEMENT_CURRENCY)}</td>
+      <td />
+      <td />
+      <td />
+    </tr>
+  );
 }
 
 export function InternalSettlementPage({ type }: Props) {
@@ -111,13 +133,19 @@ export function InternalSettlementPage({ type }: Props) {
     if (pullDisabled) return;
     setLoading(true);
     try {
-      const ready = await checkFinanceCenterReady();
-      if (!ready) {
-        setToast({ message: '财务中心还未结算完成', type: 'error' });
-        return;
+      if (type === 'internal') {
+        const ready = await checkFinanceCenterReady();
+        if (!ready) {
+          setToast({ message: '财务中心还未结算完成', type: 'error' });
+          return;
+        }
       }
       const incomeMonthKey = getPreviousMonthKey();
       const rows = fetchFinanceCenterRows(type, scopedFormulas, scopedGames, incomeMonthKey, businessType);
+      if (rows.length === 0) {
+        setToast({ message: '暂无可拉取数据', type: 'error' });
+        return;
+      }
       pullInternal(type, rows, incomeMonthKey);
       const range = getRecentTwoMonthsRange();
       setMonthRange(range);
@@ -187,6 +215,7 @@ export function InternalSettlementPage({ type }: Props) {
       <DataTable
         rowKey={(r) => r.id}
         data={data}
+        leadingRow={buildSettlementSummaryRow(data)}
         columns={[
           {
             key: 'time',

@@ -252,7 +252,7 @@ export function FormulaListPage() {
       />
       </div>
       <Drawer title="结算公式设置" open={formulaDrawer} onClose={() => setFormulaDrawer(false)} large
-        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setFormulaDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveFormula}>保存</button></>}>
+        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setFormulaDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveFormula}>确定</button></>}>
         {editing && editingGame && (
           <div data-annotation-id="formula-list-formula-form">
             <div className="agf-form-readonly-grid">

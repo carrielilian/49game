@@ -32,10 +32,16 @@ const CONTRACT_FIELD_META: Record<CooperationContent, { key: ContractContentAmou
   委托开发费: { key: 'developmentFee', label: '委托开发费', hint: '请输入合同约定的委托开发费' },
 };
 
-const PAID_FIELD_META: Record<CooperationContent, { key: PaidAmountKey; label: string; hint: string }> = {
-  游戏代理金: { key: 'paidAgencyFee', label: '已付游戏代理金', hint: '请输入目前已支付的游戏代理金' },
-  预付分成款: { key: 'paidPrepayment', label: '已付预付分成款', hint: '请输入目前已支付的预付分成款' },
-  委托开发费: { key: 'paidDevelopmentFee', label: '已付委托开发费', hint: '请输入目前已支付的委托开发费' },
+const PAID_FIELD_META: Record<CooperationContent, {
+  key: PaidAmountKey;
+  contractKey: ContractContentAmountKey;
+  label: string;
+  contractLabel: string;
+  hint: string;
+}> = {
+  游戏代理金: { key: 'paidAgencyFee', contractKey: 'agencyFee', label: '已付游戏代理金', contractLabel: '游戏代理金', hint: '请输入目前已支付的游戏代理金' },
+  预付分成款: { key: 'paidPrepayment', contractKey: 'prepaymentAmount', label: '已付预付分成款', contractLabel: '预付分成款', hint: '请输入目前已支付的预付分成款' },
+  委托开发费: { key: 'paidDevelopmentFee', contractKey: 'developmentFee', label: '已付委托开发费', contractLabel: '委托开发费', hint: '请输入目前已支付的委托开发费' },
 };
 
 type ContractAmountFields = {
@@ -87,13 +93,22 @@ function validateContractAmount(value: string, label: string): string | undefine
   return undefined;
 }
 
-function validatePaidAmountIncrease(
+function validatePaidAmount(
   value: string,
   label: string,
   savedValue: number | undefined,
+  contractValue: number | undefined,
+  contractLabel: string,
 ): string | undefined {
   const amountError = validateContractAmount(value, label);
   if (amountError) return amountError;
+  if (
+    contractValue != null
+    && Number.isFinite(contractValue)
+    && parseContractAmount(value) > contractValue
+  ) {
+    return `${label}不能大于合同约定的${contractLabel}`;
+  }
   if (
     savedValue != null
     && Number.isFinite(savedValue)
@@ -604,6 +619,8 @@ export function GameListPage() {
   };
   const toggleCooperationContent = (item: CooperationContent, checked: boolean) => {
     if (!contractForm) return;
+    const existingContract = contractByGameId.get(contractForm.gameId);
+    if (!checked && existingContract?.cooperationContents.includes(item)) return;
     const contractMeta = CONTRACT_FIELD_META[item];
     const paidMeta = PAID_FIELD_META[item];
     const nextContents = checked
@@ -623,11 +640,18 @@ export function GameListPage() {
 
   const saveContract = () => {
     if (!contractForm) return;
+    const existingContract = contractByGameId.get(contractForm.gameId);
     const nextErrors: FieldErrors = {};
     if (!contractForm.contractNumber.trim()) nextErrors.contractNumber = '合同编号不能为空';
     if (!contractForm.currency) nextErrors.currency = '支付币种不能为空';
     if (!contractForm.cooperationContents.length) {
       nextErrors.cooperationContents = '合作内容不能为空';
+    }
+    const removedSubmittedContent = existingContract?.cooperationContents.some(
+      (item) => !contractForm.cooperationContents.includes(item),
+    );
+    if (removedSubmittedContent) {
+      nextErrors.cooperationContents = '已提交的合作内容不可取消';
     }
 
     const contractAmountErr = validateContractAmount(contractAmountFields.contractAmount, '合同金额');
@@ -636,7 +660,15 @@ export function GameListPage() {
     for (const item of contractForm.cooperationContents) {
       const { key, label } = CONTRACT_FIELD_META[item];
       const err = validateContractAmount(contractAmountFields[key], label);
-      if (err) nextErrors[key] = err;
+      if (err) {
+        nextErrors[key] = err;
+        continue;
+      }
+      const paidMeta = PAID_FIELD_META[item];
+      const paidAmount = existingContract?.[paidMeta.key];
+      if (paidAmount != null && parseContractAmount(contractAmountFields[key]) < paidAmount) {
+        nextErrors[key] = `${label}不能小于${paidMeta.label}`;
+      }
     }
 
     if (!contractForm.cooperationStatus) {
@@ -660,7 +692,6 @@ export function GameListPage() {
     };
     setContractAmountFields((prev) => ({ ...prev, ...normalizedAmounts }));
 
-    const existingContract = contracts.find((x) => x.gameId === contractForm.gameId);
     updateContract({
       ...contractForm,
       contractNumber: contractForm.contractNumber.trim(),
@@ -687,11 +718,13 @@ export function GameListPage() {
     if (!paidContract) return;
     const nextErrors: FieldErrors = {};
     for (const item of paidContract.cooperationContents) {
-      const { key, label } = PAID_FIELD_META[item];
-      const err = validatePaidAmountIncrease(
+      const { key, contractKey, label, contractLabel } = PAID_FIELD_META[item];
+      const err = validatePaidAmount(
         paidAmountFields[key],
         label,
         paidContract[key],
+        paidContract[contractKey],
+        contractLabel,
       );
       if (err) nextErrors[key] = err;
     }
@@ -846,7 +879,7 @@ export function GameListPage() {
         </div>
       </Drawer>
       <Drawer title="编辑游戏" open={editOpen} onClose={() => setEditOpen(false)} large
-        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>保存</button></>}>
+        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setEditOpen(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={handleEdit}>确定</button></>}>
         {editing && (
           <div data-annotation-id="game-list-edit-form">
             <EditGameForm form={form} setForm={setForm} editing={editing} getVendorName={getVendorName} errors={errors} clearError={clearError} />
@@ -854,7 +887,7 @@ export function GameListPage() {
         )}
       </Drawer>
       <Drawer title="合同管理" open={contractDrawer} onClose={() => setContractDrawer(false)}
-        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setContractDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveContract}>保存</button></>}>
+        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setContractDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={saveContract}>确定</button></>}>
         {contractForm && contractGame && (
           <div data-annotation-id="game-list-contract-form">
             <ReadonlyField label="游戏ID / 游戏名称" value={`${contractGame.id} / ${contractGame.onlineName}`} />
@@ -927,6 +960,7 @@ export function GameListPage() {
                       <input
                         type="checkbox"
                         checked={contractForm.cooperationContents.includes(opt)}
+                        disabled={savedContract?.cooperationContents.includes(opt)}
                         onChange={(e) => toggleCooperationContent(opt, e.target.checked)}
                       />
                       {opt}
@@ -982,7 +1016,7 @@ export function GameListPage() {
         )}
       </Drawer>
       <Drawer title="已付款项" open={paidDrawer} onClose={() => setPaidDrawer(false)}
-        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setPaidDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={savePaidItems}>保存</button></>}>
+        footer={<><button type="button" className="agf-btn agf-btn--default" onClick={() => setPaidDrawer(false)}>取消</button><button type="button" className="agf-btn agf-btn--primary" onClick={savePaidItems}>确定</button></>}>
         {paidContract && paidGame && (
           <div data-annotation-id="game-list-paid-items-form">
             <ReadonlyField label="游戏ID / 游戏名称" value={`${paidGame.id} / ${paidGame.onlineName}`} />
