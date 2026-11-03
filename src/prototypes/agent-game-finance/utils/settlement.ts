@@ -87,14 +87,12 @@ export function getSettlementChannelOwnership(
     : 'external';
 }
 
-/** 退款无论渠道归属均使用外部渠道结算公式；收入仍按实际渠道归属选择公式。 */
+/** 收入与退款均按实际渠道归属选择自有渠道或外部渠道结算公式。 */
 export function getSettlementFormulaOwnership(
   record: SettlementRecord,
   vendor: Vendor | undefined,
 ): ChannelOwnership {
-  return record.type === 'refund'
-    ? 'external'
-    : getSettlementChannelOwnership(record, vendor);
+  return getSettlementChannelOwnership(record, vendor);
 }
 
 export function isFormulaConfiguredForOwnership(
@@ -180,7 +178,12 @@ export function calcRecordSettlementIncome(
   const tax = formula.internalTaxMode === '跟随发票' && vendor
     ? resolveFollowInvoiceTax(vendor.invoiceInfo, formula.internalTax, vendor.taxPoint)
     : formula.internalTax;
-  return calcSettlement(record.settlementAmount, tax, formula.internalChannelFee, formula.internalShare);
+  return calcSettlement(
+    record.settlementAmount,
+    tax,
+    record.type === 'refund' ? 0 : formula.internalChannelFee,
+    formula.internalShare,
+  );
 }
 
 /** 结算时间等：精确到秒，格式 YYYY-MM-DD HH:mm:ss */

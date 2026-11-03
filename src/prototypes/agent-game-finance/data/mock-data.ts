@@ -16,6 +16,7 @@ import type {
 import { deriveGameBalances } from '../utils/balance';
 import { resolveFollowInvoiceTax } from '../utils/invoiceTax';
 import { buildGamePaymentApplySnapshot } from '../utils/gamePaymentApplySnapshot';
+import { calcHistoricalDeductionLimit } from '../utils/prepayment';
 import {
   calcRecordSettlementIncome,
   getSettlementChannelOwnership,
@@ -101,7 +102,7 @@ export const INITIAL_GAMES: Game[] = [
   gameWithPaymentSettings({ id: '100008', name: '策略争霸', onlineName: '策略争霸', vendorId: '4004', launchDate: '2024-07-12', manager: '吴磊', payer: '游戏之家', license: '有', operationStatus: '已上线', cooperationStatus: '合作中', createdAt: '2024-06-01T11:30:00' }),
   gameWithPaymentSettings({ id: '100009', name: '音乐节奏', onlineName: '音乐节奏', vendorId: '4005', launchDate: '2024-02-28', manager: '郑雪', payer: '游乐', license: '有', operationStatus: '已上线', cooperationStatus: '合作中', createdAt: '2024-06-15T09:00:00' }),
   gameWithPaymentSettings({ id: '100010', name: '射击精英', onlineName: '射击精英', englishName: 'Elite Shooter', vendorId: '4006', launchDate: '2024-05-08', manager: '孙涛', payer: '香港4399', license: '有', operationStatus: '已上线', cooperationStatus: '合作中', createdAt: '2024-07-01T15:00:00' }),
-  gameWithPaymentSettings({ id: '100011', name: '卡牌对决', onlineName: '卡牌对决', vendorId: '4007', launchDate: '2024-10-15', manager: '钱伟', payer: '游戏之家', license: '无', operationStatus: '未上线', cooperationStatus: '合作终止', createdAt: '2024-08-10T10:30:00' }),
+  gameWithPaymentSettings({ id: '100011', name: '卡牌对决', onlineName: '卡牌对决', vendorId: '4007', launchDate: '2024-10-15', manager: '钱伟', payer: '游戏之家', license: '无', operationStatus: '已下线', cooperationStatus: '合作终止', createdAt: '2024-08-10T10:30:00' }),
   gameWithPaymentSettings({ id: '100012', name: '农场物语', onlineName: '农场物语', vendorId: '4008', launchDate: '2024-03-22', manager: '冯丽', payer: '游家时代', license: '有', operationStatus: '已上线', cooperationStatus: '合作中', createdAt: '2024-09-01T13:00:00' }),
   gameWithPaymentSettings({ id: '300001', name: '爆裂跑酷', onlineName: '爆裂跑酷OL', englishName: 'Blazing Runner Online', vendorId: '8001', launchDate: '2024-04-10', manager: '林峰', payer: '4399', license: '有', operationStatus: '已上线', cooperationStatus: '合作中', createdAt: '2024-04-05T09:00:00' }),
   gameWithPaymentSettings({ id: '300002', name: '休闲消除', onlineName: '休闲消除', vendorId: '8001', launchDate: '2024-07-20', manager: '苏婷', payer: '4399', license: '有', operationStatus: '已上线', cooperationStatus: '合作中', createdAt: '2024-05-12T11:00:00' }),
@@ -298,7 +299,7 @@ function enrichRefundSettlementExamples() {
     const sourceOwnership = getSettlementChannelOwnership(record, vendor);
     // 自有渠道读取财务中心原始退款；发行渠道保留财务中心已计算后的来源金额。
     if (sourceOwnership === 'own') record.settlementAmount = record.grossRevenue;
-    record.formulaText = getSettlementFormulaText(formula, vendor, 'external', '退款金额');
+    record.formulaText = getSettlementFormulaText(formula, vendor, sourceOwnership, '退款金额');
     record.settlementIncome = calcRecordSettlementIncome(record, formula, vendor);
   }
 }
@@ -495,9 +496,13 @@ function validateMockDataClosure() {
       throw new Error(`Mock付款设置不完整：${game.id}`);
     }
     if (Number.isFinite(game.historicalDeduction)) {
-      const paidPrepayment = contractByGameId.get(game.id)?.paidPrepayment ?? 0;
-      if ((game.historicalDeduction ?? 0) > paidPrepayment) {
-        throw new Error(`Mock历史已抵扣大于已付预付分成款：${game.id}`);
+      const historicalDeductionLimit = calcHistoricalDeductionLimit(
+        contractByGameId.get(game.id),
+        game.id,
+        INITIAL_GAME_PAYMENTS,
+      );
+      if ((game.historicalDeduction ?? 0) > historicalDeductionLimit) {
+        throw new Error(`Mock历史已抵扣超过可填写上限：${game.id}`);
       }
     }
   }
@@ -526,7 +531,7 @@ export const INITIAL_GAME_LOGS: GameOperationLog[] = [
   { id: 'GL003', gameId: '100006', operator: '刘洋', time: '2024-09-01 11:00:00', action: '合作状态', status: '合作中' },
   { id: 'GL002', gameId: '100006', operator: '刘洋', time: '2024-09-05 11:00:00', action: '运营状态', status: '未上线' },
   { id: 'GL006', gameId: '100011', operator: '钱伟', time: '2025-11-01 10:00:00', action: '合作状态', status: '合作终止' },
-  { id: 'GL007', gameId: '100011', operator: '钱伟', time: '2025-11-02 14:30:00', action: '运营状态', status: '未上线' },
+  { id: 'GL007', gameId: '100011', operator: '钱伟', time: '2025-11-02 14:30:00', action: '运营状态', status: '已下线' },
   // 100012 农场物语：游戏管理批注验收样例（列表默认首行）
   { id: 'GL011', gameId: '100012', operator: '冯丽', time: '2024-09-01 13:00:00', action: '添加游戏' },
   { id: 'GL010', gameId: '100012', operator: '冯丽', time: '2024-09-06 10:30:00', action: '运营状态', status: '已上线' },

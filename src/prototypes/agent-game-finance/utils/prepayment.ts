@@ -47,17 +47,6 @@ export function getGamePrepayment(_game?: Game, contract?: Contract): number {
   return contract?.paidPrepayment ?? 0;
 }
 
-/** 历史已抵扣分成款不能大于已付预付分成款；未维护已付金额时按 0 校验。 */
-export function isHistoricalDeductionWithinPaidPrepayment(
-  historicalDeduction: number,
-  contract?: Contract,
-): boolean {
-  const paidPrepayment = isPaidPrepaymentMaintained(contract)
-    ? contract?.paidPrepayment ?? 0
-    : 0;
-  return historicalDeduction <= paidPrepayment;
-}
-
 export function getGameHistoricalDeduction(game?: Game): number {
   return game?.historicalDeduction ?? 0;
 }
@@ -86,6 +75,28 @@ export function sumGameAppliedPrepaymentDeduction(
   return payments
     .filter((payment) => payment.gameId === gameId)
     .reduce((sum, payment) => sum + getAppliedPrepaymentDeduction(payment), 0);
+}
+
+/** 历史已抵扣可填写上限 = 预付分成款 - 历次申请付款已抵扣的预付分成款。 */
+export function calcHistoricalDeductionLimit(
+  contract: Contract | undefined,
+  gameId: string,
+  payments: GamePaymentRequest[],
+): number {
+  const paidPrepayment = isPaidPrepaymentMaintained(contract)
+    ? contract?.paidPrepayment ?? 0
+    : 0;
+  const appliedDeductionSum = sumGameAppliedPrepaymentDeduction(gameId, payments);
+  return calcRemainingUndeductedPrepayment(paidPrepayment, appliedDeductionSum);
+}
+
+export function isHistoricalDeductionWithinLimit(
+  historicalDeduction: number,
+  contract: Contract | undefined,
+  gameId: string,
+  payments: GamePaymentRequest[],
+): boolean {
+  return historicalDeduction <= calcHistoricalDeductionLimit(contract, gameId, payments);
 }
 
 export function calcGamePrepaymentSummary(

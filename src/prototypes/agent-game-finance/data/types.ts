@@ -1,6 +1,6 @@
 export type PaymentApplyStatus = '未申请' | '已申请';
 export type PaymentStatus = '未付款' | '已付款';
-export type OperationStatus = '未上线' | '已上线';
+export type OperationStatus = '未上线' | '已上线' | '已下线';
 export type CooperationStatus = '合作中' | '合作终止';
 export type LicenseStatus = '有' | '无';
 export type GamePayer = '4399' | '纯游' | '游乐' | '游戏之家' | '香港4399' | '游家时代';

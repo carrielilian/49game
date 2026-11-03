@@ -112,9 +112,9 @@ function validatePaidAmount(
   if (
     savedValue != null
     && Number.isFinite(savedValue)
-    && parseContractAmount(value) <= savedValue
+    && parseContractAmount(value) < savedValue
   ) {
-    return '本次提交金额需大于历史金额';
+    return '本次提交金额需大于等于历史金额';
   }
   return undefined;
 }
@@ -383,6 +383,7 @@ function AddGameForm({ form, setForm, vendors, errors, clearError }: {
           <div className="agf-radio-group">
             <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '未上线' }); }} />未上线</label>
             <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '已上线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '已上线' }); }} />已上线</label>
+            <label className="agf-radio-item"><input type="radio" name="add-operationStatus" checked={form.operationStatus === '已下线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '已下线' }); }} />已下线</label>
           </div>
           <FieldError message={errors.operationStatus} />
         </div>
@@ -424,6 +425,7 @@ function EditGameForm({ form, setForm, editing, getVendorName, errors, clearErro
           <div className="agf-radio-group">
             <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '未上线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '未上线' }); }} />未上线</label>
             <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '已上线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '已上线' }); }} />已上线</label>
+            <label className="agf-radio-item"><input type="radio" name="edit-operationStatus" checked={form.operationStatus === '已下线'} onChange={() => { clearError('operationStatus'); setForm({ ...form, operationStatus: '已下线' }); }} />已下线</label>
           </div>
           <FieldError message={errors.operationStatus} />
         </div>

@@ -85,7 +85,7 @@ export function fetchFinanceCenterRows(
           channelGameId,
           gameId: game.id,
           // 退款发行渠道从财务中心读取“退款金额 × 财务中心结算公式”的结果；
-          // 自有渠道退款仍读取原始退款金额。进入本系统后两者都会再套外部渠道结算公式。
+          // 自有渠道退款仍读取原始退款金额。进入本系统后按实际渠道归属选择对应结算公式。
           amount: type === 'refund' && !isOwnChannel
             ? mockFinanceCenterSettledRefund(rawAmount)
             : rawAmount,

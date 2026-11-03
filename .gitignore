@@ -133,6 +133,7 @@ storybook-static/
 # Temporary folders
 tmp/
 temp/
+/outputs/
 
 # Git version management temporary files
 .git-versions/

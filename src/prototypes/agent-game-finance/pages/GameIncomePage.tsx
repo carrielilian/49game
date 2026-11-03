@@ -9,7 +9,8 @@ import { useAppStore } from '../data/store';
 import { ListSearchFields } from '../components/ListSearchFields';
 import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
 import {
-  isHistoricalDeductionWithinPaidPrepayment,
+  calcHistoricalDeductionLimit,
+  isHistoricalDeductionWithinLimit,
   isPaidPrepaymentMaintained,
 } from '../utils/prepayment';
 import { formatCurrencyMoney, formatMoney, formatOptionalCurrencyMoney, SETTLEMENT_CURRENCY } from '../utils/settlement';
@@ -57,6 +58,7 @@ type PaymentSettingsErrors = Partial<Record<
 export function GameIncomePage() {
   const {
     scopedGameBalances,
+    scopedGamePayments,
     scopedGames,
     contracts,
     applyGamePayment,
@@ -122,6 +124,9 @@ export function GameIncomePage() {
   const prepayGame = selectedGameId ? getGame(selectedGameId) : undefined;
   const prepayContract = prepayGame ? contractByGameId.get(prepayGame.id) : undefined;
   const prepayCurrency = resolveContractCurrency(prepayContract);
+  const historicalDeductionLimit = selectedGameId
+    ? calcHistoricalDeductionLimit(prepayContract, selectedGameId, scopedGamePayments)
+    : 0;
 
   const confirmAmountText = `申请付款金额：${formatMoney(confirmAmount)}元`;
 
@@ -164,9 +169,14 @@ export function GameIncomePage() {
     const historicalDeduction = historicalError ? undefined : parsePrepayAmount(historicalAmount);
     if (
       historicalDeduction != null
-      && !isHistoricalDeductionWithinPaidPrepayment(historicalDeduction, prepayContract)
+      && !isHistoricalDeductionWithinLimit(
+        historicalDeduction,
+        prepayContract,
+        prepayGame.id,
+        scopedGamePayments,
+      )
     ) {
-      nextErrors.historicalDeduction = '历史已抵扣分成款不能大于已付预付分成款';
+      nextErrors.historicalDeduction = `历史已抵扣分成款需 ≤ ${formatPrepayAmountInput(historicalDeductionLimit)}`;
     }
     if (!sharePaymentCompany.trim()) nextErrors.sharePaymentCompany = '分成付款公司不能为空';
     if (!sharePaymentCurrency) nextErrors.sharePaymentCurrency = '付款币种不能为空';
@@ -293,7 +303,7 @@ export function GameIncomePage() {
             <ReadonlyField label="游戏ID / 游戏名称" value={`${prepayGame.id} / ${prepayGame.onlineName}`} />
             <FormSectionTitle>预付分成信息</FormSectionTitle>
             <ReadonlyCurrencyField
-              label="已付预付分成款"
+              label="预付分成款"
               amount={prepayContract?.paidPrepayment}
               currency={prepayCurrency}
               unset={isPrepaymentUnset(prepayContract?.paidPrepayment)}
@@ -315,7 +325,11 @@ export function GameIncomePage() {
                     '历史已抵扣分成款',
                   )}
                 />
-                <FieldHint>请填写线下已抵扣处理的预付分成款，若无则填写0；不能大于已付预付分成款</FieldHint>
+                <FieldHint>
+                  请填写线下已抵扣处理的预付分成款，若无则填写0；
+                  <br />
+                  填写数值需 ≤ 预付分成款 - 历史累计申请付款抵扣的预付分成款。
+                </FieldHint>
                 <FieldError message={prepayErrors.historicalDeduction} />
               </div>
             </div>

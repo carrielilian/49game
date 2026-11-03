@@ -16,6 +16,7 @@ const VARIANT_MAP: Record<string, BadgeVariant> = {
   '待付款': 'warning',
   '未申请': 'warning',
   '合作终止': 'danger',
+  '已下线': 'muted',
   '未上线': 'muted',
 };
 

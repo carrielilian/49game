@@ -3,6 +3,7 @@ import type { FormulaConfig, SettlementRecord, Vendor } from '../src/prototypes/
 import { compareSettlementAddedDesc } from '../src/prototypes/agent-game-finance/utils/listSort';
 import {
   calcRecordSettlementIncome,
+  getSettlementFormulaOwnership,
   getSettlementFormulaText,
 } from '../src/prototypes/agent-game-finance/utils/settlement';
 
@@ -19,7 +20,7 @@ const formula = {
   channels: [],
 } satisfies FormulaConfig;
 
-const vendor = { businessType: '游戏盒', invoiceInfo: '其他', taxPoint: 0.06 } as unknown as Vendor;
+const vendor = { businessType: '4399', invoiceInfo: '其他', taxPoint: 0.06 } as unknown as Vendor;
 
 function record(overrides: Partial<SettlementRecord> = {}): SettlementRecord {
   return {
@@ -40,10 +41,20 @@ function record(overrides: Partial<SettlementRecord> = {}): SettlementRecord {
 }
 
 describe('agent game finance settlement rules', () => {
-  it('退款公式和计算均不包含渠道费', () => {
+  it('自有渠道退款使用自有渠道公式且不包含渠道费', () => {
+    const ownRefund = record({ channel: '游戏盒' });
+    expect(getSettlementFormulaOwnership(ownRefund, vendor)).toBe('own');
+    expect(getSettlementFormulaText(formula, vendor, 'own', '退款金额'))
+      .toBe('自有渠道：退款金额*（1-5%）*50%');
+    expect(calcRecordSettlementIncome(ownRefund, formula, vendor)).toBe(475);
+  });
+
+  it('外部渠道退款使用外部渠道公式且不包含渠道费', () => {
+    const externalRefund = record({ channel: '快爆' });
+    expect(getSettlementFormulaOwnership(externalRefund, vendor)).toBe('external');
     expect(getSettlementFormulaText(formula, vendor, 'external', '退款金额'))
       .toBe('外部渠道：退款金额*（1-6%）*40%');
-    expect(calcRecordSettlementIncome(record(), formula, vendor)).toBe(376);
+    expect(calcRecordSettlementIncome(externalRefund, formula, vendor)).toBe(376);
   });
 
   it('收入计算仍保留渠道费', () => {
