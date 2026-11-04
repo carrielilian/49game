@@ -3,8 +3,8 @@
 > **用途**：在新 Cursor 对话中快速恢复本项目背景、已做决策和待办，避免重复对齐。  
 > **UI 细节**：改样式、表单、抽屉、分页等请优先读 [`ui-spec.md`](./ui-spec.md)。  
 > **正式需求依据**：[`agent-game-finance-requirements.md`](./agent-game-finance-requirements.md)、[`requirement-history.md`](./requirement-history.md) 与 [主规格](../../prototypes/agent-game-finance/.spec/spec.html)；本文件仅用于 AI 恢复上下文。
-> **当前原型版本**：V1.0；版本说明见 [`versions/v1.0.md`](./versions/v1.0.md)。
-> **最后更新**：2026-11-03（建立 V1.0 基线、需求变更台账和版本追溯机制）
+> **当前版本关系**：V1.0 已归档；V1.1 已冻结；V1.2 为后续需求版本，当前仅建立版本框架。版本说明见 [`versions/`](./versions/)。
+> **最后更新**：2026-11-04（建立独立 V1.1、V1.2 原型及 V1.2 变更展示框架）
 > **对应 Git**：见文末「Git 状态」；远程 https://github.com/carrielilian/49game.git `main`（本地可能有未推送改动）
 
 ---
