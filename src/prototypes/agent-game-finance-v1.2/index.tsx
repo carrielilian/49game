@@ -7,17 +7,11 @@
  * - /rules/prototype-development-guide.md
  */
 import React, { useMemo, useState } from 'react';
-import {
-  AnnotationViewer,
-  type AnnotationDirectoryRouteNode,
-  type AnnotationViewerOptions,
-} from '@axhub/annotation';
 import { defineHashPageRoute, useHashPage } from '../../common/useHashPage';
 import { AdminLayout } from './components/AdminLayout';
-import { AnnotationToggle } from './components/AnnotationToggle';
 import { VersionChangeCenter } from './components/VersionChangeCenter';
 import { VersionChangeMarkerLayer } from './components/VersionChangeMarkerLayer';
-import { OverlayScopeProvider, useOverlayScope } from './components/OverlayScope';
+import { OverlayScopeProvider } from './components/OverlayScope';
 import { GameIncomeFieldHelp } from './components/GameIncomeFieldHelp';
 import type { MenuGroup } from './components/Sidebar';
 import { AppProvider } from './data/store';
@@ -29,10 +23,7 @@ import { GamePaymentListPage } from './pages/GamePaymentListPage';
 import { InternalSettlementPage } from './pages/InternalSettlementPage';
 import { RevenueSummaryPage } from './pages/RevenueSummaryPage';
 import { VendorListPage } from './pages/VendorListPage';
-import { buildAnnotationSource } from './utils/buildAnnotationSource';
 import { VERSION_CHANGES, type VersionChange } from './content/versionChanges';
-import { useAnnotationPanelWidth } from './utils/annotationPanelWidth';
-import { createAnnotationElementResolver } from './utils/resolveAnnotationElement';
 import './style.css';
 
 const ROUTE = defineHashPageRoute([
@@ -107,30 +98,11 @@ function PageContent({ pageId }: { pageId: string }) {
 
 function AppShell() {
   const { page, setPage } = useHashPage(ROUTE);
-  const { overlayOpenRef } = useOverlayScope();
-  const [showAnnotation, setShowAnnotation] = useState(true);
   const [showChanges, setShowChanges] = useState(true);
   const [changeCenterOpen, setChangeCenterOpen] = useState(false);
   const [focusedChange, setFocusedChange] = useState<VersionChange | null>(null);
-  const resolveElement = useMemo(
-    () => createAnnotationElementResolver(overlayOpenRef),
-    [overlayOpenRef],
-  );
   const meta = PAGE_META[page] ?? PAGE_META['vendor-list'];
   const breadcrumbs = useMemo(() => ['业务中台', '代理游戏台账', meta.group, meta.title], [meta]);
-  const annotationSource = useMemo(() => buildAnnotationSource(), []);
-  const viewerOptions = useMemo<AnnotationViewerOptions>(() => ({
-    currentPageId: page,
-    showToolbar: true,
-    showColorFilter: true,
-    defaultMarkerIndexVisible: true,
-    emptyWhenNoData: false,
-    onDirectoryRoute: (node: AnnotationDirectoryRouteNode) => {
-      if (typeof node.route === 'string') setPage(node.route);
-    },
-  }), [page, setPage]);
-
-  useAnnotationPanelWidth(showAnnotation);
 
   return (
     <AdminLayout
@@ -155,7 +127,6 @@ function AppShell() {
               onClick={() => setShowChanges((value) => !value)}
             />
           </label>
-          <AnnotationToggle checked={showAnnotation} onChange={setShowAnnotation} />
         </>
       )}
       breadcrumbExtra={
@@ -176,13 +147,6 @@ function AppShell() {
         onNavigate={setPage}
         focusedChangeId={focusedChange?.id}
       />
-      {showAnnotation && (
-        <AnnotationViewer
-          source={annotationSource}
-          options={viewerOptions}
-          resolveElement={resolveElement}
-        />
-      )}
     </AdminLayout>
   );
 }
