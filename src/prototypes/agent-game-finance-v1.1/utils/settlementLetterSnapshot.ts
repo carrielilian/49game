@@ -1,0 +1,181 @@
+import type {
+  Contract,
+  ContractCurrency,
+  ExchangeRateRecord,
+  Game,
+  GamePaymentRequest,
+  SettlementLetterSnapshot,
+  SettlementRecord,
+  Vendor,
+} from '../data/types';
+import { getExchangeRateByApplyTime } from './exchangeRate';
+import { resolveMarkPaymentContractCurrency } from './currencySnapshot';
+import { resolveGameMarkPaymentDefaults, resolveLetterPayAmount } from './gamePaymentMarkDefaults';
+import { calcGamePrepaymentSummary } from './prepayment';
+import { displaySettlementFormula } from './settlement';
+import {
+  buildLetterIncomeRows,
+  buildLetterRefundRows,
+  calcGameLetterPrepaymentDeduction,
+  resolveLetterShowExchangeRate,
+  type LetterIncomeRow,
+  type LetterRefundRow,
+} from './settlementLetter';
+
+function formatLetterFormula(formulaText?: string, marker: '①' | '③' = '①'): string {
+  const expr = displaySettlementFormula(formulaText);
+  if (expr === '-') return '-';
+  return expr.replace('待结算金额', marker);
+}
+
+export interface BuildSettlementLetterSnapshotInput {
+  vendorId: string;
+  gameId: string;
+  amount: number;
+  settlementIds?: string[];
+  applyTime?: string;
+  /** 排除本笔已付款记录，使 remaining 为付款前余额（mock 重建快照时使用） */
+  paymentId?: string;
+  vendor?: Vendor;
+  game?: Game;
+  contract?: Contract;
+  settlements: SettlementRecord[];
+  gamePayments: GamePaymentRequest[];
+  exchangeRates: ExchangeRateRecord[];
+  games: Game[];
+  getGameName: (id: string) => string;
+  /** 标记已付款时写入表单中的实际付款金额（优先于实时计算） */
+  letterPayAmountOverride?: number;
+  /** 申请付款时手工填写的汇率；提供后不再按申请时间查汇率表 */
+  exchangeRateOverride?: number;
+  /** 申请付款时手工选择的汇率取值日期 */
+  exchangeRateDateOverride?: string;
+  /** 申请付款时已经计算并冻结的申请前剩余预付分成款 */
+  remainingPrepaymentOverride?: number;
+  /** 申请付款时已经计算并冻结的本次预付抵扣金额 */
+  prepaymentDeductionOverride?: number;
+  /** 申请付款时已经计算并冻结的抵扣后剩余预付分成款 */
+  remainingPrepaymentAfterApplyOverride?: number;
+}
+
+function buildLetterRows(input: BuildSettlementLetterSnapshotInput): {
+  incomeRows: LetterIncomeRow[];
+  refundRows: LetterRefundRow[];
+} {
+  const { vendorId, amount, settlementIds, gameId, games, getGameName, settlements } = input;
+  const linked = settlementIds?.length
+    ? settlements.filter((s) => settlementIds.includes(s.id) && s.settled)
+    : [];
+
+  if (linked.length > 0) {
+    const incomeRecords = linked.filter((s) => s.type !== 'refund');
+    const refundRecords = linked.filter((s) => s.type === 'refund');
+    return {
+      incomeRows: buildLetterIncomeRows(incomeRecords, getGameName, (t) => formatLetterFormula(t, '①')),
+      refundRows: buildLetterRefundRows(refundRecords, getGameName, (t) => formatLetterFormula(t, '③')),
+    };
+  }
+
+  const fallbackGame = games.find((g) => g.id === gameId);
+  if (!fallbackGame) return { incomeRows: [], refundRows: [] };
+
+  return {
+    incomeRows: [{
+      id: 'fallback',
+      productName: `《${getGameName(fallbackGame.id)}》快爆付费`,
+      period: '2025.06',
+      revenue: amount,
+      formula: '①* (1-5%-0%) *50%',
+      settlementAmount: amount,
+    }],
+    refundRows: [],
+  };
+}
+
+export function buildSettlementLetterSnapshot(input: BuildSettlementLetterSnapshotInput): SettlementLetterSnapshot {
+  const {
+    vendorId,
+    amount,
+    applyTime,
+    gameId,
+    paymentId,
+    vendor,
+    game,
+    contract,
+    gamePayments,
+    exchangeRates,
+    letterPayAmountOverride,
+  } = input;
+
+  const { incomeRows, refundRows } = buildLetterRows(input);
+  const incomeTotal = incomeRows.reduce((sum, row) => sum + row.settlementAmount, 0);
+  const refundTotal = refundRows.reduce((sum, row) => sum + row.settlementRefund, 0);
+  const netTotal = Math.round((incomeTotal - refundTotal) * 100) / 100;
+  const paymentCurrency: ContractCurrency = game?.sharePaymentCurrency ?? '人民币';
+  const contractPaymentCurrency = resolveMarkPaymentContractCurrency(game, contract);
+  const exchangeRate = input.exchangeRateOverride
+    ?? (applyTime ? getExchangeRateByApplyTime(applyTime, exchangeRates) : undefined)
+    ?? 7.21;
+
+  const scopedGamePayments = paymentId
+    ? gamePayments.filter((p) => p.id !== paymentId)
+    : gamePayments;
+  const prepaymentSummary = calcGamePrepaymentSummary(game, contract, gameId, scopedGamePayments);
+  const remainingPrepayment = input.remainingPrepaymentOverride
+    ?? prepaymentSummary.remainingPrepayment;
+  const showExchangeRate = resolveLetterShowExchangeRate(
+    paymentCurrency,
+    contractPaymentCurrency,
+    remainingPrepayment,
+  );
+  const showPrepaymentDeductionRows = remainingPrepayment > 0;
+  const calculatedDeduction =
+    calcGameLetterPrepaymentDeduction(
+      game,
+      contract,
+      gameId,
+      gamePayments,
+      incomeTotal,
+      refundTotal,
+      contractPaymentCurrency,
+      exchangeRate,
+      paymentId,
+    );
+  const prepaidDeduction = input.prepaymentDeductionOverride
+    ?? calculatedDeduction.deduction;
+  const remainingUndeducted = input.remainingPrepaymentAfterApplyOverride
+    ?? calculatedDeduction.remainingUndeducted;
+  const formulaPayAmount = calculatedDeduction.payAmount;
+
+  let letterPayAmount = formulaPayAmount;
+  if (letterPayAmountOverride !== undefined) {
+    letterPayAmount = letterPayAmountOverride;
+  } else {
+    const defaults = resolveGameMarkPaymentDefaults(
+      amount,
+      game,
+      vendor,
+      contract,
+      remainingPrepayment,
+      exchangeRate,
+    );
+    letterPayAmount = resolveLetterPayAmount(defaults, paymentCurrency);
+  }
+
+  return {
+    incomeRows,
+    refundRows,
+    incomeTotal,
+    refundTotal,
+    netTotal,
+    paymentCurrency,
+    contractPaymentCurrency,
+    showExchangeRate,
+    exchangeRateDate: showExchangeRate ? input.exchangeRateDateOverride : undefined,
+    exchangeRate: showExchangeRate ? exchangeRate : undefined,
+    showPrepaymentDeductionRows,
+    prepaidDeduction: showPrepaymentDeductionRows ? prepaidDeduction : undefined,
+    remainingUndeducted: showPrepaymentDeductionRows ? remainingUndeducted : undefined,
+    letterPayAmount,
+  };
+}

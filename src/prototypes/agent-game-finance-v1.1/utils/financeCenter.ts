@@ -1,0 +1,122 @@
+import type { BusinessType, ChannelOwnership, FormulaConfig, Game, SettlementRole } from '../data/types';
+
+/** 原型 mock：false 时模拟财务中心本月尚有业务未结算 */
+export const MOCK_FINANCE_CENTER_READY = true;
+
+export interface FinanceCenterRow {
+  channel: string;
+  channelGameId: string;
+  gameId: string;
+  amount: number;
+  channelOwnership: ChannelOwnership;
+  settlementRole: SettlementRole;
+}
+
+const PULL_DELAY_MS = 800;
+
+export const INTERNAL_CHANNEL_CATEGORIES = ['游戏盒', '快爆'];
+
+export function getInternalChannelCategory(channel: string): string {
+  if (channel === '游戏盒' || channel.startsWith('游戏盒') || channel === '49广告联盟') {
+    return '游戏盒';
+  }
+  if (channel === '快爆' || channel.startsWith('快爆')) {
+    return '快爆';
+  }
+  return channel;
+}
+
+export function getSelfChannelCategory(businessType: BusinessType): string {
+  return businessType === '4399' ? '游戏盒' : '快爆';
+}
+
+export function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 模拟查询财务中心上月业务是否全部结算完成（通过后才可拉取上月收入） */
+export async function checkFinanceCenterReady(): Promise<boolean> {
+  await delay(PULL_DELAY_MS);
+  return MOCK_FINANCE_CENTER_READY;
+}
+
+/** V1.1：收入、退款拉取前均校验财务中心当月所有游戏业务已结算。 */
+export function requiresFinanceCenterSettlementCheck(type: 'internal' | 'refund'): boolean {
+  return type === 'internal' || type === 'refund';
+}
+
+function mockAmount(gameId: string, channelGameId: string, type: 'internal' | 'refund'): number {
+  let hash = 0;
+  const seed = `${gameId}-${channelGameId}-${type}`;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) % 100000;
+  }
+  const base = type === 'refund' ? 8000 : 30000;
+  return base + (hash % 70000);
+}
+
+/** 原型 mock：模拟财务中心已按其结算公式计算完成的发行渠道退款金额。 */
+function mockFinanceCenterSettledRefund(rawRefundAmount: number): number {
+  return Math.round(rawRefundAmount * 0.5 * 100) / 100;
+}
+
+/**
+ * 按「渠道 + 渠道游戏ID」从财务中心拉取待结算/待退款数据（原型 mock）。
+ * 仅包含已上线游戏、渠道映射中已勾选的自有渠道及外部关联平台。
+ */
+/** @param incomeMonthKey 拉取的收入月份（上一自然月，YYYY-MM） */
+export function fetchFinanceCenterRows(
+  type: 'internal' | 'refund',
+  formulas: FormulaConfig[],
+  games: Game[],
+  incomeMonthKey: string,
+  businessType: BusinessType,
+): FinanceCenterRow[] {
+  void incomeMonthKey;
+  const rows: FinanceCenterRow[] = [];
+  for (const game of games) {
+    if (game.operationStatus !== '已上线') continue;
+    const formula = formulas.find((f) => f.gameId === game.id);
+    if (!formula) continue;
+    for (const ch of formula.channels) {
+      if (ch.type !== 'internal' || !ch.enabled || !ch.channelGameId) continue;
+      const channelGameIds = ch.channelGameId.split(',').map((id) => id.trim()).filter(Boolean);
+      const channel = getInternalChannelCategory(ch.name);
+      const isOwnChannel = channel === getSelfChannelCategory(businessType);
+      for (const channelGameId of channelGameIds) {
+        const rawAmount = mockAmount(game.id, channelGameId, type);
+        rows.push({
+          channel,
+          channelGameId,
+          gameId: game.id,
+          // 退款发行渠道从财务中心读取“退款金额 × 财务中心结算公式”的结果；
+          // 自有渠道退款仍读取原始退款金额。进入本系统后按实际渠道归属选择对应结算公式。
+          amount: type === 'refund' && !isOwnChannel
+            ? mockFinanceCenterSettledRefund(rawAmount)
+            : rawAmount,
+          channelOwnership: isOwnChannel ? 'own' : 'external',
+          settlementRole: isOwnChannel ? 'agency' : 'distribution',
+        });
+      }
+    }
+  }
+  const grouped = new Map<string, FinanceCenterRow>();
+  for (const row of rows) {
+    const key = `${row.gameId}::${row.channel}`;
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, { ...row });
+      continue;
+    }
+    const channelGameIds = [...new Set([
+      ...current.channelGameId.split(',').map((id) => id.trim()).filter(Boolean),
+      row.channelGameId,
+    ])];
+    grouped.set(key, {
+      ...current,
+      amount: current.amount + row.amount,
+      channelGameId: channelGameIds.join(','),
+    });
+  }
+  return [...grouped.values()];
+}

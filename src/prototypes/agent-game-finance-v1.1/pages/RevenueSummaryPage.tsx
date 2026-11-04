@@ -1,0 +1,390 @@
+import React, { useMemo, useState } from 'react';
+import { COL_ALIGN_RIGHT, DataTable, DualCell, renderCurrencyTotals } from '../components/DataTable';
+import { FilterBar } from '../components/FilterBar';
+import { ListSearchFields } from '../components/ListSearchFields';
+import { Toast, type ToastType } from '../components/Modal';
+import { useAppStore } from '../data/store';
+import type { Contract, ContractCurrency, Game, GamePaymentRequest, SettlementRecord } from '../data/types';
+import { sumContractPaymentsByCurrency } from '../utils/currencySnapshot';
+import { EMPTY_LIST_SEARCH, matchesListSearch, type ListSearchQuery } from '../utils/listKeyword';
+import { downloadCsv } from '../utils/listExport';
+import { isPaidPayment } from '../utils/payment';
+import { formatCurrencyMoney, formatDateTime, SETTLEMENT_CURRENCY } from '../utils/settlement';
+import { getInternalChannelCategory } from '../utils/financeCenter';
+import { settlementAddedAt } from '../utils/listSort';
+
+type QueryDimension = 'game' | 'channel' | 'vendor';
+
+interface SummaryRow {
+  id: string;
+  /** 汇总项所包含数据中，最近一次进入系统的时间。 */
+  addedAt: string;
+  gameId?: string;
+  gameName?: string;
+  vendorId?: string;
+  vendorName?: string;
+  channel?: string;
+  paymentByCurrency: Partial<Record<ContractCurrency, number>>;
+  totalRevenue: number;
+  settlementIncome: number;
+  settlementRefund: number;
+  settlementPaymentAmount: number;
+  /** 渠道/厂商维度汇总指标时关联的游戏 */
+  paymentGameIds?: Set<string>;
+}
+
+function attachPaymentAmount(
+  rows: Array<Omit<SummaryRow, 'paymentByCurrency'> & { paymentGameIds?: Set<string> }>,
+  dimension: QueryDimension,
+  contractMap: Map<string, Contract>,
+): SummaryRow[] {
+  return rows.map((row) => {
+    if (dimension === 'channel') {
+      const { paymentGameIds: _omit, ...rest } = row;
+      return { ...rest, paymentByCurrency: {} };
+    }
+    const gameIds = dimension === 'game'
+      ? (row.gameId ? [row.gameId] : [])
+      : Array.from(row.paymentGameIds ?? []);
+    const paymentByCurrency = sumContractPaymentsByCurrency(gameIds, contractMap);
+    const { paymentGameIds: _omit, ...rest } = row;
+    return { ...rest, paymentByCurrency };
+  });
+}
+
+function attachSettlementPaymentAmount(
+  rows: Array<Omit<SummaryRow, 'paymentByCurrency'> & { paymentGameIds?: Set<string> }>,
+  dimension: QueryDimension,
+  gamePayments: GamePaymentRequest[],
+  search: ListSearchQuery,
+  getGame: (id: string) => Game | undefined,
+  getGameName: (id: string) => string,
+  getVendorName: (id: string) => string,
+): Array<Omit<SummaryRow, 'paymentByCurrency'> & { paymentGameIds?: Set<string> }> {
+  if (dimension === 'channel') {
+    return rows.map((row) => ({ ...row, settlementPaymentAmount: 0 }));
+  }
+  return rows.map((row) => {
+    let settlementPaymentAmount = 0;
+    for (const payment of gamePayments) {
+      if (!isPaidPayment(payment.status) || payment.actualAmount == null) continue;
+
+      const game = getGame(payment.gameId);
+      if (!game) continue;
+      if (!matchesListSearch(search, {
+        gameId: payment.gameId,
+        gameName: getGameName(payment.gameId),
+        vendorId: game.vendorId,
+        vendorName: getVendorName(game.vendorId),
+      })) continue;
+
+      const matchesDimension = dimension === 'game'
+        ? payment.gameId === row.gameId
+        : dimension === 'vendor'
+          ? game.vendorId === row.vendorId
+          : row.paymentGameIds?.has(payment.gameId) ?? false;
+      if (!matchesDimension) continue;
+
+      settlementPaymentAmount += payment.actualAmount;
+    }
+    return { ...row, settlementPaymentAmount };
+  });
+}
+
+function formatPaymentAmount(paymentByCurrency: Partial<Record<ContractCurrency, number>>): React.ReactNode {
+  return renderCurrencyTotals(paymentByCurrency);
+}
+
+const SETTLEMENT_AMOUNT = (value: number) => formatCurrencyMoney(value, SETTLEMENT_CURRENCY);
+
+interface SummaryTotals {
+  paymentByCurrency: Partial<Record<ContractCurrency, number>>;
+  totalRevenue: number;
+  settlementPaymentAmount: number;
+}
+
+function computeSummaryTotals(rows: SummaryRow[]): SummaryTotals {
+  const paymentByCurrency: Partial<Record<ContractCurrency, number>> = {};
+  let totalRevenue = 0;
+  let settlementPaymentAmount = 0;
+  for (const row of rows) {
+    for (const [currency, amount] of Object.entries(row.paymentByCurrency) as [ContractCurrency, number][]) {
+      paymentByCurrency[currency] = (paymentByCurrency[currency] ?? 0) + amount;
+    }
+    totalRevenue += row.totalRevenue;
+    settlementPaymentAmount += row.settlementPaymentAmount;
+  }
+  return { paymentByCurrency, totalRevenue, settlementPaymentAmount };
+}
+
+function renderPaymentTotal(paymentByCurrency: Partial<Record<ContractCurrency, number>>): React.ReactNode {
+  return renderCurrencyTotals(paymentByCurrency);
+}
+
+const AMOUNT_CELL = 'agf-table__cell--right';
+
+function buildSummaryLeadingRow(dimension: QueryDimension, totals: SummaryTotals): React.ReactNode {
+  const paymentCell = renderPaymentTotal(totals.paymentByCurrency);
+  const revenueCell = SETTLEMENT_AMOUNT(totals.totalRevenue);
+  const settlementCell = SETTLEMENT_AMOUNT(totals.settlementPaymentAmount);
+
+  if (dimension === 'game') {
+    return (
+      <tr className="agf-table__summary-row" data-annotation-id="stats-summary-summary-row">
+        <td>查询总计</td>
+        <td className={AMOUNT_CELL}>{paymentCell}</td>
+        <td className={AMOUNT_CELL}>{revenueCell}</td>
+        <td className={AMOUNT_CELL}>{settlementCell}</td>
+      </tr>
+    );
+  }
+  if (dimension === 'channel') {
+    return (
+      <tr className="agf-table__summary-row" data-annotation-id="stats-summary-summary-row">
+        <td>查询总计</td>
+        <td className={AMOUNT_CELL}>-</td>
+        <td className={AMOUNT_CELL}>{revenueCell}</td>
+        <td className={AMOUNT_CELL}>-</td>
+      </tr>
+    );
+  }
+  return (
+    <tr className="agf-table__summary-row" data-annotation-id="stats-summary-summary-row">
+      <td>查询总计</td>
+      <td className={AMOUNT_CELL}>{paymentCell}</td>
+      <td className={AMOUNT_CELL}>{revenueCell}</td>
+      <td className={AMOUNT_CELL}>{settlementCell}</td>
+    </tr>
+  );
+}
+
+const PAYMENT_COLUMN = {
+  ...COL_ALIGN_RIGHT,
+  key: 'paymentAmount',
+  title: '合同已付款金额',
+  render: (r: SummaryRow) => formatPaymentAmount(r.paymentByCurrency),
+};
+
+function buildSummaryRows(
+  settlements: SettlementRecord[],
+  dimension: QueryDimension,
+  search: ListSearchQuery,
+  getVendorName: (id: string) => string,
+  getGameName: (id: string) => string,
+): Array<Omit<SummaryRow, 'paymentByCurrency'>> {
+  const map = new Map<string, Omit<SummaryRow, 'paymentByCurrency'> & { paymentGameIds?: Set<string> }>();
+
+  for (const s of settlements) {
+    if (!s.settled) continue;
+
+    const gameName = getGameName(s.gameId);
+    const vendorName = getVendorName(s.vendorId);
+    const summaryChannel = s.type === 'external'
+      ? s.channel
+      : getInternalChannelCategory(s.channel);
+    if (!matchesListSearch(search, {
+      gameId: s.gameId,
+      gameName,
+      vendorId: s.vendorId,
+      vendorName,
+    })) continue;
+
+    const key = dimension === 'game'
+      ? s.gameId
+      : dimension === 'channel'
+        ? summaryChannel
+        : s.vendorId;
+
+    let row = map.get(key);
+    if (!row) {
+      row = {
+        id: key,
+        addedAt: settlementAddedAt(s),
+        settlementIncome: 0,
+        settlementRefund: 0,
+        settlementPaymentAmount: 0,
+        ...(dimension === 'game' ? { gameId: s.gameId, gameName } : {}),
+        ...(dimension === 'channel' ? { channel: summaryChannel, paymentGameIds: new Set<string>() } : {}),
+        ...(dimension === 'vendor' ? { vendorId: s.vendorId, vendorName, paymentGameIds: new Set<string>() } : {}),
+      };
+      map.set(key, row);
+    }
+    if (settlementAddedAt(s) > row.addedAt) row.addedAt = settlementAddedAt(s);
+
+    if (dimension !== 'game') {
+      if (!row.paymentGameIds) row.paymentGameIds = new Set<string>();
+      row.paymentGameIds.add(s.gameId);
+    }
+
+    if (s.type === 'refund') {
+      row.settlementRefund += s.settlementIncome;
+    } else {
+      row.settlementIncome += s.settlementIncome;
+    }
+  }
+
+  return Array.from(map.values())
+    .map((row) => ({
+      ...row,
+      totalRevenue: row.settlementIncome - row.settlementRefund,
+    }))
+    .sort((a, b) => b.addedAt.localeCompare(a.addedAt) || b.id.localeCompare(a.id));
+}
+
+const DIMENSION_OPTIONS: { value: QueryDimension; label: string }[] = [
+  { value: 'game', label: '游戏' },
+  { value: 'channel', label: '渠道' },
+  { value: 'vendor', label: '厂商' },
+];
+
+const DIMENSION_LABEL: Record<QueryDimension, string> = {
+  game: '游戏',
+  channel: '渠道',
+  vendor: '厂商',
+};
+
+const PAYMENT_CURRENCY_ORDER: ContractCurrency[] = ['人民币', '美金'];
+
+function formatPaymentAmountExport(paymentByCurrency: Partial<Record<ContractCurrency, number>>): string {
+  const lines = PAYMENT_CURRENCY_ORDER
+    .map((currency) => ({ currency, amount: paymentByCurrency[currency] ?? 0 }))
+    .filter(({ amount }) => amount !== 0);
+  if (lines.length === 0) return formatCurrencyMoney(0, '人民币');
+  return lines.map(({ currency, amount }) => formatCurrencyMoney(amount, currency)).join('\n');
+}
+
+function getExportHeaders(dimension: QueryDimension): string[] {
+  if (dimension === 'game') {
+    return ['游戏ID / 游戏名称', '合同已付款金额', '总收入', '累计实际付款金额'];
+  }
+  if (dimension === 'channel') {
+    return ['渠道', '合同已付款金额', '总收入', '累计实际付款金额'];
+  }
+  return ['厂商ID', '厂商名称', '合同已付款金额', '总收入', '累计实际付款金额'];
+}
+
+function rowToExport(row: SummaryRow, dimension: QueryDimension): string[] {
+  const payment = formatPaymentAmountExport(row.paymentByCurrency);
+  const totalRevenue = formatCurrencyMoney(row.totalRevenue, SETTLEMENT_CURRENCY);
+  const settlementPayment = formatCurrencyMoney(row.settlementPaymentAmount, SETTLEMENT_CURRENCY);
+  if (dimension === 'game') {
+    return [`${row.gameId!} / ${row.gameName!}`, payment, totalRevenue, settlementPayment];
+  }
+  if (dimension === 'channel') {
+    return [row.channel!, '-', totalRevenue, '-'];
+  }
+  return [row.vendorId!, row.vendorName!, payment, totalRevenue, settlementPayment];
+}
+
+const SETTLEMENT_PAYMENT_COLUMN = {
+  ...COL_ALIGN_RIGHT,
+  key: 'settlementPaymentAmount',
+  title: '累计实际付款金额',
+  render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.settlementPaymentAmount),
+};
+
+export function RevenueSummaryPage() {
+  const { scopedSettlements, scopedGamePayments, contracts, getVendorName, getGameName, getGame } = useAppStore();
+  const [dimension, setDimension] = useState<QueryDimension>('game');
+  const [search, setSearch] = useState<ListSearchQuery>(EMPTY_LIST_SEARCH);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  const contractMap = useMemo(
+    () => new Map(contracts.map((c) => [c.gameId, c])),
+    [contracts],
+  );
+
+  const allRows = useMemo(() => {
+    const base = buildSummaryRows(
+      scopedSettlements,
+      dimension,
+      search,
+      getVendorName,
+      getGameName,
+    );
+    const withSettlementPayment = attachSettlementPaymentAmount(
+      base,
+      dimension,
+      scopedGamePayments,
+      search,
+      getGame,
+      getGameName,
+      getVendorName,
+    );
+    return attachPaymentAmount(withSettlementPayment, dimension, contractMap);
+  }, [scopedSettlements, scopedGamePayments, dimension, search, getVendorName, getGameName, contractMap, getGame]);
+
+  const rows = allRows;
+
+  const summaryTotals = useMemo(() => computeSummaryTotals(rows), [rows]);
+  const leadingRow = rows.length > 0 ? buildSummaryLeadingRow(dimension, summaryTotals) : undefined;
+
+  const columns = dimension === 'game'
+    ? [
+        { key: 'game', title: '游戏ID / 游戏名称', render: (r: SummaryRow) => <DualCell main={r.gameName!} sub={r.gameId!} /> },
+        PAYMENT_COLUMN,
+        { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
+        SETTLEMENT_PAYMENT_COLUMN,
+      ]
+    : dimension === 'channel'
+      ? [
+          {
+            key: 'channel',
+            title: '渠道',
+            header: <span data-annotation-id="stats-summary-channel-col">渠道</span>,
+            render: (r: SummaryRow) => r.channel,
+          },
+          { ...PAYMENT_COLUMN, render: () => '-' },
+          { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
+          { ...SETTLEMENT_PAYMENT_COLUMN, render: () => '-' },
+        ]
+      : [
+          { key: 'vendor', title: '厂商ID / 厂商名称', render: (r: SummaryRow) => <DualCell main={r.vendorName!} sub={r.vendorId!} /> },
+          PAYMENT_COLUMN,
+          { ...COL_ALIGN_RIGHT, key: 'totalRevenue', title: '总收入', render: (r: SummaryRow) => SETTLEMENT_AMOUNT(r.totalRevenue) },
+          SETTLEMENT_PAYMENT_COLUMN,
+        ];
+
+  const handleExport = () => {
+    const exportRows = rows.map((row) => rowToExport(row, dimension));
+    const date = formatDateTime().slice(0, 10);
+    downloadCsv(
+      `收入汇总统计-${DIMENSION_LABEL[dimension]}-${date}.csv`,
+      getExportHeaders(dimension),
+      exportRows,
+    );
+    setToast({ message: '导出成功', type: 'success' });
+  };
+
+  return (
+    <div className="agf-card">
+      <div data-annotation-id="stats-summary-query">
+        <FilterBar>
+          <select
+            className="agf-select"
+            value={dimension}
+            onChange={(e) => setDimension(e.target.value as QueryDimension)}
+            aria-label="查询维度"
+          >
+            {DIMENSION_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <ListSearchFields mode="gameAndVendor" value={search} onChange={setSearch} />
+          <button
+            type="button"
+            className="agf-btn agf-btn--primary"
+            data-annotation-id="stats-summary-export"
+            onClick={handleExport}
+          >
+            导出
+          </button>
+        </FilterBar>
+      </div>
+      <div data-annotation-id="stats-summary-table">
+      <DataTable key={dimension} rowKey={(r) => r.id} data={rows} columns={columns} leadingRow={leadingRow} />
+      </div>
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
+    </div>
+  );
+}
